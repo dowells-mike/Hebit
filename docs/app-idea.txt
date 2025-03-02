@@ -1,0 +1,41 @@
+What
+The goal of this project is to develop a highly adaptive productivity app that
+combines task management, goal setting, and habit tracking with a unique
+level of personalization. The app will use sophisticated algorithms to
+analyze user behavior and deliver tailored recommendations, smart
+reminders, and dynamic scheduling suggestions. Gamified elements, like
+rewards, badges, and streaks, will encourage long-term engagement and
+productivity. Additionally, the app will support offline functionality with
+data syncing across devices for multi-platform integration.
+Why
+Most existing productivity apps fall short of offering both comprehensive
+task management and habit tracking in an adaptable way. They either lack
+personalization or limit their scope to simplistic reminders and lists. My goal
+is to design an app that dynamically adapts to individual productivity
+patterns, that will provide insights which encourage better time
+management and goal achievement. I believe this project will be challenging
+while also aligning with my interest in Data Structures, making it the perfect
+opportunity to demonstrate what I’ve learned throughout these years in
+Griffith.
+How
+To achieve this level of complexity, I will implement a three-layer
+architecture: frontend, backend, and database, with a focus on algorithmic
+adaptation and intelligent scheduling. The following technologies might not
+be definitive and I might replace some in the course of my project;
+Frontend: Kotlin (with Jetpack Compose), Material Design components,
+MotionLayout, Retrofit (API requests)
+Backend: Node.js (express), GraphQL API, Socket.io (real time data syncs)
+Database: Firebase Firestore, Redis, AWS RDS (PostgreSQL)
+Agorithmic Complexity: depends on the particular module of the app. But
+the main ones are: smart task prioritization, habit recommendation and
+notificiation timing adjustments based on usage patterns.
+Analytics: Firebase Analytics, BigQuery, Firebase predictions
+Notifications: Firebase Cloud Messaging, Firebase Remote Config
+Testing: Github Actions, Jest and Cypress, Firebase Test Lab
+References:
+-Any.do: A task manager with basic reminders and team collaboration, but
+lacking advanced personalization or habit-tracking features.
+-Habitica: A gamified habit-building app that lacks personalized
+recommendations or detailed task management features.
+-Todoist: A popular task manager that lacks habit tracking, gamification,
+and personalized scheduling optimizations.
