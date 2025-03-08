@@ -1,0 +1,331 @@
+package com.hebit.app.ui.screens.tasks
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.dp
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TaskListScreen(
+    onNavigateBack: () -> Unit
+) {
+    // Mock tasks data - would come from ViewModel in real app
+    val tasks = remember {
+        mutableStateListOf(
+            TaskItem(id = "1", title = "Complete project plan", completed = false, priority = TaskPriority.HIGH),
+            TaskItem(id = "2", title = "Review pull requests", completed = true, priority = TaskPriority.MEDIUM),
+            TaskItem(id = "3", title = "Schedule team meeting", completed = false, priority = TaskPriority.LOW),
+            TaskItem(id = "4", title = "Update documentation", completed = false, priority = TaskPriority.MEDIUM),
+            TaskItem(id = "5", title = "Prepare presentation", completed = false, priority = TaskPriority.HIGH)
+        )
+    }
+    
+    var showAddTaskDialog by remember { mutableStateOf(false) }
+    
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Tasks") },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = { showAddTaskDialog = true }) {
+                Icon(Icons.Default.Add, contentDescription = "Add Task")
+            }
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            // Statistics summary
+            TaskStatsCard(
+                totalTasks = tasks.size,
+                completedTasks = tasks.count { it.completed },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            )
+            
+            // Task list
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(tasks, key = { it.id }) { task ->
+                    TaskItem(
+                        task = task,
+                        onTaskToggle = { taskId ->
+                            // Find and toggle the task's completed status
+                            val index = tasks.indexOfFirst { it.id == taskId }
+                            if (index != -1) {
+                                tasks[index] = tasks[index].copy(completed = !tasks[index].completed)
+                            }
+                        },
+                        onTaskDelete = { taskId ->
+                            // Remove the task from the list
+                            tasks.removeIf { it.id == taskId }
+                        }
+                    )
+                }
+            }
+        }
+        
+        // Add task dialog
+        if (showAddTaskDialog) {
+            AddTaskDialog(
+                onDismiss = { showAddTaskDialog = false },
+                onTaskAdd = { title, priority ->
+                    if (title.isNotBlank()) {
+                        val newTask = TaskItem(
+                            id = (tasks.size + 1).toString(),
+                            title = title,
+                            completed = false,
+                            priority = priority
+                        )
+                        tasks.add(0, newTask)
+                        showAddTaskDialog = false
+                    }
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun TaskStatsCard(
+    totalTasks: Int,
+    completedTasks: Int,
+    modifier: Modifier = Modifier
+) {
+    Card(modifier = modifier) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = totalTasks.toString(),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(text = "Total", style = MaterialTheme.typography.bodyMedium)
+            }
+            
+            Divider(
+                modifier = Modifier
+                    .height(36.dp)
+                    .width(1.dp),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+            )
+            
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = completedTasks.toString(),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+                Text(text = "Completed", style = MaterialTheme.typography.bodyMedium)
+            }
+            
+            Divider(
+                modifier = Modifier
+                    .height(36.dp)
+                    .width(1.dp),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+            )
+            
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = (totalTasks - completedTasks).toString(),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = if (totalTasks - completedTasks > 0) 
+                        MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary
+                )
+                Text(text = "Pending", style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TaskItem(
+    task: TaskItem,
+    onTaskToggle: (String) -> Unit,
+    onTaskDelete: (String) -> Unit
+) {
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = { onTaskToggle(task.id) }
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Priority indicator
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .padding(end = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                val color = when (task.priority) {
+                    TaskPriority.HIGH -> MaterialTheme.colorScheme.error
+                    TaskPriority.MEDIUM -> MaterialTheme.colorScheme.tertiary
+                    TaskPriority.LOW -> MaterialTheme.colorScheme.secondary
+                }
+                Surface(
+                    modifier = Modifier.size(12.dp),
+                    color = color,
+                    shape = MaterialTheme.shapes.small
+                ) {}
+            }
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            // Checkbox
+            Checkbox(
+                checked = task.completed,
+                onCheckedChange = { onTaskToggle(task.id) }
+            )
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            // Task title
+            Text(
+                text = task.title,
+                style = MaterialTheme.typography.bodyLarge,
+                textDecoration = if (task.completed) TextDecoration.LineThrough else TextDecoration.None,
+                modifier = Modifier.weight(1f)
+            )
+            
+            // Delete button
+            IconButton(onClick = { showDeleteConfirm = true }) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete",
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+    }
+    
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete Task") },
+            text = { Text("Are you sure you want to delete this task?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onTaskDelete(task.id)
+                        showDeleteConfirm = false
+                    }
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun AddTaskDialog(
+    onDismiss: () -> Unit,
+    onTaskAdd: (String, TaskPriority) -> Unit
+) {
+    var taskTitle by remember { mutableStateOf("") }
+    var selectedPriority by remember { mutableStateOf(TaskPriority.MEDIUM) }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add New Task") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = taskTitle,
+                    onValueChange = { taskTitle = it },
+                    label = { Text("Task title") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text("Priority", style = MaterialTheme.typography.bodyMedium)
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    PriorityOptions.forEach { priority ->
+                        FilterChip(
+                            selected = selectedPriority == priority,
+                            onClick = { selectedPriority = priority },
+                            label = { Text(priority.name.capitalize()) }
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onTaskAdd(taskTitle, selectedPriority) },
+                enabled = taskTitle.isNotBlank()
+            ) {
+                Text("Add")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+// Helper for capitalization
+private fun String.capitalize(): String {
+    return this.lowercase().replaceFirstChar { it.uppercase() }
+}
+
+// Domain models
+data class TaskItem(
+    val id: String,
+    val title: String,
+    val completed: Boolean = false,
+    val priority: TaskPriority = TaskPriority.MEDIUM
+)
+
+enum class TaskPriority {
+    LOW, MEDIUM, HIGH
+}
+
+val PriorityOptions = listOf(TaskPriority.LOW, TaskPriority.MEDIUM, TaskPriority.HIGH)
