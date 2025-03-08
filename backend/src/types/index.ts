@@ -5,6 +5,7 @@ export interface UserDocument {
   name: string;
   email: string;
   password: string;
+  isAdmin?: boolean;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
