@@ -12,16 +12,45 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.hebit.app.domain.model.Resource
+import kotlinx.coroutines.flow.collectAsState
 
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
-    onRegisterClick: () -> Unit
+    onRegisterClick: () -> Unit,
+    viewModel: AuthViewModel = hiltViewModel()
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    
+    val loginState by viewModel.loginState.collectAsState()
+    
+    // Check login state
+    LaunchedEffect(loginState) {
+        when (loginState) {
+            is Resource.Success -> {
+                onLoginSuccess()
+                // Reset login state after successful login
+                viewModel.resetLoginState()
+            }
+            is Resource.Error -> {
+                errorMessage = loginState.message
+            }
+            is Resource.Loading -> {
+                // Do nothing while loading
+            }
+        }
+    }
+    
+    // Check if already logged in on screen enter
+    LaunchedEffect(Unit) {
+        if (viewModel.isLoggedIn()) {
+            onLoginSuccess()
+        }
+    }
     
     Column(
         modifier = Modifier
@@ -83,29 +112,24 @@ fun LoginScreen(
         // Login Button
         Button(
             onClick = {
-                // Mock login functionality for now
-                isLoading = true
-                // Simulate network delay
-                // In a real app, we would call the login API
-                // For now, just navigate to dashboard after a delay
+                // Clear previous error message
                 errorMessage = null
                 
                 // Simple validation
                 if (email.isBlank() || password.isBlank()) {
                     errorMessage = "Please enter both email and password"
-                    isLoading = false
                     return@Button
                 }
                 
-                // For demo purposes only - in real app we'd authenticate with backend
-                onLoginSuccess()
+                // Call login method from view model
+                viewModel.login(email, password)
             },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp),
-            enabled = !isLoading
+            enabled = loginState !is Resource.Loading
         ) {
-            if (isLoading) {
+            if (loginState is Resource.Loading) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(24.dp),
                     color = MaterialTheme.colorScheme.onPrimary
