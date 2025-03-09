@@ -243,17 +243,17 @@ fun TaskListScreen(
             }
         }
         
-        // Add task dialog
+        // Task creation screen
         if (showAddTaskDialog) {
-            AddTaskDialog(
+            TaskCreationScreen(
                 onDismiss = { showAddTaskDialog = false },
-                onTaskAdd = { title, priority ->
-                    if (title.isNotBlank()) {
+                onSaveTask = { taskData ->
+                    if (taskData.title.isNotBlank()) {
                         val newTask = TaskItem(
                             id = (tasks.size + 1).toString(),
-                            title = title,
+                            title = taskData.title,
                             completed = false,
-                            priority = priority
+                            priority = taskData.priority
                         )
                         tasks.add(0, newTask)
                         showAddTaskDialog = false
