@@ -13,6 +13,8 @@ import com.hebit.app.ui.screens.auth.LoginScreen
 import com.hebit.app.ui.screens.auth.RegistrationScreen
 import com.hebit.app.ui.screens.auth.SplashScreen
 import com.hebit.app.ui.screens.dashboard.DashboardScreen
+import com.hebit.app.ui.screens.dashboard.ProgressStatsScreen
+import com.hebit.app.ui.screens.dashboard.QuickActionsScreen
 import com.hebit.app.ui.screens.habits.HabitListScreen
 import com.hebit.app.ui.screens.tasks.TaskListScreen
 import com.hebit.app.ui.screens.goals.GoalListScreen
@@ -30,6 +32,8 @@ object Routes {
     
     // Main app screens
     const val DASHBOARD = "dashboard"
+    const val QUICK_ACTIONS = "quick_actions"
+    const val PROGRESS_STATS = "progress_stats"
     const val TASKS = "tasks"
     const val HABITS = "habits"
     const val GOALS = "goals"
@@ -101,7 +105,9 @@ fun HebitNavigation(
                 onTasksClick = { navController.navigate(Routes.TASKS) },
                 onHabitsClick = { navController.navigate(Routes.HABITS) },
                 onGoalsClick = { navController.navigate(Routes.GOALS) },
-                onSettingsClick = { navController.navigate(Routes.SETTINGS) }
+                onSettingsClick = { navController.navigate(Routes.SETTINGS) },
+                onQuickActionsClick = { navController.navigate(Routes.QUICK_ACTIONS) },
+                onProgressStatsClick = { navController.navigate(Routes.PROGRESS_STATS) }
             )
         }
         
@@ -123,6 +129,36 @@ fun HebitNavigation(
             )
         }
 
+        composable(Routes.QUICK_ACTIONS) {
+            QuickActionsScreen(
+                onNavigateBack = { navController.navigateUp() },
+                onHomeClick = { 
+                    navController.navigate(Routes.DASHBOARD) {
+                        popUpTo(Routes.DASHBOARD) { inclusive = true }
+                    }
+                },
+                onTasksClick = { navController.navigate(Routes.TASKS) },
+                onHabitsClick = { navController.navigate(Routes.HABITS) },
+                onGoalsClick = { navController.navigate(Routes.GOALS) },
+                onProfileClick = { navController.navigate(Routes.SETTINGS) }
+            )
+        }
+        
+        composable(Routes.PROGRESS_STATS) {
+            ProgressStatsScreen(
+                onNavigateBack = { navController.navigateUp() },
+                onHomeClick = { 
+                    navController.navigate(Routes.DASHBOARD) {
+                        popUpTo(Routes.DASHBOARD) { inclusive = true }
+                    }
+                },
+                onTasksClick = { navController.navigate(Routes.TASKS) },
+                onHabitsClick = { navController.navigate(Routes.HABITS) },
+                onGoalsClick = { navController.navigate(Routes.GOALS) },
+                onProfileClick = { navController.navigate(Routes.SETTINGS) }
+            )
+        }
+        
         composable(Routes.SETTINGS) {
             SettingsScreen(
                 onNavigateBack = { navController.navigateUp() }
