@@ -96,12 +96,13 @@ fun RegistrationScreen(
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp),
+                    .heightIn(min = 56.dp),
                 keyboardOptions = KeyboardOptions.Default.copy(
                     imeAction = ImeAction.Next,
                     keyboardType = KeyboardType.Email
                 ),
-                isError = errorMessage != null && email.isBlank()
+                isError = errorMessage != null && email.isBlank(),
+                textStyle = MaterialTheme.typography.bodyLarge
             )
             
             if (email.isNotBlank() && !isValidEmail(email)) {
@@ -125,7 +126,7 @@ fun RegistrationScreen(
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp),
+                    .heightIn(min = 56.dp),
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions.Default.copy(
                     imeAction = ImeAction.Next,
@@ -139,7 +140,8 @@ fun RegistrationScreen(
                         )
                     }
                 },
-                isError = errorMessage != null && password.isBlank()
+                isError = errorMessage != null && password.isBlank(),
+                textStyle = MaterialTheme.typography.bodyLarge
             )
             
             // Password strength indicator
@@ -188,7 +190,7 @@ fun RegistrationScreen(
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp),
+                    .heightIn(min = 56.dp),
                 visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions.Default.copy(
                     imeAction = ImeAction.Done,
@@ -202,7 +204,8 @@ fun RegistrationScreen(
                         )
                     }
                 },
-                isError = confirmPassword.isNotBlank() && password != confirmPassword
+                isError = confirmPassword.isNotBlank() && password != confirmPassword,
+                textStyle = MaterialTheme.typography.bodyLarge
             )
             
             if (confirmPassword.isNotBlank() && password != confirmPassword) {

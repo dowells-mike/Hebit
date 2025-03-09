@@ -91,12 +91,13 @@ fun LoginScreen(
             singleLine = true,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp),
+                .heightIn(min = 56.dp),
             keyboardOptions = KeyboardOptions.Default.copy(
                 imeAction = ImeAction.Next,
                 keyboardType = KeyboardType.Email
             ),
-            isError = errorMessage != null && email.isBlank()
+            isError = errorMessage != null && email.isBlank(),
+            textStyle = MaterialTheme.typography.bodyLarge
         )
         
         Spacer(modifier = Modifier.height(16.dp))
@@ -109,7 +110,7 @@ fun LoginScreen(
             singleLine = true,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp),
+                .heightIn(min = 56.dp),
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions.Default.copy(
                 imeAction = ImeAction.Done,
@@ -123,7 +124,8 @@ fun LoginScreen(
                     )
                 }
             },
-            isError = errorMessage != null && password.isBlank()
+            isError = errorMessage != null && password.isBlank(),
+            textStyle = MaterialTheme.typography.bodyLarge
         )
         
         Spacer(modifier = Modifier.height(16.dp))

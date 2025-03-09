@@ -83,12 +83,13 @@ fun ForgotPasswordScreen(
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp),
+                        .heightIn(min = 56.dp),
                     keyboardOptions = KeyboardOptions.Default.copy(
                         keyboardType = KeyboardType.Email,
                         imeAction = ImeAction.Done
                     ),
-                    isError = errorMessage != null
+                    isError = errorMessage != null,
+                    textStyle = MaterialTheme.typography.bodyLarge
                 )
                 
                 // Error message
