@@ -8,6 +8,8 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import androidx.navigation.NavType
 import com.hebit.app.ui.screens.auth.ForgotPasswordScreen
 import com.hebit.app.ui.screens.auth.LoginScreen
 import com.hebit.app.ui.screens.auth.RegistrationScreen
@@ -17,6 +19,9 @@ import com.hebit.app.ui.screens.dashboard.ProgressStatsScreen
 import com.hebit.app.ui.screens.dashboard.QuickActionsScreen
 import com.hebit.app.ui.screens.habits.HabitListScreen
 import com.hebit.app.ui.screens.tasks.TaskListScreen
+import com.hebit.app.ui.screens.tasks.TaskDetailScreen
+import com.hebit.app.ui.screens.tasks.TaskCategoriesScreen
+import com.hebit.app.ui.screens.tasks.TaskBoardScreen
 import com.hebit.app.ui.screens.goals.GoalListScreen
 import com.hebit.app.ui.screens.settings.SettingsScreen
 
@@ -35,6 +40,9 @@ object Routes {
     const val QUICK_ACTIONS = "quick_actions"
     const val PROGRESS_STATS = "progress_stats"
     const val TASKS = "tasks"
+    const val TASK_DETAIL = "task_detail"
+    const val TASK_CATEGORIES = "task_categories"
+    const val TASK_BOARD = "task_board"
     const val HABITS = "habits"
     const val GOALS = "goals"
     const val SETTINGS = "settings"
@@ -111,9 +119,69 @@ fun HebitNavigation(
             )
         }
         
+        // Task Screens
         composable(Routes.TASKS) {
             TaskListScreen(
-                onNavigateBack = { navController.navigateUp() }
+                onNavigateBack = { navController.navigateUp() },
+                onHomeClick = { navController.navigate(Routes.DASHBOARD) {
+                    popUpTo(Routes.DASHBOARD) { inclusive = true }
+                }},
+                onHabitsClick = { navController.navigate(Routes.HABITS) },
+                onGoalsClick = { navController.navigate(Routes.GOALS) },
+                onProfileClick = { navController.navigate(Routes.SETTINGS) },
+                onTaskCategoriesClick = { navController.navigate(Routes.TASK_CATEGORIES) },
+                onTaskBoardClick = { navController.navigate(Routes.TASK_BOARD) },
+                onTaskClick = { taskId -> 
+                    navController.navigate("${Routes.TASK_DETAIL}/$taskId")
+                }
+            )
+        }
+        
+        composable(
+            route = "${Routes.TASK_DETAIL}/{taskId}",
+            arguments = listOf(navArgument("taskId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val taskId = backStackEntry.arguments?.getString("taskId") ?: ""
+            TaskDetailScreen(
+                taskId = taskId,
+                onNavigateBack = { navController.navigateUp() },
+                onHomeClick = { navController.navigate(Routes.DASHBOARD) {
+                    popUpTo(Routes.DASHBOARD) { inclusive = true }
+                }},
+                onTasksClick = { navController.navigate(Routes.TASKS) },
+                onHabitsClick = { navController.navigate(Routes.HABITS) },
+                onGoalsClick = { navController.navigate(Routes.GOALS) },
+                onProfileClick = { navController.navigate(Routes.SETTINGS) }
+            )
+        }
+        
+        composable(Routes.TASK_CATEGORIES) {
+            TaskCategoriesScreen(
+                onNavigateBack = { navController.navigateUp() },
+                onCategorySelect = { /* Navigate to filtered tasks */ },
+                onHomeClick = { navController.navigate(Routes.DASHBOARD) {
+                    popUpTo(Routes.DASHBOARD) { inclusive = true }
+                }},
+                onTasksClick = { navController.navigate(Routes.TASKS) },
+                onHabitsClick = { navController.navigate(Routes.HABITS) },
+                onGoalsClick = { navController.navigate(Routes.GOALS) },
+                onProfileClick = { navController.navigate(Routes.SETTINGS) }
+            )
+        }
+        
+        composable(Routes.TASK_BOARD) {
+            TaskBoardScreen(
+                onNavigateBack = { navController.navigateUp() },
+                onTaskClick = { taskId -> 
+                    navController.navigate("${Routes.TASK_DETAIL}/$taskId")
+                },
+                onHomeClick = { navController.navigate(Routes.DASHBOARD) {
+                    popUpTo(Routes.DASHBOARD) { inclusive = true }
+                }},
+                onTasksClick = { navController.navigate(Routes.TASKS) },
+                onHabitsClick = { navController.navigate(Routes.HABITS) },
+                onGoalsClick = { navController.navigate(Routes.GOALS) },
+                onProfileClick = { navController.navigate(Routes.SETTINGS) }
             )
         }
         

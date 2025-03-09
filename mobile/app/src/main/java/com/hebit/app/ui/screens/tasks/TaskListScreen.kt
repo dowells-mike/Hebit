@@ -1,6 +1,9 @@
 package com.hebit.app.ui.screens.tasks
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import com.hebit.app.ui.components.BottomNavItem
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -15,7 +18,14 @@ import androidx.compose.ui.unit.dp
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaskListScreen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onHomeClick: () -> Unit = {},
+    onHabitsClick: () -> Unit = {},
+    onGoalsClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {},
+    onTaskCategoriesClick: () -> Unit = {},
+    onTaskBoardClick: () -> Unit = {},
+    onTaskClick: (String) -> Unit = {}
 ) {
     // Mock tasks data - would come from ViewModel in real app
     val tasks = remember {
@@ -30,13 +40,26 @@ fun TaskListScreen(
     
     var showAddTaskDialog by remember { mutableStateOf(false) }
     
+    var viewMode by remember { mutableStateOf(TaskViewMode.LIST) }
+    
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Tasks") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                actions = {
+                    // Search button
+                    IconButton(onClick = { /* Open search */ }) {
+                        Icon(Icons.Default.Search, contentDescription = "Search")
+                    }
+                    
+                    // Filter button
+                    IconButton(onClick = { /* Open filter */ }) {
+                        Icon(Icons.Default.FilterList, contentDescription = "Filter")
+                    }
+                    
+                    // Menu button
+                    IconButton(onClick = { /* Open menu */ }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "Menu")
                     }
                 }
             )
@@ -45,6 +68,49 @@ fun TaskListScreen(
             FloatingActionButton(onClick = { showAddTaskDialog = true }) {
                 Icon(Icons.Default.Add, contentDescription = "Add Task")
             }
+        },
+        bottomBar = {
+            BottomAppBar {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    BottomNavItem(
+                        icon = Icons.Default.Home,
+                        label = "Home",
+                        selected = false,
+                        onClick = onHomeClick
+                    )
+                    
+                    BottomNavItem(
+                        icon = Icons.Default.CheckCircle,
+                        label = "Tasks",
+                        selected = true,
+                        onClick = { /* Already on tasks */ }
+                    )
+                    
+                    BottomNavItem(
+                        icon = Icons.Default.Loop,
+                        label = "Habits",
+                        selected = false,
+                        onClick = onHabitsClick
+                    )
+                    
+                    BottomNavItem(
+                        icon = Icons.Default.Flag,
+                        label = "Goals",
+                        selected = false,
+                        onClick = onGoalsClick
+                    )
+                    
+                    BottomNavItem(
+                        icon = Icons.Default.Person,
+                        label = "Profile",
+                        selected = false,
+                        onClick = onProfileClick
+                    )
+                }
+            }
         }
     ) { paddingValues ->
         Column(
@@ -52,6 +118,79 @@ fun TaskListScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            // Search and filter row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Search field
+                OutlinedTextField(
+                    value = "",
+                    onValueChange = { },
+                    placeholder = { Text("Search tasks...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 48.dp),
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.medium
+                )
+                
+                Spacer(modifier = Modifier.width(8.dp))
+                
+                // Filter button
+                IconButton(onClick = { /* Show filter options */ }) {
+                    Icon(
+                        Icons.Default.FilterList,
+                        contentDescription = "Filter",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            
+            // View mode selector (List/Board)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.End
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Categories button
+                    TextButton(
+                        onClick = { onTaskCategoriesClick() }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Category,
+                            contentDescription = "Categories",
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Categories")
+                    }
+                    
+                    Spacer(modifier = Modifier.width(16.dp))
+                    
+                    // View mode selector
+                    SegmentedControl(
+                        items = listOf("List", "Board"),
+                        selectedIndex = if (viewMode == TaskViewMode.LIST) 0 else 1,
+                        onItemSelection = { index ->
+                            if (index == 0) {
+                                viewMode = TaskViewMode.LIST
+                            } else {
+                                // Navigate to Board view
+                                onTaskBoardClick()
+                            }
+                        }
+                    )
+                }
+            }
+            
             // Statistics summary
             TaskStatsCard(
                 totalTasks = tasks.size,
@@ -61,28 +200,46 @@ fun TaskListScreen(
                     .padding(16.dp)
             )
             
-            // Task list
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(tasks, key = { it.id }) { task ->
-                    TaskItem(
-                        task = task,
-                        onTaskToggle = { taskId ->
-                            // Find and toggle the task's completed status
-                            val index = tasks.indexOfFirst { it.id == taskId }
-                            if (index != -1) {
-                                tasks[index] = tasks[index].copy(completed = !tasks[index].completed)
-                            }
-                        },
-                        onTaskDelete = { taskId ->
-                            // Remove the task from the list
-                            tasks.removeIf { it.id == taskId }
+            // Task content based on view mode
+            if (viewMode == TaskViewMode.LIST) {
+                // List view
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(tasks, key = { it.id }) { task ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = { onTaskClick(task.id) }
+                        ) {
+                            TaskItem(
+                                task = task,
+                                onTaskToggle = { taskId ->
+                                    // Find and toggle the task's completed status
+                                    val index = tasks.indexOfFirst { it.id == taskId }
+                                    if (index != -1) {
+                                        tasks[index] = tasks[index].copy(completed = !tasks[index].completed)
+                                    }
+                                },
+                                onTaskDelete = { taskId ->
+                                    // Remove the task from the list
+                                    tasks.removeIf { it.id == taskId }
+                                }
+                            )
                         }
-                    )
+                    }
                 }
+            } else {
+                // Board view
+                Text(
+                    text = "Board View Coming Soon",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp)
+                        .align(Alignment.CenterHorizontally)
+                )
             }
         }
         
@@ -103,6 +260,51 @@ fun TaskListScreen(
                     }
                 }
             )
+        }
+    }
+}
+
+@Composable
+fun SegmentedControl(
+    items: List<String>,
+    selectedIndex: Int,
+    onItemSelection: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Row(
+            modifier = Modifier.height(36.dp)
+        ) {
+            items.forEachIndexed { index, item ->
+                val isSelected = index == selectedIndex
+                
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .let {
+                            if (isSelected) {
+                                it.background(MaterialTheme.colorScheme.primaryContainer)
+                            } else {
+                                it.background(MaterialTheme.colorScheme.surface)
+                            }
+                        }
+                        .clickable { onItemSelection(index) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = item,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (isSelected) 
+                            MaterialTheme.colorScheme.onPrimaryContainer 
+                        else 
+                            MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
         }
     }
 }
@@ -326,6 +528,10 @@ data class TaskItem(
 
 enum class TaskPriority {
     LOW, MEDIUM, HIGH
+}
+
+enum class TaskViewMode {
+    LIST, BOARD
 }
 
 val PriorityOptions = listOf(TaskPriority.LOW, TaskPriority.MEDIUM, TaskPriority.HIGH)
