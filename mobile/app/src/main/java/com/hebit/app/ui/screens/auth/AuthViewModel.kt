@@ -22,13 +22,14 @@ class AuthViewModel @Inject constructor(
     private val authRepository: AuthRepository
 ) : ViewModel() {
     
-    private val _loginState = MutableStateFlow<Resource<User>>(Resource.Loading())
+    // Initialize with empty state instead of loading to prevent showing loading indicators initially
+    private val _loginState = MutableStateFlow<Resource<User>>(Resource.Success(User("", "", "", false)))
     val loginState: StateFlow<Resource<User>> = _loginState
     
-    private val _registerState = MutableStateFlow<Resource<User>>(Resource.Loading())
+    private val _registerState = MutableStateFlow<Resource<User>>(Resource.Success(User("", "", "", false)))
     val registerState: StateFlow<Resource<User>> = _registerState
     
-    private val _resetPasswordState = MutableStateFlow<Resource<Boolean>>(Resource.Loading())
+    private val _resetPasswordState = MutableStateFlow<Resource<Boolean>>(Resource.Success(false))
     val resetPasswordState: StateFlow<Resource<Boolean>> = _resetPasswordState
     
     /**
@@ -96,20 +97,20 @@ class AuthViewModel @Inject constructor(
      * Reset login state
      */
     fun resetLoginState() {
-        _loginState.value = Resource.Loading()
+        _loginState.value = Resource.Success(User("", "", "", false))
     }
     
     /**
      * Reset register state
      */
     fun resetRegisterState() {
-        _registerState.value = Resource.Loading()
+        _registerState.value = Resource.Success(User("", "", "", false))
     }
     
     /**
      * Reset password reset state
      */
     fun resetPasswordResetState() {
-        _resetPasswordState.value = Resource.Loading()
+        _resetPasswordState.value = Resource.Success(false)
     }
 }
