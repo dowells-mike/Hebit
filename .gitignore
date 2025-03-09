@@ -9,6 +9,26 @@
 .externalNativeBuild
 .cxx
 
+# Documentation files to ignore
+docs/app-idea.txt
+docs/backend-architecture.md
+docs/backend-setup-part2.md
+docs/backend-setup.md
+docs/caching-strategy.md
+docs/data-privacy.md
+docs/database-relationships.md
+docs/deployment-cicd.md
+docs/error-handling.md
+docs/git-setup-guide.md
+docs/ml-research-guide.md
+docs/mobile-deployment.md
+docs/phase2-detailed-requirements.md
+docs/project-initialization-guide.md
+docs/project-setup.md
+docs/security-measures.md
+docs/supervisor-meeting-overview.md
+docs/updated-gradle-config.md
+
 # Node.js
 node_modules/
 npm-debug.log
