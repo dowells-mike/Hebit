@@ -6,6 +6,7 @@ import com.hebit.app.data.repository.AuthRepository
 import com.hebit.app.domain.model.Resource
 import com.hebit.app.domain.model.User
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.launchIn
@@ -26,6 +27,9 @@ class AuthViewModel @Inject constructor(
     
     private val _registerState = MutableStateFlow<Resource<User>>(Resource.Loading())
     val registerState: StateFlow<Resource<User>> = _registerState
+    
+    private val _resetPasswordState = MutableStateFlow<Resource<Boolean>>(Resource.Loading())
+    val resetPasswordState: StateFlow<Resource<Boolean>> = _resetPasswordState
     
     /**
      * Login with email and password
@@ -50,6 +54,27 @@ class AuthViewModel @Inject constructor(
                     _registerState.value = result
                 }
                 .launchIn(viewModelScope)
+        }
+    }
+    
+    /**
+     * Request password reset
+     * 
+     * Note: This is a simulated implementation since we don't have a real backend yet.
+     * In a real app, this would call the repository to make an API request.
+     */
+    fun resetPassword(email: String, onComplete: () -> Unit) {
+        viewModelScope.launch {
+            _resetPasswordState.value = Resource.Loading()
+            
+            // Simulate network delay
+            delay(1500)
+            
+            // For demo purposes, always succeed
+            _resetPasswordState.value = Resource.Success(true)
+            
+            // Call the completion callback
+            onComplete()
         }
     }
     
@@ -79,5 +104,12 @@ class AuthViewModel @Inject constructor(
      */
     fun resetRegisterState() {
         _registerState.value = Resource.Loading()
+    }
+    
+    /**
+     * Reset password reset state
+     */
+    fun resetPasswordResetState() {
+        _resetPasswordState.value = Resource.Loading()
     }
 }

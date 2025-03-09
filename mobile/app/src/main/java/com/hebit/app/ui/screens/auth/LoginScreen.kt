@@ -1,29 +1,42 @@
 package com.hebit.app.ui.screens.auth
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.hebit.app.R
 import com.hebit.app.domain.model.Resource
-import kotlinx.coroutines.flow.collectAsState
 
+/**
+ * Login screen implementation based on wireframe specifications
+ */
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
     onRegisterClick: () -> Unit,
+    onForgotPasswordClick: () -> Unit,
     viewModel: AuthViewModel = hiltViewModel()
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var rememberMe by remember { mutableStateOf(false) }
+    var passwordVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     
     val loginState by viewModel.loginState.collectAsState()
@@ -55,45 +68,86 @@ fun LoginScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(horizontal = 24.dp, vertical = 48.dp)
             .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // App Logo/Title
-        Text(
-            text = "Hebit",
-            style = MaterialTheme.typography.headlineLarge,
-            color = MaterialTheme.colorScheme.primary
+        // App Logo
+        Image(
+            painter = painterResource(id = R.drawable.ic_shield), // Replace with your app logo
+            contentDescription = "Hebit App Logo",
+            modifier = Modifier
+                .size(100.dp)
+                .padding(8.dp)
         )
         
-        Spacer(modifier = Modifier.height(48.dp))
+        Spacer(modifier = Modifier.height(32.dp))
         
-        // Login Form
+        // Email Input Field
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
             label = { Text("Email") },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp),
             keyboardOptions = KeyboardOptions.Default.copy(
-                imeAction = ImeAction.Next
-            )
+                imeAction = ImeAction.Next,
+                keyboardType = KeyboardType.Email
+            ),
+            isError = errorMessage != null && email.isBlank()
         )
         
         Spacer(modifier = Modifier.height(16.dp))
         
+        // Password Input Field
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
             label = { Text("Password") },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-            visualTransformation = PasswordVisualTransformation(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp),
+            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions.Default.copy(
-                imeAction = ImeAction.Done
-            )
+                imeAction = ImeAction.Done,
+                keyboardType = KeyboardType.Password
+            ),
+            trailingIcon = {
+                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                    Icon(
+                        imageVector = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                        contentDescription = if (passwordVisible) "Hide password" else "Show password"
+                    )
+                }
+            },
+            isError = errorMessage != null && password.isBlank()
         )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Remember Me Checkbox
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Checkbox(
+                checked = rememberMe,
+                onCheckedChange = { rememberMe = it },
+                modifier = Modifier.size(24.dp)
+            )
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            Text(
+                text = "Remember me",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            
+            Spacer(modifier = Modifier.weight(1f))
+        }
         
         Spacer(modifier = Modifier.height(8.dp))
         
@@ -108,6 +162,8 @@ fun LoginScreen(
             )
             Spacer(modifier = Modifier.height(8.dp))
         }
+        
+        Spacer(modifier = Modifier.height(8.dp))
         
         // Login Button
         Button(
@@ -126,7 +182,7 @@ fun LoginScreen(
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(50.dp),
+                .height(48.dp),
             enabled = loginState !is Resource.Loading
         ) {
             if (loginState is Resource.Loading) {
@@ -135,11 +191,40 @@ fun LoginScreen(
                     color = MaterialTheme.colorScheme.onPrimary
                 )
             } else {
-                Text("Login")
+                Text("Log In")
             }
         }
         
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        // Google Sign-In Button
+        OutlinedButton(
+            onClick = { /* Handle Google sign-in */ },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_google), // Add a Google icon
+                contentDescription = "Google icon",
+                modifier = Modifier.size(24.dp)
+            )
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            Text("Continue with Google")
+        }
+        
         Spacer(modifier = Modifier.height(16.dp))
+        
+        // Forgot Password Link
+        TextButton(
+            onClick = { onForgotPasswordClick() }
+        ) {
+            Text("Forgot password?")
+        }
+        
+        Spacer(modifier = Modifier.weight(1f))
         
         // Register Link
         TextButton(
