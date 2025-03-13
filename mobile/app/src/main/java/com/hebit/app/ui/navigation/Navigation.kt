@@ -18,6 +18,8 @@ import com.hebit.app.ui.screens.dashboard.DashboardScreen
 import com.hebit.app.ui.screens.dashboard.ProgressStatsScreen
 import com.hebit.app.ui.screens.dashboard.QuickActionsScreen
 import com.hebit.app.ui.screens.habits.HabitListScreen
+import com.hebit.app.ui.screens.habits.HabitDetailScreen
+import com.hebit.app.ui.screens.habits.HabitStreakScreen
 import com.hebit.app.ui.screens.tasks.TaskListScreen
 import com.hebit.app.ui.screens.tasks.TaskDetailScreen
 import com.hebit.app.ui.screens.tasks.TaskCategoriesScreen
@@ -44,6 +46,8 @@ object Routes {
     const val TASK_CATEGORIES = "task_categories"
     const val TASK_BOARD = "task_board"
     const val HABITS = "habits"
+    const val HABIT_DETAIL = "habit_detail"
+    const val HABIT_STREAK = "habit_streak"
     const val GOALS = "goals"
     const val SETTINGS = "settings"
 }
@@ -185,9 +189,58 @@ fun HebitNavigation(
             )
         }
         
+        // Habit Screens
         composable(Routes.HABITS) {
             HabitListScreen(
-                onNavigateBack = { navController.navigateUp() }
+                onNavigateBack = { navController.navigateUp() },
+                onHomeClick = { navController.navigate(Routes.DASHBOARD) {
+                    popUpTo(Routes.DASHBOARD) { inclusive = true }
+                }},
+                onTasksClick = { navController.navigate(Routes.TASKS) },
+                onGoalsClick = { navController.navigate(Routes.GOALS) },
+                onProfileClick = { navController.navigate(Routes.SETTINGS) },
+                onHabitClick = { habitId ->
+                    navController.navigate("${Routes.HABIT_DETAIL}/$habitId")
+                }
+            )
+        }
+        
+        composable(
+            route = "${Routes.HABIT_DETAIL}/{habitId}",
+            arguments = listOf(navArgument("habitId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val habitId = backStackEntry.arguments?.getString("habitId") ?: ""
+            HabitDetailScreen(
+                habitId = habitId,
+                onNavigateBack = { navController.navigateUp() },
+                onHomeClick = { navController.navigate(Routes.DASHBOARD) {
+                    popUpTo(Routes.DASHBOARD) { inclusive = true }
+                }},
+                onTasksClick = { navController.navigate(Routes.TASKS) },
+                onHabitsClick = { navController.navigate(Routes.HABITS) },
+                onGoalsClick = { navController.navigate(Routes.GOALS) },
+                onProfileClick = { navController.navigate(Routes.SETTINGS) },
+                onStreakClick = { 
+                    navController.navigate("${Routes.HABIT_STREAK}/$habitId")
+                }
+            )
+        }
+        
+        composable(
+            route = "${Routes.HABIT_STREAK}/{habitId}",
+            arguments = listOf(navArgument("habitId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val habitId = backStackEntry.arguments?.getString("habitId") ?: ""
+            HabitStreakScreen(
+                habitId = habitId,
+                onNavigateBack = { navController.navigateUp() },
+                onHomeClick = { navController.navigate(Routes.DASHBOARD) {
+                    popUpTo(Routes.DASHBOARD) { inclusive = true }
+                }},
+                onTasksClick = { navController.navigate(Routes.TASKS) },
+                onHabitsClick = { navController.navigate(Routes.HABITS) },
+                onGoalsClick = { navController.navigate(Routes.GOALS) },
+                onProfileClick = { navController.navigate(Routes.SETTINGS) }
             )
         }
 

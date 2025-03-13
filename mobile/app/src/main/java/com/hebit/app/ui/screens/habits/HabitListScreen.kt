@@ -2,74 +2,128 @@ package com.hebit.app.ui.screens.habits
 
 import android.os.Build
 import androidx.annotation.RequiresApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.hebit.app.ui.components.BottomNavItem
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HabitListScreen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onHabitClick: (String) -> Unit = {},
+    onHomeClick: () -> Unit = {},
+    onTasksClick: () -> Unit = {},
+    onGoalsClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {}
 ) {
     // Mock habits data - would come from ViewModel in real app
     val habits = remember {
         mutableStateListOf(
             HabitItem(
                 id = "1",
-                title = "Morning Meditation",
-                description = "10 minutes mindfulness meditation",
+                title = "Morning Workout",
+                category = HabitCategory.FITNESS,
                 frequency = HabitFrequency.DAILY,
-                streak = 5
+                time = "6:00 AM",
+                streak = 5,
+                completedToday = false
             ),
             HabitItem(
                 id = "2",
-                title = "Read a book",
-                description = "Read at least 30 minutes",
+                title = "Read 30 minutes",
+                category = HabitCategory.EDUCATION,
                 frequency = HabitFrequency.DAILY,
-                streak = 3
+                time = "Evening",
+                streak = 12,
+                completedToday = true
             ),
             HabitItem(
                 id = "3",
                 title = "Weekly Review",
-                description = "Review goals and progress",
+                category = HabitCategory.PRODUCTIVITY,
                 frequency = HabitFrequency.WEEKLY,
-                streak = 2
+                time = null,
+                streak = 4,
+                completedToday = false
             ),
             HabitItem(
                 id = "4",
-                title = "Exercise",
-                description = "30 minutes workout",
+                title = "Meditation",
+                category = HabitCategory.MINDFULNESS,
                 frequency = HabitFrequency.DAILY,
-                streak = 8
+                time = "8:00 AM",
+                streak = 8,
+                completedToday = true
             ),
             HabitItem(
                 id = "5",
-                title = "Study Language",
-                description = "Practice for 20 minutes",
+                title = "Drink Water",
+                category = HabitCategory.HEALTH,
                 frequency = HabitFrequency.DAILY,
-                streak = 4
+                time = null,
+                streak = 9,
+                completedToday = false
+            ),
+            HabitItem(
+                id = "6",
+                title = "Journal",
+                category = HabitCategory.MINDFULNESS,
+                frequency = HabitFrequency.DAILY,
+                time = "9:30 PM",
+                streak = 3,
+                completedToday = false
             )
         )
     }
     
     var showAddHabitDialog by remember { mutableStateOf(false) }
+    var selectedCategory by remember { mutableStateOf<HabitCategory?>(null) }
+    
+    // Calculate completed habits
+    val completedHabits = habits.count { it.completedToday }
+    val totalHabits = habits.size
+    val completionRate = if (totalHabits > 0) completedHabits.toFloat() / totalHabits else 0f
+    
+    val currentDate = remember { LocalDate.now() }
+    val dateFormatter = remember { DateTimeFormatter.ofPattern("MMMM d, yyyy") }
     
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Habits") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                actions = {
+                    // Search button
+                    IconButton(onClick = { /* Open search */ }) {
+                        Icon(Icons.Default.Search, contentDescription = "Search")
+                    }
+                    
+                    // Filter button
+                    IconButton(onClick = { /* Open filter */ }) {
+                        Icon(Icons.Default.FilterList, contentDescription = "Filter")
+                    }
+                    
+                    // Menu button
+                    IconButton(onClick = { /* Open menu */ }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "Menu")
                     }
                 }
             )
@@ -78,44 +132,98 @@ fun HabitListScreen(
             FloatingActionButton(onClick = { showAddHabitDialog = true }) {
                 Icon(Icons.Default.Add, contentDescription = "Add Habit")
             }
+        },
+        bottomBar = {
+            BottomAppBar {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    BottomNavItem(
+                        icon = Icons.Default.Home,
+                        label = "Home",
+                        selected = false,
+                        onClick = onHomeClick
+                    )
+                    
+                    BottomNavItem(
+                        icon = Icons.Default.CheckCircle,
+                        label = "Tasks",
+                        selected = false,
+                        onClick = onTasksClick
+                    )
+                    
+                    BottomNavItem(
+                        icon = Icons.Default.Loop,
+                        label = "Habits",
+                        selected = true,
+                        onClick = { /* Already on habits */ }
+                    )
+                    
+                    BottomNavItem(
+                        icon = Icons.Default.Flag,
+                        label = "Goals",
+                        selected = false,
+                        onClick = onGoalsClick
+                    )
+                    
+                    BottomNavItem(
+                        icon = Icons.Default.Person,
+                        label = "Profile",
+                        selected = false,
+                        onClick = onProfileClick
+                    )
+                }
+            }
         }
     ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .padding(horizontal = 16.dp)
         ) {
-            // Habits summary card
-            HabitsSummaryCard(
-                habits = habits,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
+            // Category tabs
+            CategoriesRow(
+                selectedCategory = selectedCategory,
+                onCategorySelected = { selectedCategory = it }
+            )
+            
+            // Progress card
+            ProgressCard(
+                date = currentDate.format(dateFormatter),
+                completedCount = completedHabits,
+                totalCount = totalHabits,
+                completionRate = completionRate
             )
             
             // Habit list
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(habits, key = { it.id }) { habit ->
-                    HabitCard(
+                val filteredHabits = if (selectedCategory != null) {
+                    habits.filter { it.category == selectedCategory }
+                } else {
+                    habits
+                }
+                
+                items(filteredHabits, key = { it.id }) { habit ->
+                    HabitListItem(
                         habit = habit,
-                        onMarkComplete = { habitId ->
-                            // Mark habit as complete for today
+                        onHabitClick = { onHabitClick(habit.id) },
+                        onToggleComplete = { habitId ->
                             val index = habits.indexOfFirst { it.id == habitId }
                             if (index != -1) {
+                                // Toggle completed status
                                 val updatedHabit = habits[index].copy(
-                                    lastCompleted = LocalDate.now(), 
-                                    streak = habits[index].streak + 1
+                                    completedToday = !habits[index].completedToday,
+                                    // Increment streak if completing, don't decrement if uncompleting
+                                    streak = if (!habits[index].completedToday) habits[index].streak + 1 else habits[index].streak
                                 )
                                 habits[index] = updatedHabit
                             }
-                        },
-                        onDeleteHabit = { habitId ->
-                            // Remove habit from list
-                            habits.removeIf { it.id == habitId }
                         }
                     )
                 }
@@ -124,20 +232,11 @@ fun HabitListScreen(
         
         // Add habit dialog
         if (showAddHabitDialog) {
-            AddHabitDialog(
+            HabitCreationDialog(
                 onDismiss = { showAddHabitDialog = false },
-                onHabitAdd = { title, description, frequency ->
-                    if (title.isNotBlank()) {
-                        val newHabit = HabitItem(
-                            id = (habits.size + 1).toString(),
-                            title = title,
-                            description = description,
-                            frequency = frequency,
-                            streak = 0
-                        )
-                        habits.add(0, newHabit)
-                        showAddHabitDialog = false
-                    }
+                onHabitCreate = { newHabit ->
+                    habits.add(0, newHabit.copy(id = (habits.size + 1).toString()))
+                    showAddHabitDialog = false
                 }
             )
         }
@@ -145,252 +244,371 @@ fun HabitListScreen(
 }
 
 @Composable
-fun HabitsSummaryCard(
-    habits: List<HabitItem>,
-    modifier: Modifier = Modifier
+fun CategoriesRow(
+    selectedCategory: HabitCategory?,
+    onCategorySelected: (HabitCategory?) -> Unit
 ) {
-    Card(modifier = modifier) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = habits.size.toString(),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(text = "Total Habits", style = MaterialTheme.typography.bodyMedium)
-            }
-            
-            Divider(
-                modifier = Modifier
-                    .height(36.dp)
-                    .width(1.dp),
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+    LazyRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // "All" option
+        item {
+            FilterChip(
+                selected = selectedCategory == null,
+                onClick = { onCategorySelected(null) },
+                label = { Text("All Habits") }
             )
-            
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = habits.count { it.frequency == HabitFrequency.DAILY }.toString(),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.secondary
-                )
-                Text(text = "Daily", style = MaterialTheme.typography.bodyMedium)
-            }
-            
-            Divider(
-                modifier = Modifier
-                    .height(36.dp)
-                    .width(1.dp),
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+        }
+        
+        // Category options
+        items(HabitCategory.values()) { category ->
+            FilterChip(
+                selected = selectedCategory == category,
+                onClick = { onCategorySelected(category) },
+                label = { Text(category.title) }
             )
-            
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = habits.count { it.frequency == HabitFrequency.WEEKLY }.toString(),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.tertiary
-                )
-                Text(text = "Weekly", style = MaterialTheme.typography.bodyMedium)
-            }
         }
     }
 }
 
-@RequiresApi(Build.VERSION_CODES.O)
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HabitCard(
-    habit: HabitItem,
-    onMarkComplete: (String) -> Unit,
-    onDeleteHabit: (String) -> Unit
+fun ProgressCard(
+    date: String,
+    completedCount: Int,
+    totalCount: Int,
+    completionRate: Float
 ) {
-    var showDeleteConfirm by remember { mutableStateOf(false) }
-    val isCompletedToday = habit.lastCompleted == LocalDate.now()
-    
     Card(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 16.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
+            // Date and Progress header
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = habit.title,
-                        style = MaterialTheme.typography.titleLarge
+                Text(
+                    text = date,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                
+                Text(
+                    text = "Overall Progress",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Progress indicator and fraction
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .padding(8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        progress = { completionRate },
+                        modifier = Modifier.fillMaxSize(),
+                        strokeWidth = 8.dp
                     )
                     
-                    Spacer(modifier = Modifier.height(4.dp))
-                    
-                    habit.description?.let {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        
-                        Spacer(modifier = Modifier.height(4.dp))
-                    }
-                    
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = when (habit.frequency) {
-                                HabitFrequency.DAILY -> Icons.Default.Today
-                                HabitFrequency.WEEKLY -> Icons.Default.DateRange
-                                HabitFrequency.MONTHLY -> Icons.Default.CalendarMonth
-                            },
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        
-                        Spacer(modifier = Modifier.width(4.dp))
-                        
-                        Text(
-                            text = habit.frequency.name.lowercase().capitalize(),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        
-                        Spacer(modifier = Modifier.width(8.dp))
-                        
-                        Icon(
-                            imageVector = Icons.Default.LocalFireDepartment,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.error
-                        )
-                        
-                        Spacer(modifier = Modifier.width(4.dp))
-                        
-                        Text(
-                            text = "${habit.streak} streak",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text(
+                        text = "${(completionRate * 100).toInt()}%",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
                 
-                Row {
-                    // Delete button
-                    IconButton(onClick = { showDeleteConfirm = true }) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete habit",
-                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
-                        )
-                    }
-                    
-                    // Mark complete button
-                    IconButton(
-                        onClick = { onMarkComplete(habit.id) },
-                        enabled = !isCompletedToday
-                    ) {
-                        Icon(
-                            imageVector = if (isCompletedToday) Icons.Default.CheckCircle else Icons.Default.Circle,
-                            contentDescription = "Mark as complete",
-                            tint = if (isCompletedToday) 
-                                MaterialTheme.colorScheme.primary 
-                            else 
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                        )
-                    }
-                }
-            }
-        }
-    }
-    
-    if (showDeleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete Habit") },
-            text = { Text("Are you sure you want to delete this habit? This will also remove all tracking history.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onDeleteHabit(habit.id)
-                        showDeleteConfirm = false
-                    }
+                Column(
+                    horizontalAlignment = Alignment.End
                 ) {
-                    Text("Delete")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) {
-                    Text("Cancel")
+                    Text(
+                        text = "$completedCount/$totalCount",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    
+                    Text(
+                        text = "habits completed",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
-        )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Motivational message
+            Text(
+                text = if (completionRate >= 0.7) {
+                    "Keep going! You're doing great today!"
+                } else if (completionRate >= 0.3) {
+                    "Good progress! Keep up the momentum."
+                } else {
+                    "Let's start building those habits today!"
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
 @Composable
-fun AddHabitDialog(
-    onDismiss: () -> Unit,
-    onHabitAdd: (String, String, HabitFrequency) -> Unit
+fun HabitListItem(
+    habit: HabitItem,
+    onHabitClick: () -> Unit,
+    onToggleComplete: (String) -> Unit
 ) {
-    var habitTitle by remember { mutableStateOf("") }
-    var habitDescription by remember { mutableStateOf("") }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onHabitClick),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Category icon
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(habit.category.color.copy(alpha = 0.2f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = habit.category.icon,
+                contentDescription = habit.category.title,
+                tint = habit.category.color
+            )
+        }
+        
+        Spacer(modifier = Modifier.width(16.dp))
+        
+        // Habit info
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(
+                text = habit.title,
+                style = MaterialTheme.typography.titleMedium
+            )
+            
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Daily",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                habit.time?.let {
+                    Text(
+                        text = " • $it",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.LocalFireDepartment,
+                    contentDescription = "Streak",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.error
+                )
+                
+                Spacer(modifier = Modifier.width(4.dp))
+                
+                Text(
+                    text = "Streak: ${habit.streak}d",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        
+        // Completion indicator and progress
+        Column(
+            horizontalAlignment = Alignment.End
+        ) {
+            // Completion indicator
+            IconButton(
+                onClick = { onToggleComplete(habit.id) },
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(
+                    imageVector = if (habit.completedToday) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                    contentDescription = if (habit.completedToday) "Completed" else "Mark as complete",
+                    tint = if (habit.completedToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            // Progress indicator for the habit (simplified version)
+            LinearProgressIndicator(
+                progress = { habit.streak.toFloat() / 10f }, // Simplified progress calculation
+                modifier = Modifier
+                    .width(80.dp)
+                    .padding(top = 4.dp),
+                color = habit.category.color
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HabitCreationDialog(
+    onDismiss: () -> Unit,
+    onHabitCreate: (HabitItem) -> Unit
+) {
+    var habitName by remember { mutableStateOf("") }
+    var selectedCategory by remember { mutableStateOf(HabitCategory.HEALTH) }
     var selectedFrequency by remember { mutableStateOf(HabitFrequency.DAILY) }
+    var habitTime by remember { mutableStateOf("") }
     
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Create New Habit") },
+        title = { Text("New Habit") },
         text = {
-            Column {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+            ) {
+                // Habit name
                 OutlinedTextField(
-                    value = habitTitle,
-                    onValueChange = { habitTitle = it },
+                    value = habitName,
+                    onValueChange = { habitName = it },
                     label = { Text("Habit name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                OutlinedTextField(
-                    value = habitDescription,
-                    onValueChange = { habitDescription = it },
-                    label = { Text("Description (optional)") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Text("Frequency", style = MaterialTheme.typography.bodyMedium)
-                
-                Row(
                     modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Category selector chips
+                Text(
+                    text = "Category",
+                    style = MaterialTheme.typography.titleSmall
+                )
+                
+                LazyRow(
+                    modifier = Modifier.padding(vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    FrequencyOptions.forEach { frequency ->
+                    items(HabitCategory.values()) { category ->
                         FilterChip(
-                            selected = selectedFrequency == frequency,
-                            onClick = { selectedFrequency = frequency },
-                            label = { Text(frequency.name.lowercase().capitalize()) }
+                            selected = selectedCategory == category,
+                            onClick = { selectedCategory = category },
+                            label = { Text(category.title) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = category.icon,
+                                    contentDescription = null,
+                                    tint = category.color
+                                )
+                            }
                         )
                     }
                 }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Frequency selector
+                Text(
+                    text = "Frequency",
+                    style = MaterialTheme.typography.titleSmall
+                )
+                
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    HabitFrequency.values().forEach { frequency ->
+                        Button(
+                            onClick = { selectedFrequency = frequency },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (selectedFrequency == frequency) 
+                                    MaterialTheme.colorScheme.primaryContainer
+                                else 
+                                    MaterialTheme.colorScheme.surface
+                            ),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = frequency.title,
+                                color = if (selectedFrequency == frequency)
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                else
+                                    MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Time preference
+                Text(
+                    text = "Time Preference (Optional)",
+                    style = MaterialTheme.typography.titleSmall
+                )
+                
+                OutlinedTextField(
+                    value = habitTime,
+                    onValueChange = { habitTime = it },
+                    label = { Text("e.g., Morning, 8:00 AM") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    trailingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Schedule,
+                            contentDescription = "Time"
+                        )
+                    }
+                )
             }
         },
         confirmButton = {
-            TextButton(
-                onClick = { onHabitAdd(habitTitle, habitDescription, selectedFrequency) },
-                enabled = habitTitle.isNotBlank()
+            Button(
+                onClick = { 
+                    if (habitName.isNotBlank()) {
+                        val newHabit = HabitItem(
+                            id = "temp",
+                            title = habitName,
+                            category = selectedCategory,
+                            frequency = selectedFrequency,
+                            time = if (habitTime.isBlank()) null else habitTime,
+                            streak = 0,
+                            completedToday = false
+                        )
+                        onHabitCreate(newHabit)
+                    }
+                },
+                enabled = habitName.isNotBlank()
             ) {
-                Text("Create")
+                Text("Save Habit")
             }
         },
         dismissButton = {
@@ -401,23 +619,31 @@ fun AddHabitDialog(
     )
 }
 
-// Helper for capitalization
-private fun String.capitalize(): String {
-    return this.lowercase().replaceFirstChar { it.uppercase() }
-}
-
 // Domain models
 data class HabitItem(
     val id: String,
     val title: String,
-    val description: String? = null,
-    val frequency: HabitFrequency = HabitFrequency.DAILY,
+    val category: HabitCategory,
+    val frequency: HabitFrequency,
+    val time: String? = null,
     val streak: Int = 0,
-    val lastCompleted: LocalDate? = null
+    val completedToday: Boolean = false,
+    val description: String? = null
 )
 
-enum class HabitFrequency {
-    DAILY, WEEKLY, MONTHLY
+enum class HabitFrequency(val title: String) {
+    DAILY("Daily"),
+    WEEKLY("Weekly"),
+    MONTHLY("Monthly"),
+    CUSTOM("Custom")
 }
 
-val FrequencyOptions = listOf(HabitFrequency.DAILY, HabitFrequency.WEEKLY, HabitFrequency.MONTHLY)
+enum class HabitCategory(val title: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val color: Color) {
+    HEALTH("Health", Icons.Default.Favorite, Color(0xFFE91E63)),
+    FITNESS("Fitness", Icons.Default.FitnessCenter, Color(0xFF2196F3)),
+    MINDFULNESS("Mindfulness", Icons.Default.SelfImprovement, Color(0xFF9C27B0)),
+    PRODUCTIVITY("Productivity", Icons.Default.Schedule, Color(0xFF4CAF50)),
+    EDUCATION("Education", Icons.Default.School, Color(0xFFFF9800)),
+    CREATIVITY("Creativity", Icons.Default.Palette, Color(0xFF795548)),
+    SOCIAL("Social", Icons.Default.People, Color(0xFF3F51B5))
+}
