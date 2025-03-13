@@ -25,6 +25,7 @@ import com.hebit.app.ui.screens.tasks.TaskDetailScreen
 import com.hebit.app.ui.screens.tasks.TaskCategoriesScreen
 import com.hebit.app.ui.screens.tasks.TaskBoardScreen
 import com.hebit.app.ui.screens.goals.GoalListScreen
+import com.hebit.app.ui.screens.goals.GoalDetailScreen
 import com.hebit.app.ui.screens.settings.SettingsScreen
 
 /**
@@ -49,6 +50,7 @@ object Routes {
     const val HABIT_DETAIL = "habit_detail"
     const val HABIT_STREAK = "habit_streak"
     const val GOALS = "goals"
+    const val GOAL_DETAIL = "goal_detail"
     const val SETTINGS = "settings"
 }
 
@@ -244,9 +246,38 @@ fun HebitNavigation(
             )
         }
 
+        // Goal Screens
         composable(Routes.GOALS) {
             GoalListScreen(
-                onNavigateBack = { navController.navigateUp() }
+                onNavigateBack = { navController.navigateUp() },
+                onGoalClick = { goalId ->
+                    navController.navigate("${Routes.GOAL_DETAIL}/$goalId")
+                },
+                onHomeClick = { navController.navigate(Routes.DASHBOARD) {
+                    popUpTo(Routes.DASHBOARD) { inclusive = true }
+                }},
+                onTasksClick = { navController.navigate(Routes.TASKS) },
+                onHabitsClick = { navController.navigate(Routes.HABITS) },
+                onProfileClick = { navController.navigate(Routes.SETTINGS) }
+            )
+        }
+        
+        composable(
+            route = "${Routes.GOAL_DETAIL}/{goalId}",
+            arguments = listOf(navArgument("goalId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val goalId = backStackEntry.arguments?.getString("goalId") ?: ""
+            GoalDetailScreen(
+                goalId = goalId,
+                onNavigateBack = { navController.navigateUp() },
+                onHomeClick = { navController.navigate(Routes.DASHBOARD) {
+                    popUpTo(Routes.DASHBOARD) { inclusive = true }
+                }},
+                onTasksClick = { navController.navigate(Routes.TASKS) },
+                onHabitsClick = { navController.navigate(Routes.HABITS) },
+                onGoalsClick = { navController.navigate(Routes.GOALS) },
+                onProfileClick = { navController.navigate(Routes.SETTINGS) },
+                onShareClick = { /* Share functionality */ }
             )
         }
 
