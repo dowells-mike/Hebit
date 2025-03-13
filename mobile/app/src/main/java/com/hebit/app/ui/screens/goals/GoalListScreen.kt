@@ -13,18 +13,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.hebit.app.ui.components.BottomNavItem
-import java.time.Duration
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -117,11 +114,6 @@ fun GoalListScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Goals") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                },
                 actions = {
                     IconButton(onClick = { /* Search functionality */ }) {
                         Icon(
@@ -343,9 +335,9 @@ fun GoalListScreen(
             }
         }
         
-        // Add goal dialog
+        // Multi-step goal creation dialog
         if (showAddGoalDialog) {
-            AddGoalDialog(
+            GoalCreationDialog(
                 onDismiss = { showAddGoalDialog = false },
                 onGoalAdd = { title, description, targetDateMonths ->
                     if (title.isNotBlank()) {
@@ -697,20 +689,6 @@ fun AddGoalDialog(
     )
 }
 
-// Domain models
-data class GoalItem(
-    val id: String,
-    val title: String,
-    val description: String? = null,
-    val targetDate: LocalDate,
-    val progress: Int = 0,
-    val status: GoalStatus = GoalStatus.NOT_STARTED
-)
-
-enum class GoalStatus {
-    NOT_STARTED, IN_PROGRESS, COMPLETED
-}
-
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun TimelineView(
@@ -778,7 +756,7 @@ fun TimelineGoalItem(
         Box(
             modifier = Modifier
                 .width(24.dp)
-                .height(if (goal == goal) 24.dp else 80.dp),
+                .height(80.dp),
             contentAlignment = Alignment.TopCenter
         ) {
             // Vertical line
@@ -889,4 +867,18 @@ fun TimelineGoalItem(
             }
         }
     }
+}
+
+// Domain models
+data class GoalItem(
+    val id: String,
+    val title: String,
+    val description: String? = null,
+    val targetDate: LocalDate,
+    val progress: Int = 0,
+    val status: GoalStatus = GoalStatus.NOT_STARTED
+)
+
+enum class GoalStatus {
+    NOT_STARTED, IN_PROGRESS, COMPLETED
 }
