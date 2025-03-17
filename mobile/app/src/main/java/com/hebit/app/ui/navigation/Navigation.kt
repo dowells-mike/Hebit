@@ -27,6 +27,9 @@ import com.hebit.app.ui.screens.tasks.TaskBoardScreen
 import com.hebit.app.ui.screens.goals.GoalListScreen
 import com.hebit.app.ui.screens.goals.GoalDetailScreen
 import com.hebit.app.ui.screens.settings.SettingsScreen
+import com.hebit.app.ui.screens.profile.ProfileScreen
+import com.hebit.app.ui.screens.profile.AchievementScreen
+import com.hebit.app.ui.screens.profile.StatisticsScreen
 
 /**
  * Main navigation routes for the app
@@ -51,6 +54,12 @@ object Routes {
     const val HABIT_STREAK = "habit_streak"
     const val GOALS = "goals"
     const val GOAL_DETAIL = "goal_detail"
+    
+    // Profile and Settings
+    const val PROFILE = "profile"
+    const val PROFILE_EDIT = "profile_edit"
+    const val PROFILE_ACHIEVEMENTS = "profile_achievements"
+    const val PROFILE_STATISTICS = "profile_statistics"
     const val SETTINGS = "settings"
 }
 
@@ -134,7 +143,7 @@ fun HebitNavigation(
                 }},
                 onHabitsClick = { navController.navigate(Routes.HABITS) },
                 onGoalsClick = { navController.navigate(Routes.GOALS) },
-                onProfileClick = { navController.navigate(Routes.SETTINGS) },
+                onProfileClick = { navController.navigate(Routes.PROFILE) },
                 onTaskCategoriesClick = { navController.navigate(Routes.TASK_CATEGORIES) },
                 onTaskBoardClick = { navController.navigate(Routes.TASK_BOARD) },
                 onTaskClick = { taskId -> 
@@ -157,7 +166,7 @@ fun HebitNavigation(
                 onTasksClick = { navController.navigate(Routes.TASKS) },
                 onHabitsClick = { navController.navigate(Routes.HABITS) },
                 onGoalsClick = { navController.navigate(Routes.GOALS) },
-                onProfileClick = { navController.navigate(Routes.SETTINGS) }
+                onProfileClick = { navController.navigate(Routes.PROFILE) }
             )
         }
         
@@ -171,7 +180,7 @@ fun HebitNavigation(
                 onTasksClick = { navController.navigate(Routes.TASKS) },
                 onHabitsClick = { navController.navigate(Routes.HABITS) },
                 onGoalsClick = { navController.navigate(Routes.GOALS) },
-                onProfileClick = { navController.navigate(Routes.SETTINGS) }
+                onProfileClick = { navController.navigate(Routes.PROFILE) }
             )
         }
         
@@ -187,7 +196,7 @@ fun HebitNavigation(
                 onTasksClick = { navController.navigate(Routes.TASKS) },
                 onHabitsClick = { navController.navigate(Routes.HABITS) },
                 onGoalsClick = { navController.navigate(Routes.GOALS) },
-                onProfileClick = { navController.navigate(Routes.SETTINGS) }
+                onProfileClick = { navController.navigate(Routes.PROFILE) }
             )
         }
         
@@ -200,7 +209,7 @@ fun HebitNavigation(
                 }},
                 onTasksClick = { navController.navigate(Routes.TASKS) },
                 onGoalsClick = { navController.navigate(Routes.GOALS) },
-                onProfileClick = { navController.navigate(Routes.SETTINGS) },
+                onProfileClick = { navController.navigate(Routes.PROFILE) },
                 onHabitClick = { habitId ->
                     navController.navigate("${Routes.HABIT_DETAIL}/$habitId")
                 }
@@ -221,7 +230,7 @@ fun HebitNavigation(
                 onTasksClick = { navController.navigate(Routes.TASKS) },
                 onHabitsClick = { navController.navigate(Routes.HABITS) },
                 onGoalsClick = { navController.navigate(Routes.GOALS) },
-                onProfileClick = { navController.navigate(Routes.SETTINGS) },
+                onProfileClick = { navController.navigate(Routes.PROFILE) },
                 onStreakClick = { 
                     navController.navigate("${Routes.HABIT_STREAK}/$habitId")
                 }
@@ -242,7 +251,7 @@ fun HebitNavigation(
                 onTasksClick = { navController.navigate(Routes.TASKS) },
                 onHabitsClick = { navController.navigate(Routes.HABITS) },
                 onGoalsClick = { navController.navigate(Routes.GOALS) },
-                onProfileClick = { navController.navigate(Routes.SETTINGS) }
+                onProfileClick = { navController.navigate(Routes.PROFILE) }
             )
         }
 
@@ -258,7 +267,7 @@ fun HebitNavigation(
                 }},
                 onTasksClick = { navController.navigate(Routes.TASKS) },
                 onHabitsClick = { navController.navigate(Routes.HABITS) },
-                onProfileClick = { navController.navigate(Routes.SETTINGS) }
+                onProfileClick = { navController.navigate(Routes.PROFILE) }
             )
         }
         
@@ -276,7 +285,7 @@ fun HebitNavigation(
                 onTasksClick = { navController.navigate(Routes.TASKS) },
                 onHabitsClick = { navController.navigate(Routes.HABITS) },
                 onGoalsClick = { navController.navigate(Routes.GOALS) },
-                onProfileClick = { navController.navigate(Routes.SETTINGS) },
+                onProfileClick = { navController.navigate(Routes.PROFILE) },
                 onShareClick = { /* Share functionality */ }
             )
         }
@@ -292,7 +301,7 @@ fun HebitNavigation(
                 onTasksClick = { navController.navigate(Routes.TASKS) },
                 onHabitsClick = { navController.navigate(Routes.HABITS) },
                 onGoalsClick = { navController.navigate(Routes.GOALS) },
-                onProfileClick = { navController.navigate(Routes.SETTINGS) }
+                onProfileClick = { navController.navigate(Routes.PROFILE) }
             )
         }
         
@@ -307,7 +316,51 @@ fun HebitNavigation(
                 onTasksClick = { navController.navigate(Routes.TASKS) },
                 onHabitsClick = { navController.navigate(Routes.HABITS) },
                 onGoalsClick = { navController.navigate(Routes.GOALS) },
-                onProfileClick = { navController.navigate(Routes.SETTINGS) }
+                onProfileClick = { navController.navigate(Routes.PROFILE) }
+            )
+        }
+        
+        // Profile and Settings Screens
+        composable(Routes.PROFILE) {
+            ProfileScreen(
+                onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
+                onNavigateToAchievements = { navController.navigate(Routes.PROFILE_ACHIEVEMENTS) },
+                onNavigateToStatistics = { navController.navigate(Routes.PROFILE_STATISTICS) },
+                onNavigateToEditProfile = { navController.navigate(Routes.PROFILE_EDIT) },
+                onHomeClick = { navController.navigate(Routes.DASHBOARD) {
+                    popUpTo(Routes.DASHBOARD) { inclusive = true }
+                }},
+                onTasksClick = { navController.navigate(Routes.TASKS) },
+                onHabitsClick = { navController.navigate(Routes.HABITS) },
+                onGoalsClick = { navController.navigate(Routes.GOALS) }
+            )
+        }
+        
+        composable(Routes.PROFILE_ACHIEVEMENTS) {
+            AchievementScreen(
+                onNavigateBack = { navController.navigateUp() }
+            )
+        }
+        
+        composable(Routes.PROFILE_STATISTICS) {
+            StatisticsScreen(
+                onNavigateBack = { navController.navigateUp() }
+            )
+        }
+        
+        composable(Routes.PROFILE_EDIT) {
+            // Will be implemented later
+            ProfileScreen(
+                onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
+                onNavigateToAchievements = { navController.navigate(Routes.PROFILE_ACHIEVEMENTS) },
+                onNavigateToStatistics = { navController.navigate(Routes.PROFILE_STATISTICS) },
+                onNavigateToEditProfile = { navController.navigateUp() },
+                onHomeClick = { navController.navigate(Routes.DASHBOARD) {
+                    popUpTo(Routes.DASHBOARD) { inclusive = true }
+                }},
+                onTasksClick = { navController.navigate(Routes.TASKS) },
+                onHabitsClick = { navController.navigate(Routes.HABITS) },
+                onGoalsClick = { navController.navigate(Routes.GOALS) }
             )
         }
         
