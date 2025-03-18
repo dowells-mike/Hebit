@@ -1,5 +1,6 @@
 package com.hebit.app.ui.screens.habits
 
+import android.annotation.SuppressLint
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
@@ -628,6 +629,7 @@ fun HabitStreakScreen(
     }
 }
 
+@SuppressLint("NewApi")
 @Composable
 fun AchievementCard(
     achievement: Achievement,

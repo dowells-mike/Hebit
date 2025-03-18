@@ -1,8 +1,10 @@
 package com.hebit.app.ui.screens.habits
 
+import android.annotation.SuppressLint
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -684,6 +686,7 @@ fun StatItem(
     }
 }
 
+@SuppressLint("NewApi")
 @Composable
 fun NoteCard(
     note: NoteItem,
