@@ -41,21 +41,42 @@ app.get('/', (req, res) => {
 // Error handling middleware
 app.use(errorHandler);
 
+// Set development mode for our project
+process.env.NODE_ENV = process.env.NODE_ENV || 'development';
+
 // Connect to MongoDB
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/hebit';
+import connectDB from './config/database';
 
-mongoose.connect(MONGODB_URI)
-  .then(() => {
-    console.log('Connected to MongoDB');
-  })
-  .catch((err) => {
-    console.error('Failed to connect to MongoDB', err);
-  });
-
-// Start server
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
+// Connect to MongoDB database
+connectDB().then(() => {
+  console.log('Connected to MongoDB');
+}).catch((err) => {
+  console.error('Failed to connect to MongoDB', err);
+  process.exit(1);  // Exit with failure
 });
+
+// Start server with fallback ports
+const startServer = (port = 5000) => {
+  try {
+    const server = app.listen(port, () => {
+      console.log(`Server running on port ${port} in ${process.env.NODE_ENV || 'development'} mode`);
+    });
+    
+    server.on('error', (e: any) => {
+      if (e.code === 'EADDRINUSE') {
+        console.log(`Port ${port} is already in use, trying port ${port + 1}...`);
+        startServer(port + 1);
+      } else {
+        console.error('Server error:', e);
+      }
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+  }
+};
+
+// Try to start server with port from env or default 5000
+const PORT = parseInt(process.env.PORT || '5000', 10);
+startServer(PORT);
 
 export default app;

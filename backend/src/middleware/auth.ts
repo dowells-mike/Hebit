@@ -1,8 +1,9 @@
 import { Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { catchAsync } from './errorHandler';
+import { catchAsync, AppError } from './errorHandler';
 import { AuthRequest } from '../types';
-import { AppError } from './errorHandler';
+import User from '../models/User';
+import config from '../config/config';
 
 interface JwtPayload {
   id: string;
@@ -23,11 +24,17 @@ export const protect = catchAsync(async (req: AuthRequest, res: Response, next: 
 
   try {
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as JwtPayload;
-
-    // Attach user to request object
-    // Note: This will be updated once we have the User model implemented
-    req.user = { id: decoded.id } as any;
+    const decoded = jwt.verify(token, config.jwtSecret) as JwtPayload;
+    
+    // Get user from database
+    const user = await User.findById(decoded.id);
+    
+    if (!user) {
+      throw new AppError('User not found', 401);
+    }
+    
+    // Add user to request object
+    req.user = user;
     
     next();
   } catch (error) {
