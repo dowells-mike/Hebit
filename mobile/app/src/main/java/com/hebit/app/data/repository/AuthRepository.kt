@@ -35,8 +35,9 @@ class AuthRepository @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 val loginResponse = response.body()!!
                 
-                // Save auth token and user ID
+                // Save auth token, refresh token and user ID
                 tokenManager.saveToken(loginResponse.token)
+                tokenManager.saveRefreshToken(loginResponse.refreshToken)
                 tokenManager.saveUserId(loginResponse.user.id)
                 
                 // Map to domain model
@@ -68,8 +69,9 @@ class AuthRepository @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 val registerResponse = response.body()!!
                 
-                // Save auth token and user ID
+                // Save auth token, refresh token and user ID
                 tokenManager.saveToken(registerResponse.token)
+                tokenManager.saveRefreshToken(registerResponse.refreshToken)
                 tokenManager.saveUserId(registerResponse.user.id)
                 
                 // Map to domain model

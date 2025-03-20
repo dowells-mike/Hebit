@@ -19,6 +19,7 @@ class TokenManager @Inject constructor(
     companion object {
         private const val PREFERENCES_FILE_NAME = "hebit_prefs"
         private const val KEY_AUTH_TOKEN = "auth_token"
+        private const val KEY_REFRESH_TOKEN = "refresh_token"
         private const val KEY_USER_ID = "user_id"
     }
     
@@ -55,11 +56,26 @@ class TokenManager @Inject constructor(
     }
     
     /**
+     * Save refresh token
+     */
+    fun saveRefreshToken(refreshToken: String) {
+        sharedPreferences.edit().putString(KEY_REFRESH_TOKEN, refreshToken).apply()
+    }
+    
+    /**
+     * Get refresh token
+     */
+    fun getRefreshToken(): String? {
+        return sharedPreferences.getString(KEY_REFRESH_TOKEN, null)
+    }
+    
+    /**
      * Clear all saved authentication data
      */
     fun clearAuthData() {
         sharedPreferences.edit()
             .remove(KEY_AUTH_TOKEN)
+            .remove(KEY_REFRESH_TOKEN)
             .remove(KEY_USER_ID)
             .apply()
     }

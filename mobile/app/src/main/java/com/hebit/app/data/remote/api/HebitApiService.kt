@@ -16,6 +16,9 @@ interface HebitApiService {
     @POST("auth/register")
     suspend fun register(@Body registerRequest: RegisterRequest): Response<LoginResponse>
     
+    @POST("auth/refresh-token")
+    suspend fun refreshToken(@Body refreshRequest: RefreshTokenRequest): Response<RefreshTokenResponse>
+    
     @GET("auth/profile")
     suspend fun getUserProfile(): Response<UserResponse>
     

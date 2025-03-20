@@ -17,7 +17,17 @@ data class RegisterRequest(
 
 data class LoginResponse(
     val token: String,
+    val refreshToken: String,
     val user: UserResponse
+)
+
+data class RefreshTokenRequest(
+    val refreshToken: String,
+    val userId: String
+)
+
+data class RefreshTokenResponse(
+    val token: String
 )
 
 data class UserResponse(
