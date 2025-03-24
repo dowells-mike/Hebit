@@ -66,7 +66,6 @@ object Routes {
 /**
  * Main navigation component for the app
  */
-@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun HebitNavigation(
     navController: NavHostController = rememberNavController(),
@@ -79,8 +78,8 @@ fun HebitNavigation(
         // Auth flow
         composable(Routes.SPLASH) {
             SplashScreen(
-                onSplashComplete = {
-                    navController.navigate(Routes.LOGIN) {
+                onSplashComplete = { destination ->
+                    navController.navigate(destination) {
                         popUpTo(Routes.SPLASH) { inclusive = true }
                     }
                 }
@@ -366,7 +365,14 @@ fun HebitNavigation(
         
         composable(Routes.SETTINGS) {
             SettingsScreen(
-                onNavigateBack = { navController.navigateUp() }
+                onNavigateBack = { navController.navigateUp() },
+                onLogoutSuccess = {
+                    navController.navigate(Routes.LOGIN) {
+                        popUpTo(navController.graph.findStartDestination().id) {
+                            inclusive = true
+                        }
+                    }
+                }
             )
         }
     }

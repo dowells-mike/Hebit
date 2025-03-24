@@ -14,6 +14,8 @@ composeBom = "2024.04.01"
 # Add these new versions
 hilt = "2.48"
 materialIconsExtended = "1.7.8"
+moshi = "1.14.0"
+moshiKotlin = "1.14.0"
 retrofit = "2.9.0"
 okhttp = "4.11.0"
 room = "2.6.1"
@@ -47,6 +49,8 @@ hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref
 hilt-compiler = { group = "com.google.dagger", name = "hilt-compiler", version.ref = "hilt" }
 
 # Retrofit (Networking)
+moshi-kotlin = { module = "com.squareup.moshi:moshi-kotlin", version.ref = "moshiKotlin" }
+moshi = { module = "com.squareup.moshi:moshi", version.ref = "moshi" }
 retrofit-core = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
 retrofit-gson = { group = "com.squareup.retrofit2", name = "converter-gson", version.ref = "retrofit" }
 okhttp-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp" }

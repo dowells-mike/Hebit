@@ -69,6 +69,10 @@ dependencies {
     kapt(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
 
+    //Moshi for JSON parsing
+    implementation(libs.moshi)
+    implementation(libs.moshi.kotlin)
+
     // Networking
     implementation(libs.retrofit.core)
     implementation(libs.retrofit.gson)

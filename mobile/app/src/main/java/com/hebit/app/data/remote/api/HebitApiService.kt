@@ -14,7 +14,7 @@ interface HebitApiService {
     suspend fun login(@Body loginRequest: LoginRequest): Response<LoginResponse>
     
     @POST("auth/register")
-    suspend fun register(@Body registerRequest: RegisterRequest): Response<LoginResponse>
+    suspend fun register(@Body registerRequest: RegisterRequest): Response<RegisterResponse>
     
     @POST("auth/refresh-token")
     suspend fun refreshToken(@Body refreshRequest: RefreshTokenRequest): Response<RefreshTokenResponse>
@@ -24,67 +24,91 @@ interface HebitApiService {
     
     // Task Endpoints
     @GET("tasks")
-    suspend fun getTasks(): Response<List<TaskResponse>>
+    suspend fun getTasks(
+        @Query("page") page: Int = 1,
+        @Query("per_page") perPage: Int = 20
+    ): Response<TaskListResponse>
+    
+    @GET("tasks/{id}")
+    suspend fun getTaskById(@Path("id") id: String): Response<TaskDto>
     
     @POST("tasks")
-    suspend fun createTask(@Body taskRequest: TaskRequest): Response<TaskResponse>
+    suspend fun createTask(@Body createTaskRequest: CreateTaskRequest): Response<TaskDto>
     
     @PUT("tasks/{id}")
     suspend fun updateTask(
-        @Path("id") taskId: String, 
-        @Body taskRequest: TaskRequest
-    ): Response<TaskResponse>
+        @Path("id") id: String,
+        @Body updateTaskRequest: UpdateTaskRequest
+    ): Response<TaskDto>
     
     @DELETE("tasks/{id}")
-    suspend fun deleteTask(@Path("id") taskId: String): Response<Unit>
+    suspend fun deleteTask(@Path("id") id: String): Response<Void>
     
-    @PATCH("tasks/{id}/complete")
-    suspend fun toggleTaskCompletion(
-        @Path("id") taskId: String,
-        @Body completeRequest: TaskCompletionRequest
-    ): Response<TaskResponse>
+    @GET("tasks/priority")
+    suspend fun getPriorityTasks(@Query("limit") limit: Int = 5): Response<TaskListResponse>
+    
+    @GET("tasks/today")
+    suspend fun getTasksDueToday(): Response<TaskListResponse>
     
     // Habit Endpoints
     @GET("habits")
-    suspend fun getHabits(): Response<List<HabitResponse>>
+    suspend fun getHabits(
+        @Query("page") page: Int = 1,
+        @Query("per_page") perPage: Int = 20
+    ): Response<HabitListResponse>
+    
+    @GET("habits/{id}")
+    suspend fun getHabitById(@Path("id") id: String): Response<HabitDto>
     
     @POST("habits")
-    suspend fun createHabit(@Body habitRequest: HabitRequest): Response<HabitResponse>
+    suspend fun createHabit(@Body createHabitRequest: CreateHabitRequest): Response<HabitDto>
     
     @PUT("habits/{id}")
     suspend fun updateHabit(
-        @Path("id") habitId: String,
-        @Body habitRequest: HabitRequest
-    ): Response<HabitResponse>
+        @Path("id") id: String,
+        @Body updateHabitRequest: UpdateHabitRequest
+    ): Response<HabitDto>
     
     @DELETE("habits/{id}")
-    suspend fun deleteHabit(@Path("id") habitId: String): Response<Unit>
+    suspend fun deleteHabit(@Path("id") id: String): Response<Void>
     
-    @POST("habits/{id}/track")
-    suspend fun trackHabit(
-        @Path("id") habitId: String,
-        @Body trackingRequest: HabitTrackingRequest
-    ): Response<HabitResponse>
+    @GET("habits/today")
+    suspend fun getTodaysHabits(): Response<HabitListResponse>
+    
+    @PUT("habits/{id}/complete")
+    suspend fun completeHabitForToday(
+        @Path("id") id: String,
+        @Body request: HabitCompletionRequest
+    ): Response<HabitDto>
     
     // Goal Endpoints
     @GET("goals")
-    suspend fun getGoals(): Response<List<GoalResponse>>
+    suspend fun getGoals(
+        @Query("page") page: Int = 1,
+        @Query("per_page") perPage: Int = 20
+    ): Response<GoalListResponse>
+    
+    @GET("goals/{id}")
+    suspend fun getGoalById(@Path("id") id: String): Response<GoalDto>
     
     @POST("goals")
-    suspend fun createGoal(@Body goalRequest: GoalRequest): Response<GoalResponse>
+    suspend fun createGoal(@Body createGoalRequest: CreateGoalRequest): Response<GoalDto>
     
     @PUT("goals/{id}")
     suspend fun updateGoal(
-        @Path("id") goalId: String,
-        @Body goalRequest: GoalRequest
-    ): Response<GoalResponse>
+        @Path("id") id: String,
+        @Body updateGoalRequest: UpdateGoalRequest
+    ): Response<GoalDto>
     
     @DELETE("goals/{id}")
-    suspend fun deleteGoal(@Path("id") goalId: String): Response<Unit>
+    suspend fun deleteGoal(@Path("id") id: String): Response<Void>
     
-    @PATCH("goals/{id}/progress")
+    @GET("goals/active")
+    suspend fun getActiveGoals(): Response<GoalListResponse>
+    
+    @PUT("goals/{id}/progress")
     suspend fun updateGoalProgress(
-        @Path("id") goalId: String,
-        @Body progressRequest: GoalProgressRequest
-    ): Response<GoalResponse>
+        @Path("id") id: String,
+        @Body request: GoalProgressRequest
+    ): Response<GoalDto>
 }

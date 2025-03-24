@@ -2,7 +2,6 @@ package com.hebit.app.ui.screens.dashboard
 
 import android.os.Build
 import androidx.annotation.RequiresApi
-import com.hebit.app.ui.components.BottomNavItem
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -25,6 +24,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.hebit.app.domain.model.Habit
+import com.hebit.app.domain.model.Resource
+import com.hebit.app.domain.model.Task
+import com.hebit.app.ui.components.BottomNavItem
+import com.hebit.app.ui.screens.habits.HabitViewModel
+import com.hebit.app.ui.screens.tasks.TaskViewModel
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -39,10 +45,21 @@ fun DashboardScreen(
     onGoalsClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onQuickActionsClick: () -> Unit = {},
-    onProgressStatsClick: () -> Unit = {}
+    onProgressStatsClick: () -> Unit = {},
+    taskViewModel: TaskViewModel = hiltViewModel(),
+    habitViewModel: HabitViewModel = hiltViewModel()
 ) {
     val today = LocalDate.now()
     val formattedDate = today.format(DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.getDefault()))
+    
+    // Load data
+    LaunchedEffect(key1 = Unit) {
+        taskViewModel.loadPriorityTasks(3)
+        habitViewModel.loadTodayHabits()
+    }
+    
+    val priorityTasksState by taskViewModel.priorityTasksState.collectAsState()
+    val todayHabitsState by habitViewModel.todayHabitsState.collectAsState()
     
     Scaffold(
         topBar = {
@@ -177,7 +194,7 @@ fun DashboardScreen(
                 }
                 
                 // Horizontal scrolling task cards
-                PriorityTasksList(onTaskClick = { /* Open task details */ })
+                PriorityTasksList(onTaskClick = { /* Open task details */ }, tasksState = priorityTasksState)
             }
             
             // Today's Habits Section
@@ -193,15 +210,24 @@ fun DashboardScreen(
                         fontWeight = FontWeight.SemiBold
                     )
                     
-                    Text(
-                        text = "3/5 Completed",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.outline
-                    )
+                    // Show completion status only when there are habits
+                    if (todayHabitsState is Resource.Success && todayHabitsState.data?.isNotEmpty() == true) {
+                        val completedCount = todayHabitsState.data?.count { it.completedToday } ?: 0
+                        val totalCount = todayHabitsState.data?.size ?: 0
+                        
+                        Text(
+                            text = "$completedCount/$totalCount Completed",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
                 }
                 
                 // Horizontal scrolling habit cards
-                TodayHabitsList(onHabitClick = { /* Open habit details */ })
+                TodayHabitsList(
+                    onHabitClick = { /* Open habit details */ },
+                    habitsState = todayHabitsState
+                )
             }
             
             // Active Goals Section
@@ -257,22 +283,60 @@ fun DashboardScreen(
 // Using common BottomNavItem from components package
 
 @Composable
-fun PriorityTasksList(onTaskClick: (String) -> Unit) {
-    val tasks = listOf(
-        Task("Client Meeting Preparation", "Work", "2:00 PM", 70),
-        Task("Gym Workout", "Personal", "5:30 PM", 0),
-        Task("Project Deadline", "Work", "11:59 PM", 90)
-    )
-    
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(160.dp)
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        tasks.forEach { task ->
-            TaskCard(task = task, onClick = { onTaskClick(task.title) })
+fun PriorityTasksList(onTaskClick: (String) -> Unit, tasksState: Resource<List<Task>>) {
+    when (tasksState) {
+        is Resource.Loading -> {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        }
+        is Resource.Success -> {
+            val tasks = tasksState.data ?: emptyList()
+            if (tasks.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No priority tasks yet",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp)
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    tasks.forEach { task ->
+                        TaskCard(task = task, onClick = { onTaskClick(task.id) })
+                    }
+                }
+            }
+        }
+        is Resource.Error -> {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Error: ${tasksState.message}",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
         }
     }
 }
@@ -312,21 +376,24 @@ fun TaskCard(task: Task, onClick: () -> Unit) {
                     )
                 }
                 
-                if (task.category == "Work") {
+                if (task.priority > 7) {
                     Icon(
                         imageVector = Icons.Default.Flag,
-                        contentDescription = "Priority",
+                        contentDescription = "High Priority",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
             }
             
-            Text(
-                text = "Due ${task.dueTime}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.outline
-            )
+            task.dueDateTime?.let {
+                val formattedTime = it.format(DateTimeFormatter.ofPattern("hh:mm a"))
+                Text(
+                    text = "Due $formattedTime",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+            }
             
             if (task.progress > 0) {
                 Column {
@@ -343,37 +410,83 @@ fun TaskCard(task: Task, onClick: () -> Unit) {
 }
 
 @Composable
-fun TodayHabitsList(onHabitClick: (String) -> Unit) {
-    val habits = listOf(
-        Habit("Drink Water", Icons.Outlined.WaterDrop, true),
-        Habit("Read", Icons.Default.MenuBook, true),
-        Habit("Meditate", Icons.Default.SelfImprovement, false),
-        Habit("Exercise", Icons.Default.FitnessCenter, true),
-        Habit("Journal", Icons.Default.Edit, false)
-    )
-    
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(100.dp)
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        habits.forEach { habit ->
-            HabitCard(habit = habit, onClick = { onHabitClick(habit.title) })
+fun TodayHabitsList(onHabitClick: (String) -> Unit, habitsState: Resource<List<Habit>>) {
+    when (habitsState) {
+        is Resource.Loading -> {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        }
+        is Resource.Success -> {
+            val habits = habitsState.data ?: emptyList()
+            if (habits.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No habits tracked yet",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp)
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    habits.forEach { habit ->
+                        HabitCard(habit = habit, onClick = { onHabitClick(habit.id) })
+                    }
+                }
+            }
+        }
+        is Resource.Error -> {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Error: ${habitsState.message}",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
         }
     }
 }
 
 @Composable
 fun HabitCard(habit: Habit, onClick: () -> Unit) {
+    val iconMap = mapOf(
+        "water_drop" to Icons.Outlined.WaterDrop,
+        "book" to Icons.Default.MenuBook,
+        "meditation" to Icons.Default.SelfImprovement,
+        "exercise" to Icons.Default.FitnessCenter,
+        "journal" to Icons.Default.Edit
+    )
+    
+    val icon = iconMap[habit.iconName] ?: Icons.Default.Check
+    
     Card(
         modifier = Modifier
             .width(100.dp)
             .height(100.dp),
         onClick = onClick,
         colors = CardDefaults.cardColors(
-            containerColor = if (habit.completed) 
+            containerColor = if (habit.completedToday) 
                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f) 
             else 
                 MaterialTheme.colorScheme.surface
@@ -387,9 +500,9 @@ fun HabitCard(habit: Habit, onClick: () -> Unit) {
             verticalArrangement = Arrangement.Center
         ) {
             Icon(
-                imageVector = habit.icon,
+                imageVector = icon,
                 contentDescription = habit.title,
-                tint = if (habit.completed) 
+                tint = if (habit.completedToday) 
                     MaterialTheme.colorScheme.primary 
                 else 
                     MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
@@ -409,7 +522,7 @@ fun HabitCard(habit: Habit, onClick: () -> Unit) {
             Spacer(modifier = Modifier.height(4.dp))
             
             // Progress indicator
-            if (habit.completed) {
+            if (habit.completedToday) {
                 Box(
                     modifier = Modifier
                         .size(4.dp, 2.dp)
@@ -549,19 +662,6 @@ fun QuickLinkCard(
 }
 
 // Data classes for UI models
-data class Task(
-    val title: String,
-    val category: String,
-    val dueTime: String,
-    val progress: Int
-)
-
-data class Habit(
-    val title: String,
-    val icon: ImageVector,
-    val completed: Boolean
-)
-
 data class Goal(
     val title: String,
     val progress: Int,

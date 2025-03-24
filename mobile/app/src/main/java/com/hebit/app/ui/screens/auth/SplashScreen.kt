@@ -18,20 +18,35 @@ import androidx.compose.ui.unit.sp
 import com.hebit.app.R
 import androidx.compose.foundation.Image
 import androidx.compose.ui.text.style.TextAlign
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.hebit.app.domain.model.Resource
+import com.hebit.app.domain.model.User
+import com.hebit.app.ui.navigation.Routes
 import kotlinx.coroutines.delay
 
 /**
  * Splash screen implementation based on wireframe specifications
+ * 
+ * Checks login status and navigates to appropriate screen
  */
 @Composable
 fun SplashScreen(
-    onSplashComplete: () -> Unit,
-    appVersion: String = "Version 1.0.0"
+    onSplashComplete: (String) -> Unit,
+    appVersion: String = "Version 1.0.0",
+    viewModel: AuthViewModel = hiltViewModel()
 ) {
+    // Authentication status states
+    val loginState by viewModel.loginState.collectAsState()
+    
     // Animation states
     var logoVisible by remember { mutableStateOf(false) }
     var titleVisible by remember { mutableStateOf(false) }
     var indicatorVisible by remember { mutableStateOf(false) }
+    
+    // Try to verify login status with stored token (if any)
+    LaunchedEffect(key1 = true) {
+        viewModel.checkLoginStatus()
+    }
     
     // Handle animations sequentially
     LaunchedEffect(key1 = true) {
@@ -41,7 +56,15 @@ fun SplashScreen(
         delay(300) // 0.3s delay before showing progress indicator
         indicatorVisible = true
         delay(1200) // 1.2s delay before navigating to next screen
-        onSplashComplete()
+    }
+    
+    // Navigate based on authentication state when it's determined
+    LaunchedEffect(key1 = loginState) {
+        if (loginState is Resource.Success || loginState is Resource.Error) {
+            val isLoggedIn = loginState is Resource.Success && (loginState as Resource.Success<User>).data?.id?.isNotEmpty() == true
+            val destination = if (isLoggedIn) Routes.DASHBOARD else Routes.LOGIN
+            onSplashComplete(destination)
+        }
     }
     
     // Main content
@@ -64,7 +87,7 @@ fun SplashScreen(
                     .size(200.dp)
                     .alpha(animateFloatAsState(
                         targetValue = if (logoVisible) 1f else 0f,
-                        animationSpec = tween(durationMillis = 1000)
+                        animationSpec = tween(durationMillis = 1000), label = ""
                     ).value)
             )
             
@@ -81,7 +104,7 @@ fun SplashScreen(
                 modifier = Modifier.alpha(
                     animateFloatAsState(
                         targetValue = if (titleVisible) 1f else 0f,
-                        animationSpec = tween(durationMillis = 800)
+                        animationSpec = tween(durationMillis = 800), label = ""
                     ).value
                 )
             )

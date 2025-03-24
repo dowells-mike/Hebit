@@ -76,7 +76,7 @@ object NetworkModule {
                 return runBlocking {
                     try {
                         val refreshRequest = RefreshTokenRequest(refreshToken, userId)
-                        val refreshResponse = tempApi.refreshToken(refreshRequest).execute()
+                        val refreshResponse = tempApi.refreshToken(refreshRequest)
                         
                         if (refreshResponse.isSuccessful && refreshResponse.body() != null) {
                             val newToken = refreshResponse.body()!!.token

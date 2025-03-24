@@ -3,8 +3,10 @@ package com.hebit.app.ui.screens.settings
 import android.annotation.SuppressLint
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hebit.app.data.repository.AuthRepository
 import com.hebit.app.domain.model.SyncSettings
 import com.hebit.app.domain.model.UserPreferences
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,11 +16,15 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
+import javax.inject.Inject
 
 /**
  * ViewModel for managing settings-related data and operations
  */
-class SettingsViewModel : ViewModel() {
+@HiltViewModel
+class SettingsViewModel @Inject constructor(
+    private val authRepository: AuthRepository
+) : ViewModel() {
 
     // Settings UI state
     private val _settingsState = MutableStateFlow<SettingsUiState>(SettingsUiState.Loading)
@@ -226,6 +232,18 @@ class SettingsViewModel : ViewModel() {
             }
         }
     }
+    
+/**
+ * Log out user
+ */
+fun logout() {
+    viewModelScope.launch {
+        // Clear authentication data
+        authRepository.logout()
+        
+        // MainActivity will be restarted to show login screen due to MainActivity.needsRestart flag
+    }
+}
     
     /**
      * Format last synced time to a human-readable string

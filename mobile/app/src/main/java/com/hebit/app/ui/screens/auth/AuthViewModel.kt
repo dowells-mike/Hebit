@@ -32,18 +32,38 @@ class AuthViewModel @Inject constructor(
     private val _resetPasswordState = MutableStateFlow<Resource<Boolean>>(Resource.Success(false))
     val resetPasswordState: StateFlow<Resource<Boolean>> = _resetPasswordState
     
-    /**
-     * Login with email and password
-     */
-    fun login(email: String, password: String) {
-        viewModelScope.launch {
-            authRepository.login(email, password)
-                .onEach { result ->
-                    _loginState.value = result
-                }
-                .launchIn(viewModelScope)
-        }
+/**
+ * Check login status with stored token
+ */
+fun checkLoginStatus() {
+    // First check if token exists
+    if (!authRepository.isLoggedIn()) {
+        _loginState.value = Resource.Error("Not logged in")
+        return
     }
+    
+    // Try to get user profile to validate token
+    viewModelScope.launch {
+        authRepository.getUserProfile()
+            .onEach { result ->
+                _loginState.value = result
+            }
+            .launchIn(viewModelScope)
+    }
+}
+
+/**
+ * Login with email and password
+ */
+fun login(email: String, password: String) {
+    viewModelScope.launch {
+        authRepository.login(email, password)
+            .onEach { result ->
+                _loginState.value = result
+            }
+            .launchIn(viewModelScope)
+    }
+}
     
     /**
      * Register new user

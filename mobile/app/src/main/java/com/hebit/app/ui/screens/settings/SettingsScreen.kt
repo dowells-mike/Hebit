@@ -3,6 +3,7 @@ package com.hebit.app.ui.screens.settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import com.hebit.app.MainActivity
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -24,7 +25,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
-    viewModel: SettingsViewModel = viewModel()
+    onLogoutSuccess: () -> Unit = {},
+    viewModel: SettingsViewModel = androidx.hilt.navigation.compose.hiltViewModel()
 ) {
     val settingsState by viewModel.settingsState.collectAsState()
     val storageState by viewModel.storageState.collectAsState()
@@ -182,8 +184,10 @@ fun SettingsScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
+                        viewModel.logout()
                         showLogoutDialog = false
-                        // Implement logout functionality
+                        // Set the restart flag in MainActivity to trigger app restart
+                        MainActivity.needsRestart = true
                     }
                 ) {
                     Text("Log out")
