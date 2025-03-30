@@ -2,7 +2,7 @@ import { Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { catchAsync, AppError } from './errorHandler';
 import { AuthRequest } from '../types';
-import User from '../models/User';
+import { User } from '../models';
 import config from '../config/config';
 
 interface JwtPayload {

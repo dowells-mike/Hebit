@@ -10,9 +10,16 @@ export const asyncHandler =
   };
 
 /**
- * Generate JWT token
+ * Format date for display
  */
-export const generateToken = (id: string): string => {
-  // This will be implemented in the auth middleware
-  return '';
+export const formatDate = (date: Date): string => {
+  return new Date(date).toLocaleString();
+};
+
+/**
+ * Calculate date difference in days
+ */
+export const dateDiffInDays = (date1: Date, date2: Date): number => {
+  const diffTime = Math.abs(date2.getTime() - date1.getTime());
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 };

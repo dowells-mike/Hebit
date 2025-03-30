@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { catchAsync, AppError } from '../middleware/errorHandler';
-import User from '../models/User';
+import { User } from '../models';
 import { AuthRequest } from '../types';
 import config from '../config/config';
 
@@ -24,7 +24,7 @@ const generateRefreshToken = (): string => {
  * @access  Public
  */
 export const register = catchAsync(async (req: Request, res: Response) => {
-  const { name, email, password } = req.body;
+  const { name, email, password, username } = req.body;
 
   // Validate required fields
   if (!name || !email || !password) {
@@ -37,11 +37,39 @@ export const register = catchAsync(async (req: Request, res: Response) => {
     throw new AppError('User already exists with this email', 400);
   }
 
-  // Create new user
+  // Check if username is taken (if provided)
+  if (username) {
+    const usernameExists = await User.findOne({ username });
+    if (usernameExists) {
+      throw new AppError('Username is already taken', 400);
+    }
+  }
+
+  // Create new user with default settings
   const user = await User.create({
     name,
     email,
-    password // Password will be hashed by the model pre-save hook
+    password, // Password will be hashed by the model pre-save hook
+    username,
+    settings: {
+      theme: 'system',
+      startScreen: 'dashboard',
+      notificationPreferences: {
+        tasks: true,
+        habits: true,
+        goals: true,
+        system: true
+      },
+      privacySettings: {
+        shareActivity: false,
+        allowSuggestions: true
+      }
+    },
+    productivity: {
+      peakHours: [9, 10, 11, 14, 15], // Default productive hours
+      completionRate: 0
+    },
+    lastLogin: new Date()
   });
 
   // Generate tokens
@@ -56,6 +84,8 @@ export const register = catchAsync(async (req: Request, res: Response) => {
     id: user._id,
     name: user.name,
     email: user.email,
+    username: user.username,
+    settings: user.settings,
     isAdmin: user.isAdmin,
     createdAt: user.createdAt
   };
@@ -92,6 +122,10 @@ export const login = catchAsync(async (req: Request, res: Response) => {
     throw new AppError('Invalid credentials', 401);
   }
 
+  // Update last login timestamp
+  user.lastLogin = new Date();
+  await user.save();
+
   // Generate tokens
   const accessToken = generateAccessToken(user._id.toString());
   const refreshToken = generateRefreshToken();
@@ -104,6 +138,9 @@ export const login = catchAsync(async (req: Request, res: Response) => {
     id: user._id,
     name: user.name,
     email: user.email,
+    username: user.username,
+    avatarUrl: user.avatarUrl,
+    settings: user.settings,
     isAdmin: user.isAdmin,
     createdAt: user.createdAt
   };
@@ -132,11 +169,20 @@ export const getProfile = catchAsync(async (req: AuthRequest, res: Response) => 
     throw new AppError('User not found', 404);
   }
 
+  // Return comprehensive user profile without sensitive information
   res.status(200).json({
     id: user._id,
     name: user.name,
     email: user.email,
+    username: user.username,
+    bio: user.bio,
+    avatarUrl: user.avatarUrl,
+    coverPhotoUrl: user.coverPhotoUrl,
+    timezone: user.timezone,
+    settings: user.settings,
+    productivity: user.productivity,
     isAdmin: user.isAdmin,
+    lastLogin: user.lastLogin,
     createdAt: user.createdAt
   });
 });
@@ -152,7 +198,7 @@ export const updateProfile = catchAsync(async (req: AuthRequest, res: Response) 
   }
 
   const userId = req.user._id;
-  const { name, email, password } = req.body;
+  const { name, email, username, bio, avatarUrl, coverPhotoUrl, timezone, password } = req.body;
   
   const user = await User.findById(userId);
   if (!user) {
@@ -161,6 +207,7 @@ export const updateProfile = catchAsync(async (req: AuthRequest, res: Response) 
 
   // Update fields if provided
   if (name) user.name = name;
+  
   if (email) {
     // Check if email is already in use by someone else
     const existingUser = await User.findOne({ email });
@@ -169,6 +216,20 @@ export const updateProfile = catchAsync(async (req: AuthRequest, res: Response) 
     }
     user.email = email;
   }
+  
+  if (username) {
+    // Check if username is already in use by someone else
+    const existingUser = await User.findOne({ username });
+    if (existingUser && existingUser._id.toString() !== userId.toString()) {
+      throw new AppError('Username is already in use', 400);
+    }
+    user.username = username;
+  }
+  
+  if (bio !== undefined) user.bio = bio;
+  if (avatarUrl !== undefined) user.avatarUrl = avatarUrl;
+  if (coverPhotoUrl !== undefined) user.coverPhotoUrl = coverPhotoUrl;
+  if (timezone !== undefined) user.timezone = timezone;
   if (password) user.password = password;
 
   const updatedUser = await user.save();
@@ -178,6 +239,12 @@ export const updateProfile = catchAsync(async (req: AuthRequest, res: Response) 
     id: updatedUser._id,
     name: updatedUser.name,
     email: updatedUser.email,
+    username: updatedUser.username,
+    bio: updatedUser.bio,
+    avatarUrl: updatedUser.avatarUrl,
+    coverPhotoUrl: updatedUser.coverPhotoUrl,
+    timezone: updatedUser.timezone,
+    settings: updatedUser.settings,
     isAdmin: updatedUser.isAdmin,
     createdAt: updatedUser.createdAt
   };

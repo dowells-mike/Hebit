@@ -9,6 +9,10 @@ import authRoutes from './routes/auth';
 import taskRoutes from './routes/tasks';
 import habitRoutes from './routes/habits';
 import goalRoutes from './routes/goals';
+import categoryRoutes from './routes/categories';
+import productivityRoutes from './routes/productivity';
+import achievementRoutes from './routes/achievements';
+import userRoutes from './routes/users';
 
 dotenv.config();
 
@@ -23,6 +27,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/habits', habitRoutes);
 app.use('/api/goals', goalRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/productivity', productivityRoutes);
+app.use('/api/achievements', achievementRoutes);
+app.use('/api/users', userRoutes);
 
 // Health check route
 app.get('/health', (req, res) => {

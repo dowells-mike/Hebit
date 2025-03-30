@@ -26,9 +26,98 @@ const userSchema = new Schema<UserDocument>(
       minlength: [6, 'Password must be at least 6 characters'],
       select: false
     },
+    username: {
+      type: String,
+      trim: true,
+      sparse: true,
+      unique: true
+    },
+    bio: {
+      type: String,
+      maxlength: [300, 'Bio cannot be more than 300 characters']
+    },
+    avatarUrl: {
+      type: String
+    },
+    coverPhotoUrl: {
+      type: String
+    },
+    timezone: {
+      type: String,
+      default: 'UTC'
+    },
+    authProviders: {
+      email: {
+        type: Boolean,
+        default: true
+      },
+      google: {
+        type: Boolean,
+        default: false
+      },
+      biometric: {
+        type: Boolean,
+        default: false
+      }
+    },
+    settings: {
+      theme: {
+        type: String,
+        enum: ['light', 'dark', 'system'],
+        default: 'system'
+      },
+      startScreen: {
+        type: String,
+        default: 'dashboard'
+      },
+      notificationPreferences: {
+        tasks: {
+          type: Boolean,
+          default: true
+        },
+        habits: {
+          type: Boolean,
+          default: true
+        },
+        goals: {
+          type: Boolean,
+          default: true
+        },
+        system: {
+          type: Boolean,
+          default: true
+        }
+      },
+      privacySettings: {
+        shareActivity: {
+          type: Boolean,
+          default: false
+        },
+        allowSuggestions: {
+          type: Boolean,
+          default: true
+        }
+      }
+    },
+    productivity: {
+      peakHours: [Number],
+      preferredWorkDays: [Number],
+      focusDuration: {
+        type: Number,
+        default: 0
+      },
+      completionRate: {
+        type: Number,
+        default: 0
+      }
+    },
     isAdmin: {
       type: Boolean,
       default: false
+    },
+    lastLogin: {
+      type: Date,
+      default: Date.now
     }
   },
   {
