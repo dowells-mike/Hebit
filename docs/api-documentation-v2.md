@@ -1,4 +1,4 @@
-# API Documentation & Specifications
+# API Documentation & Specifications v2.0
 
 ## 1. API Architecture
 
@@ -1190,35 +1190,32 @@ Rate limit headers are included in all responses:
 - `X-RateLimit-Remaining`: Remaining requests in current window
 - `X-RateLimit-Reset`: Time until reset (in seconds)
 
-## 9. Webhooks
-
-The API supports webhooks for real-time event notifications:
-
-- Event types:
-  - `task.created`
-  - `task.updated`
-  - `task.completed`
-  - `habit.tracked`
-  - `goal.progress_updated`
-  - `achievement.earned`
-
-- Webhook registration:
-  - `POST /api/webhooks`
-  - Requires API key authentication
-
-## 10. Machine Learning Integration
+## 9. Machine Learning Integration
 
 The API collects data for machine learning features:
 
 - User behavior patterns
-- Task completion patterns
+  - Task completion by time of day and day of week
+  - Habit consistency patterns
+  - Peak productivity hours
+
+- Task patterns
+  - Completion time based on complexity/effort
+  - Connection between due dates and completion probability
+  - Task categorization effectiveness
+
 - Habit consistency
-- Productivity metrics by time of day/week
+  - Streak maintenance factors
+  - Contextual triggers for habit completion
+  - Optimum scheduling for maximum adherence
+
+- Goal achievement
+  - Progress consistency
+  - Impact of milestone structure on completion
+  - Predictive completion timelines
 
 This data is used for:
-- Personalized recommendations
-- Productivity optimization
-- Smart reminders
-- Success probability predictions
-
-This comprehensive API documentation provides detailed specifications, examples, and testing strategies for the application's API. The documentation includes OpenAPI specifications, example generation, and various testing approaches to ensure API reliability and performance.
+- Personalized task scheduling recommendations
+- Smart habit reminders based on completion patterns
+- Goal progress projections
+- Success probability predictions 
