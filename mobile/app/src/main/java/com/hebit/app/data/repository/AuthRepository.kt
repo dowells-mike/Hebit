@@ -4,9 +4,11 @@ import com.hebit.app.data.local.TokenManager
 import com.hebit.app.data.remote.api.HebitApiService
 import com.hebit.app.data.remote.dto.LoginRequest
 import com.hebit.app.data.remote.dto.RegisterRequest
+import com.hebit.app.data.remote.dto.ForgotPasswordRequest
 import com.hebit.app.data.remote.dto.UserResponse
 import com.hebit.app.domain.model.Resource
 import com.hebit.app.domain.model.User
+import com.hebit.app.domain.repository.IAuthRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import retrofit2.HttpException
@@ -21,11 +23,11 @@ import javax.inject.Singleton
 class AuthRepository @Inject constructor(
     private val apiService: HebitApiService,
     private val tokenManager: TokenManager
-) {
+) : IAuthRepository {
     /**
      * Login user with email and password
      */
-    suspend fun login(email: String, password: String): Flow<Resource<User>> = flow {
+    override fun login(email: String, password: String): Flow<Resource<User>> = flow {
         emit(Resource.Loading())
         
         try {
@@ -44,8 +46,15 @@ class AuthRepository @Inject constructor(
                 val user = mapUserResponseToDomain(loginResponse.user)
                 emit(Resource.Success(user))
             } else {
-                val errorMessage = response.errorBody()?.string() ?: "Unknown error occurred"
-                emit(Resource.Error(errorMessage))
+                val errorCode = response.code()
+                when (errorCode) {
+                    401 -> emit(Resource.Error("Invalid email or password"))
+                    429 -> emit(Resource.Error("Too many login attempts. Please try again later"))
+                    else -> {
+                        val errorMessage = response.errorBody()?.string() ?: "Unknown error occurred"
+                        emit(Resource.Error(errorMessage))
+                    }
+                }
             }
         } catch (e: HttpException) {
             emit(Resource.Error("Server error: ${e.message()}"))
@@ -59,7 +68,7 @@ class AuthRepository @Inject constructor(
     /**
      * Register new user
      */
-    suspend fun register(name: String, email: String, password: String): Flow<Resource<User>> = flow {
+    override fun register(name: String, email: String, password: String): Flow<Resource<User>> = flow {
         emit(Resource.Loading())
         
         try {
@@ -78,8 +87,15 @@ class AuthRepository @Inject constructor(
                 val user = mapUserResponseToDomain(registerResponse.user)
                 emit(Resource.Success(user))
             } else {
-                val errorMessage = response.errorBody()?.string() ?: "Unknown error occurred"
-                emit(Resource.Error(errorMessage))
+                val errorCode = response.code()
+                when (errorCode) {
+                    409 -> emit(Resource.Error("Email already in use"))
+                    400 -> emit(Resource.Error("Invalid registration data"))
+                    else -> {
+                        val errorMessage = response.errorBody()?.string() ?: "Unknown error occurred"
+                        emit(Resource.Error(errorMessage))
+                    }
+                }
             }
         } catch (e: HttpException) {
             emit(Resource.Error("Server error: ${e.message()}"))
@@ -93,7 +109,7 @@ class AuthRepository @Inject constructor(
     /**
      * Get currently logged in user profile
      */
-    suspend fun getUserProfile(): Flow<Resource<User>> = flow {
+    override fun getUserProfile(): Flow<Resource<User>> = flow {
         emit(Resource.Loading())
         
         try {
@@ -106,8 +122,55 @@ class AuthRepository @Inject constructor(
                 val user = mapUserResponseToDomain(userResponse)
                 emit(Resource.Success(user))
             } else {
-                val errorMessage = response.errorBody()?.string() ?: "Unknown error occurred"
-                emit(Resource.Error(errorMessage))
+                val errorCode = response.code()
+                when (errorCode) {
+                    401 -> {
+                        // Token expired or invalid, clear auth data
+                        tokenManager.clearAuthData()
+                        emit(Resource.Error("Authentication required"))
+                    }
+                    else -> {
+                        val errorMessage = response.errorBody()?.string() ?: "Unknown error occurred"
+                        emit(Resource.Error(errorMessage))
+                    }
+                }
+            }
+        } catch (e: HttpException) {
+            if (e.code() == 401) {
+                tokenManager.clearAuthData()
+                emit(Resource.Error("Authentication required"))
+            } else {
+                emit(Resource.Error("Server error: ${e.message()}"))
+            }
+        } catch (e: IOException) {
+            emit(Resource.Error("Network error: ${e.localizedMessage ?: "Check your internet connection"}"))
+        } catch (e: Exception) {
+            emit(Resource.Error("Unexpected error: ${e.localizedMessage ?: "An unexpected error occurred"}"))
+        }
+    }
+    
+    /**
+     * Request password reset
+     */
+    override fun requestPasswordReset(email: String): Flow<Resource<Boolean>> = flow {
+        emit(Resource.Loading())
+        
+        try {
+            val request = ForgotPasswordRequest(email)
+            val response = apiService.requestPasswordReset(request)
+            
+            if (response.isSuccessful) {
+                emit(Resource.Success(true))
+            } else {
+                val errorCode = response.code()
+                when (errorCode) {
+                    404 -> emit(Resource.Error("Email not found"))
+                    429 -> emit(Resource.Error("Too many requests. Please try again later"))
+                    else -> {
+                        val errorMessage = response.errorBody()?.string() ?: "Unknown error occurred"
+                        emit(Resource.Error(errorMessage))
+                    }
+                }
             }
         } catch (e: HttpException) {
             emit(Resource.Error("Server error: ${e.message()}"))
@@ -121,14 +184,14 @@ class AuthRepository @Inject constructor(
     /**
      * Logout user
      */
-    fun logout() {
+    override fun logout() {
         tokenManager.clearAuthData()
     }
     
     /**
      * Check if user is logged in
      */
-    fun isLoggedIn(): Boolean {
+    override fun isLoggedIn(): Boolean {
         return tokenManager.isLoggedIn()
     }
     

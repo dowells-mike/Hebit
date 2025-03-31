@@ -1,5 +1,6 @@
-package com.hebit.app.data.remote.dto
+ package com.hebit.app.data.remote.dto
 
+import com.google.gson.annotations.SerializedName
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
@@ -18,28 +19,32 @@ data class RegisterRequest(
 
 @JsonClass(generateAdapter = true)
 data class RefreshTokenRequest(
-    @Json(name = "refresh_token") val refreshToken: String,
-    @Json(name = "user_id") val userId: String
+    @SerializedName("refresh_token") val refreshToken: String
+)
+
+@JsonClass(generateAdapter = true)
+data class ForgotPasswordRequest(
+    val email: String
 )
 
 @JsonClass(generateAdapter = true)
 data class LoginResponse(
     val token: String,
-    @Json(name = "refresh_token") val refreshToken: String,
+    @SerializedName("refresh_token") val refreshToken: String,
     val user: UserResponse
 )
 
 @JsonClass(generateAdapter = true)
 data class RegisterResponse(
     val token: String,
-    @Json(name = "refresh_token") val refreshToken: String,
+    @SerializedName("refresh_token") val refreshToken: String,
     val user: UserResponse
 )
 
 @JsonClass(generateAdapter = true)
 data class RefreshTokenResponse(
     val token: String,
-    @Json(name = "refresh_token") val refreshToken: String
+    @SerializedName("refresh_token") val refreshToken: String
 )
 
 @JsonClass(generateAdapter = true)
@@ -47,5 +52,13 @@ data class UserResponse(
     val id: String,
     val name: String,
     val email: String,
-    @Json(name = "is_admin") val isAdmin: Boolean
+    @SerializedName("is_admin") val isAdmin: Boolean = false,
+    @SerializedName("created_at") val createdAt: String? = null,
+    @SerializedName("updated_at") val updatedAt: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class ForgotPasswordResponse(
+    val success: Boolean,
+    val message: String
 ) 

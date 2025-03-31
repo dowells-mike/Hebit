@@ -2,9 +2,10 @@ package com.hebit.app.ui.screens.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.hebit.app.data.repository.AuthRepository
 import com.hebit.app.domain.model.Resource
 import com.hebit.app.domain.model.User
+import com.hebit.app.domain.repository.IAuthRepository
+import com.hebit.app.util.ValidationHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,57 +20,127 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class AuthViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: IAuthRepository
 ) : ViewModel() {
     
-    // Initialize with empty state instead of loading to prevent showing loading indicators initially
-    private val _loginState = MutableStateFlow<Resource<User>>(Resource.Success(User("", "", "", false)))
+    // Login state
+    private val _loginState = MutableStateFlow<Resource<User>>(Resource.Success(null))
     val loginState: StateFlow<Resource<User>> = _loginState
     
-    private val _registerState = MutableStateFlow<Resource<User>>(Resource.Success(User("", "", "", false)))
+    // Register state
+    private val _registerState = MutableStateFlow<Resource<User>>(Resource.Success(null))
     val registerState: StateFlow<Resource<User>> = _registerState
     
+    // Password reset state
     private val _resetPasswordState = MutableStateFlow<Resource<Boolean>>(Resource.Success(false))
     val resetPasswordState: StateFlow<Resource<Boolean>> = _resetPasswordState
     
-/**
- * Check login status with stored token
- */
-fun checkLoginStatus() {
-    // First check if token exists
-    if (!authRepository.isLoggedIn()) {
-        _loginState.value = Resource.Error("Not logged in")
-        return
-    }
-    
-    // Try to get user profile to validate token
-    viewModelScope.launch {
+    /**
+     * Check login status with stored token
+     */
+    fun checkLoginStatus() {
+        // First check if token exists
+        if (!authRepository.isLoggedIn()) {
+            _loginState.value = Resource.Error("Not logged in")
+            return
+        }
+        
+        // Try to get user profile to validate token
         authRepository.getUserProfile()
             .onEach { result ->
                 _loginState.value = result
             }
             .launchIn(viewModelScope)
     }
-}
-
-/**
- * Login with email and password
- */
-fun login(email: String, password: String) {
-    viewModelScope.launch {
-        authRepository.login(email, password)
-            .onEach { result ->
-                _loginState.value = result
-            }
-            .launchIn(viewModelScope)
+    
+    /**
+     * Login with email and password
+     * 
+     * @return Error message if validation fails, null if successful
+     */
+    fun validateLoginInput(email: String, password: String): String? {
+        // Validate email
+        if (email.isBlank()) {
+            return "Email is required"
+        }
+        
+        if (!ValidationHelper.isValidEmail(email)) {
+            return "Please enter a valid email address"
+        }
+        
+        // Validate password
+        if (password.isBlank()) {
+            return "Password is required"
+        }
+        
+        return null // No validation errors
     }
-}
+    
+    /**
+     * Login with email and password
+     */
+    fun login(email: String, password: String) {
+        viewModelScope.launch {
+            _loginState.value = Resource.Loading()
+            authRepository.login(email, password)
+                .onEach { result ->
+                    _loginState.value = result
+                }
+                .launchIn(viewModelScope)
+        }
+    }
+    
+    /**
+     * Validate registration input
+     * 
+     * @return Error message if validation fails, null if successful
+     */
+    fun validateRegistrationInput(name: String, email: String, password: String, confirmPassword: String): String? {
+        // Validate name
+        if (name.isBlank()) {
+            return "Name is required"
+        }
+        
+        if (!ValidationHelper.isValidName(name)) {
+            return "Please enter a valid name"
+        }
+        
+        // Validate email
+        if (email.isBlank()) {
+            return "Email is required"
+        }
+        
+        if (!ValidationHelper.isValidEmail(email)) {
+            return "Please enter a valid email address"
+        }
+        
+        // Validate password
+        if (password.isBlank()) {
+            return "Password is required"
+        }
+        
+        if (password.length < 8) {
+            return "Password must be at least 8 characters long"
+        }
+        
+        if (!ValidationHelper.isStrongPassword(password)) {
+            return "Password must contain uppercase, lowercase, number, and special character"
+        }
+        
+        // Validate confirm password
+        if (confirmPassword != password) {
+            return "Passwords do not match"
+        }
+        
+        return null // No validation errors
+    }
     
     /**
      * Register new user
      */
     fun register(name: String, email: String, password: String) {
         viewModelScope.launch {
+            _registerState.value = Resource.Loading()
             authRepository.register(name, email, password)
                 .onEach { result ->
                     _registerState.value = result
@@ -79,23 +150,34 @@ fun login(email: String, password: String) {
     }
     
     /**
-     * Request password reset
+     * Validate password reset email
      * 
-     * Note: This is a simulated implementation since we don't have a real backend yet.
-     * In a real app, this would call the repository to make an API request.
+     * @return Error message if validation fails, null if successful
      */
-    fun resetPassword(email: String, onComplete: () -> Unit) {
+    fun validateResetPasswordEmail(email: String): String? {
+        // Validate email
+        if (email.isBlank()) {
+            return "Email is required"
+        }
+        
+        if (!ValidationHelper.isValidEmail(email)) {
+            return "Please enter a valid email address"
+        }
+        
+        return null // No validation errors
+    }
+    
+    /**
+     * Request password reset
+     */
+    fun resetPassword(email: String) {
         viewModelScope.launch {
             _resetPasswordState.value = Resource.Loading()
-            
-            // Simulate network delay
-            delay(1500)
-            
-            // For demo purposes, always succeed
-            _resetPasswordState.value = Resource.Success(true)
-            
-            // Call the completion callback
-            onComplete()
+            authRepository.requestPasswordReset(email)
+                .onEach { result ->
+                    _resetPasswordState.value = result
+                }
+                .launchIn(viewModelScope)
         }
     }
     
@@ -117,14 +199,14 @@ fun login(email: String, password: String) {
      * Reset login state
      */
     fun resetLoginState() {
-        _loginState.value = Resource.Success(User("", "", "", false))
+        _loginState.value = Resource.Success(null)
     }
     
     /**
      * Reset register state
      */
     fun resetRegisterState() {
-        _registerState.value = Resource.Success(User("", "", "", false))
+        _registerState.value = Resource.Success(null)
     }
     
     /**

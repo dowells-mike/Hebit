@@ -24,7 +24,7 @@ import com.hebit.app.R
 import com.hebit.app.domain.model.Resource
 
 /**
- * Login screen implementation based on wireframe specifications
+ * Login screen with improved functionality
  */
 @Composable
 fun LoginScreen(
@@ -35,19 +35,19 @@ fun LoginScreen(
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var rememberMe by remember { mutableStateOf(false) }
     var passwordVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     
     val loginState by viewModel.loginState.collectAsState()
     
-    // Check login state
+    // Check login state changes
     LaunchedEffect(loginState) {
         when (loginState) {
             is Resource.Success -> {
-                onLoginSuccess()
-                // Reset login state after successful login
-                viewModel.resetLoginState()
+                if (loginState.data != null) {
+                    onLoginSuccess()
+                    viewModel.resetLoginState()
+                }
             }
             is Resource.Error -> {
                 errorMessage = loginState.message
@@ -61,60 +61,60 @@ fun LoginScreen(
     // Check if already logged in on screen enter
     LaunchedEffect(Unit) {
         if (viewModel.isLoggedIn()) {
-            onLoginSuccess()
+            viewModel.checkLoginStatus()
         }
     }
     
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp, vertical = 48.dp)
+            .padding(horizontal = 24.dp)
             .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        // App Logo
-        Image(
-            painter = painterResource(id = R.drawable.ic_shield), // Replace with your app logo
-            contentDescription = "Hebit App Logo",
-            modifier = Modifier
-                .size(100.dp)
-                .padding(8.dp)
+        Text(
+            text = "Login to Hebit",
+            style = MaterialTheme.typography.headlineMedium,
+            modifier = Modifier.padding(bottom = 32.dp)
         )
-        
-        Spacer(modifier = Modifier.height(32.dp))
         
         // Email Input Field
         OutlinedTextField(
             value = email,
-            onValueChange = { email = it },
+            onValueChange = { 
+                email = it
+                errorMessage = null // Clear error when user types
+            },
             label = { Text("Email") },
             singleLine = true,
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 56.dp),
-            keyboardOptions = KeyboardOptions.Default.copy(
-                imeAction = ImeAction.Next,
-                keyboardType = KeyboardType.Email
+                .padding(bottom = 16.dp),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Email,
+                imeAction = ImeAction.Next
             ),
-            isError = errorMessage != null && email.isBlank(),
-            textStyle = MaterialTheme.typography.bodyLarge
+            isError = errorMessage != null && (errorMessage?.contains("email", ignoreCase = true) == true || 
+                                              errorMessage?.contains("login", ignoreCase = true) == true)
         )
-        
-        Spacer(modifier = Modifier.height(16.dp))
         
         // Password Input Field
         OutlinedTextField(
             value = password,
-            onValueChange = { password = it },
+            onValueChange = { 
+                password = it
+                errorMessage = null // Clear error when user types
+            },
             label = { Text("Password") },
             singleLine = true,
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 56.dp),
+                .padding(bottom = 8.dp),
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions.Default.copy(
-                imeAction = ImeAction.Done,
-                keyboardType = KeyboardType.Password
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Password,
+                imeAction = ImeAction.Done
             ),
             trailingIcon = {
                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
@@ -124,34 +124,19 @@ fun LoginScreen(
                     )
                 }
             },
-            isError = errorMessage != null && password.isBlank(),
-            textStyle = MaterialTheme.typography.bodyLarge
+            isError = errorMessage != null && (errorMessage?.contains("password", ignoreCase = true) == true || 
+                                             errorMessage?.contains("login", ignoreCase = true) == true)
         )
         
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // Remember Me Checkbox
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+        // Forgot Password Link
+        TextButton(
+            onClick = { onForgotPasswordClick() },
+            modifier = Modifier
+                .align(Alignment.End)
+                .padding(bottom = 16.dp)
         ) {
-            Checkbox(
-                checked = rememberMe,
-                onCheckedChange = { rememberMe = it },
-                modifier = Modifier.size(24.dp)
-            )
-            
-            Spacer(modifier = Modifier.width(8.dp))
-            
-            Text(
-                text = "Remember me",
-                style = MaterialTheme.typography.bodyMedium
-            )
-            
-            Spacer(modifier = Modifier.weight(1f))
+            Text("Forgot password?")
         }
-        
-        Spacer(modifier = Modifier.height(8.dp))
         
         // Error message
         errorMessage?.let {
@@ -160,31 +145,28 @@ fun LoginScreen(
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
             )
-            Spacer(modifier = Modifier.height(8.dp))
         }
-        
-        Spacer(modifier = Modifier.height(8.dp))
         
         // Login Button
         Button(
             onClick = {
-                // Clear previous error message
-                errorMessage = null
-                
-                // Simple validation
-                if (email.isBlank() || password.isBlank()) {
-                    errorMessage = "Please enter both email and password"
+                // Validate inputs
+                val validationError = viewModel.validateLoginInput(email, password)
+                if (validationError != null) {
+                    errorMessage = validationError
                     return@Button
                 }
                 
-                // Call login method from view model
+                // Perform login
                 viewModel.login(email, password)
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp),
+                .height(50.dp),
             enabled = loginState !is Resource.Loading
         ) {
             if (loginState is Resource.Loading) {
@@ -199,40 +181,20 @@ fun LoginScreen(
         
         Spacer(modifier = Modifier.height(24.dp))
         
-        // Google Sign-In Button
-        OutlinedButton(
-            onClick = { /* Handle Google sign-in */ },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp)
+        // Register Link
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                painter = painterResource(id = R.drawable.ic_google), // Add a Google icon
-                contentDescription = "Google icon",
-                modifier = Modifier.size(24.dp)
+            Text(
+                text = "Don't have an account?",
+                style = MaterialTheme.typography.bodyMedium
             )
             
-            Spacer(modifier = Modifier.width(8.dp))
-            
-            Text("Continue with Google")
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // Forgot Password Link
-        TextButton(
-            onClick = { onForgotPasswordClick() }
-        ) {
-            Text("Forgot password?")
-        }
-        
-        Spacer(modifier = Modifier.weight(1f))
-        
-        // Register Link
-        TextButton(
-            onClick = { onRegisterClick() }
-        ) {
-            Text("Don't have an account? Sign up")
+            TextButton(onClick = { onRegisterClick() }) {
+                Text("Sign Up")
+            }
         }
     }
 }
