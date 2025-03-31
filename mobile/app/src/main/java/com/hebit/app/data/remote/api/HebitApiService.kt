@@ -11,16 +11,19 @@ interface HebitApiService {
     
     // Auth Endpoints
     @POST("auth/login")
-    suspend fun login(@Body loginRequest: LoginRequest): Response<LoginResponse>
+    suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
     
     @POST("auth/register")
-    suspend fun register(@Body registerRequest: RegisterRequest): Response<RegisterResponse>
+    suspend fun register(@Body request: RegisterRequest): Response<RegisterResponse>
     
-    @POST("auth/refresh-token")
-    suspend fun refreshToken(@Body refreshRequest: RefreshTokenRequest): Response<RefreshTokenResponse>
+    @POST("auth/refresh")
+    suspend fun refreshToken(@Body request: RefreshTokenRequest): Response<RefreshTokenResponse>
     
-    @GET("auth/profile")
+    @GET("auth/me")
     suspend fun getUserProfile(): Response<UserResponse>
+    
+    @POST("auth/forgot-password")
+    suspend fun requestPasswordReset(@Body request: ForgotPasswordRequest): Response<ForgotPasswordResponse>
     
     // Task Endpoints
     @GET("tasks")
@@ -111,4 +114,39 @@ interface HebitApiService {
         @Path("id") id: String,
         @Body request: GoalProgressRequest
     ): Response<GoalDto>
+    
+    // Productivity Metrics Endpoints
+    @GET("productivity/metrics")
+    suspend fun getProductivityMetrics(
+        @Query("from_date") fromDate: String?,
+        @Query("to_date") toDate: String?
+    ): Response<List<ProductivityMetricsDto>>
+    
+    @POST("productivity/focus-time")
+    suspend fun trackFocusTime(@Body request: FocusTimeRequest): Response<ProductivityMetricsDto>
+    
+    @POST("productivity/day-rating")
+    suspend fun submitDayRating(@Body request: DayRatingRequest): Response<ProductivityMetricsDto>
+    
+    @GET("productivity/insights")
+    suspend fun getProductivityInsights(@Query("period") period: String?): Response<ProductivityInsightsResponse>
+    
+    // Achievement Endpoints
+    @GET("achievements")
+    suspend fun getAchievements(
+        @Query("category") category: String?,
+        @Query("earned") earned: Boolean?,
+        @Query("rarity") rarity: String?,
+        @Query("page") page: Int,
+        @Query("per_page") perPage: Int
+    ): Response<AchievementListResponse>
+    
+    @GET("achievements/progress")
+    suspend fun getAchievementProgress(): Response<AchievementProgressResponse>
+    
+    @GET("achievements/check")
+    suspend fun checkNewAchievements(): Response<NewlyEarnedAchievementsResponse>
+    
+    @GET("achievements/user")
+    suspend fun getUserAchievements(): Response<UserAchievementResponse>
 }

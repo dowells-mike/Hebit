@@ -10,8 +10,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.NavType
+import com.hebit.app.ui.screens.achievements.AchievementScreen
 import com.hebit.app.ui.screens.auth.ForgotPasswordScreen
 import com.hebit.app.ui.screens.auth.LoginScreen
+import com.hebit.app.ui.screens.auth.RegisterScreen
 import com.hebit.app.ui.screens.auth.RegistrationScreen
 import com.hebit.app.ui.screens.auth.SplashScreen
 import com.hebit.app.ui.screens.dashboard.DashboardScreen
@@ -20,6 +22,7 @@ import com.hebit.app.ui.screens.dashboard.QuickActionsScreen
 import com.hebit.app.ui.screens.habits.HabitListScreen
 import com.hebit.app.ui.screens.habits.HabitDetailScreen
 import com.hebit.app.ui.screens.habits.HabitStreakScreen
+import com.hebit.app.ui.screens.productivity.ProductivityScreen
 import com.hebit.app.ui.screens.tasks.TaskListScreen
 import com.hebit.app.ui.screens.tasks.TaskDetailScreen
 import com.hebit.app.ui.screens.tasks.TaskCategoriesScreen
@@ -28,7 +31,6 @@ import com.hebit.app.ui.screens.goals.GoalListScreen
 import com.hebit.app.ui.screens.goals.GoalDetailScreen
 import com.hebit.app.ui.screens.settings.SettingsScreen
 import com.hebit.app.ui.screens.profile.ProfileScreen
-import com.hebit.app.ui.screens.profile.AchievementScreen
 import com.hebit.app.ui.screens.profile.StatisticsScreen
 
 /**
@@ -58,9 +60,12 @@ object Routes {
     // Profile and Settings
     const val PROFILE = "profile"
     const val PROFILE_EDIT = "profile_edit"
-    const val PROFILE_ACHIEVEMENTS = "profile_achievements"
     const val PROFILE_STATISTICS = "profile_statistics"
     const val SETTINGS = "settings"
+    
+    // New features
+    const val PRODUCTIVITY = "productivity"
+    const val ACHIEVEMENTS = "achievements"
 }
 
 /**
@@ -102,20 +107,22 @@ fun HebitNavigation(
         }
         
         composable(Routes.REGISTER) {
-            RegistrationScreen(
-                onNavigateBack = { navController.navigateUp() },
-                onRegistrationSuccess = {
+            RegisterScreen(
+                onRegisterSuccess = {
                     navController.navigate(Routes.DASHBOARD) {
                         popUpTo(Routes.LOGIN) { inclusive = true }
                     }
-                }
+                },
+                onLoginClick = { navController.navigate(Routes.LOGIN) {
+                    popUpTo(Routes.LOGIN) { inclusive = true }
+                }}
             )
         }
         
         composable(Routes.FORGOT_PASSWORD) {
             ForgotPasswordScreen(
-                onNavigateBack = { navController.navigateUp() },
-                onReturnToLogin = { navController.navigate(Routes.LOGIN) {
+                onBackClick = { navController.navigateUp() },
+                onResetSuccess = { navController.navigate(Routes.LOGIN) {
                     popUpTo(Routes.LOGIN) { inclusive = true }
                 }}
             )
@@ -129,7 +136,9 @@ fun HebitNavigation(
                 onGoalsClick = { navController.navigate(Routes.GOALS) },
                 onSettingsClick = { navController.navigate(Routes.SETTINGS) },
                 onQuickActionsClick = { navController.navigate(Routes.QUICK_ACTIONS) },
-                onProgressStatsClick = { navController.navigate(Routes.PROGRESS_STATS) }
+                onProgressStatsClick = { navController.navigate(Routes.PROGRESS_STATS) },
+                onProductivityClick = { navController.navigate(Routes.PRODUCTIVITY) },
+                onAchievementsClick = { navController.navigate(Routes.ACHIEVEMENTS) }
             )
         }
         
@@ -323,7 +332,7 @@ fun HebitNavigation(
         composable(Routes.PROFILE) {
             ProfileScreen(
                 onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
-                onNavigateToAchievements = { navController.navigate(Routes.PROFILE_ACHIEVEMENTS) },
+                onNavigateToAchievements = { navController.navigate(Routes.ACHIEVEMENTS) },
                 onNavigateToStatistics = { navController.navigate(Routes.PROFILE_STATISTICS) },
                 onNavigateToEditProfile = { navController.navigate(Routes.PROFILE_EDIT) },
                 onHomeClick = { navController.navigate(Routes.DASHBOARD) {
@@ -332,12 +341,6 @@ fun HebitNavigation(
                 onTasksClick = { navController.navigate(Routes.TASKS) },
                 onHabitsClick = { navController.navigate(Routes.HABITS) },
                 onGoalsClick = { navController.navigate(Routes.GOALS) }
-            )
-        }
-        
-        composable(Routes.PROFILE_ACHIEVEMENTS) {
-            AchievementScreen(
-                onNavigateBack = { navController.navigateUp() }
             )
         }
         
@@ -351,7 +354,7 @@ fun HebitNavigation(
             // Will be implemented later
             ProfileScreen(
                 onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
-                onNavigateToAchievements = { navController.navigate(Routes.PROFILE_ACHIEVEMENTS) },
+                onNavigateToAchievements = { navController.navigate(Routes.ACHIEVEMENTS) },
                 onNavigateToStatistics = { navController.navigate(Routes.PROFILE_STATISTICS) },
                 onNavigateToEditProfile = { navController.navigateUp() },
                 onHomeClick = { navController.navigate(Routes.DASHBOARD) {
@@ -374,6 +377,15 @@ fun HebitNavigation(
                     }
                 }
             )
+        }
+        
+        // New screens for productivity features
+        composable(Routes.PRODUCTIVITY) {
+            ProductivityScreen()
+        }
+        
+        composable(Routes.ACHIEVEMENTS) {
+            AchievementScreen()
         }
     }
 }

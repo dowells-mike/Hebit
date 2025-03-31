@@ -46,6 +46,8 @@ fun DashboardScreen(
     onSettingsClick: () -> Unit,
     onQuickActionsClick: () -> Unit = {},
     onProgressStatsClick: () -> Unit = {},
+    onProductivityClick: () -> Unit = {},
+    onAchievementsClick: () -> Unit = {},
     taskViewModel: TaskViewModel = hiltViewModel(),
     habitViewModel: HabitViewModel = hiltViewModel()
 ) {
@@ -74,8 +76,8 @@ fun DashboardScreen(
                         Icon(Icons.Default.Speed, contentDescription = "Quick Actions")
                     }
                     
-                    IconButton(onClick = { /* Open notifications */ }) {
-                        Icon(Icons.Default.Notifications, contentDescription = "Notifications")
+                    IconButton(onClick = { onProductivityClick() }) {
+                        Icon(Icons.Default.Timer, contentDescription = "Productivity")
                     }
                     
                     IconButton(onClick = { onSettingsClick() }) {
@@ -119,10 +121,10 @@ fun DashboardScreen(
                     )
                     
                     BottomNavItem(
-                        icon = Icons.Default.Person,
-                        label = "Profile",
+                        icon = Icons.Default.EmojiEvents,
+                        label = "Achievements",
                         selected = false,
-                        onClick = onSettingsClick
+                        onClick = onAchievementsClick
                     )
                 }
             }
@@ -171,6 +173,30 @@ fun DashboardScreen(
                         fontWeight = FontWeight.Bold
                     )
                 }
+            }
+            
+            // New Productivity and Achievements shortcuts
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                DashboardShortcutButton(
+                    icon = Icons.Default.Timer,
+                    label = "Productivity",
+                    onClick = onProductivityClick,
+                    modifier = Modifier.weight(1f),
+                    color = MaterialTheme.colorScheme.primary
+                )
+                
+                DashboardShortcutButton(
+                    icon = Icons.Default.EmojiEvents,
+                    label = "Achievements",
+                    onClick = onAchievementsClick,
+                    modifier = Modifier.weight(1f),
+                    color = MaterialTheme.colorScheme.secondary
+                )
             }
             
             Divider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -668,3 +694,42 @@ data class Goal(
     val dueDate: String,
     val category: String
 )
+
+// Add new composable for shortcuts
+@Composable
+fun DashboardShortcutButton(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.primary
+) {
+    Card(
+        modifier = modifier
+            .height(80.dp)
+            .clickable { onClick() },
+        colors = CardDefaults.cardColors(
+            containerColor = color.copy(alpha = 0.1f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = color
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
