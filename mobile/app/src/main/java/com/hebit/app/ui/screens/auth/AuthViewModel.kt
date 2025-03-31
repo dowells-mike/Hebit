@@ -24,12 +24,12 @@ class AuthViewModel @Inject constructor(
 ) : ViewModel() {
     
     // Login state
-    private val _loginState = MutableStateFlow<Resource<User>>(Resource.Success(null))
-    val loginState: StateFlow<Resource<User>> = _loginState
+    private val _loginState = MutableStateFlow<Resource<User?>>(Resource.Success(null))
+    val loginState: StateFlow<Resource<User?>> = _loginState
     
     // Register state
-    private val _registerState = MutableStateFlow<Resource<User>>(Resource.Success(null))
-    val registerState: StateFlow<Resource<User>> = _registerState
+    private val _registerState = MutableStateFlow<Resource<User?>>(Resource.Success(null))
+    val registerState: StateFlow<Resource<User?>> = _registerState
     
     // Password reset state
     private val _resetPasswordState = MutableStateFlow<Resource<Boolean>>(Resource.Success(false))
