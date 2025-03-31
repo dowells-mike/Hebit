@@ -27,7 +27,7 @@ class AuthRepository @Inject constructor(
     /**
      * Login user with email and password
      */
-    override fun login(email: String, password: String): Flow<Resource<User>> = flow {
+    override fun login(email: String, password: String): Flow<Resource<User?>> = flow {
         emit(Resource.Loading())
         
         try {
@@ -68,7 +68,7 @@ class AuthRepository @Inject constructor(
     /**
      * Register new user
      */
-    override fun register(name: String, email: String, password: String): Flow<Resource<User>> = flow {
+    override fun register(name: String, email: String, password: String): Flow<Resource<User?>> = flow {
         emit(Resource.Loading())
         
         try {
@@ -109,7 +109,7 @@ class AuthRepository @Inject constructor(
     /**
      * Get currently logged in user profile
      */
-    override fun getUserProfile(): Flow<Resource<User>> = flow {
+    override fun getUserProfile(): Flow<Resource<User?>> = flow {
         emit(Resource.Loading())
         
         try {

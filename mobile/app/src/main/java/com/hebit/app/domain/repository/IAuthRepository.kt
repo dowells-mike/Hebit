@@ -11,17 +11,17 @@ interface IAuthRepository {
     /**
      * Login user with email and password
      */
-    fun login(email: String, password: String): Flow<Resource<User>>
+    fun login(email: String, password: String): Flow<Resource<User?>>
     
     /**
      * Register new user
      */
-    fun register(name: String, email: String, password: String): Flow<Resource<User>>
+    fun register(name: String, email: String, password: String): Flow<Resource<User?>>
     
     /**
      * Get user profile using stored token
      */
-    fun getUserProfile(): Flow<Resource<User>>
+    fun getUserProfile(): Flow<Resource<User?>>
     
     /**
      * Request password reset
