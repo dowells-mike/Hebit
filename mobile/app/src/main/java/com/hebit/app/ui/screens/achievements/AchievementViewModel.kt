@@ -9,6 +9,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -45,114 +46,126 @@ class AchievementViewModel @Inject constructor(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingAchievements = true) }
-            when (val response = achievementRepository.getAchievements(category, earned, rarity, page, perPage)) {
-                is Resource.Success -> {
-                    _uiState.update { 
-                        it.copy(
-                            isLoadingAchievements = false,
-                            achievements = response.data?.achievements ?: emptyList(),
-                            error = null
-                        )
+            achievementRepository.getAchievements(category, earned, rarity, page, perPage)
+                .collectLatest { response ->
+                    when (response) {
+                        is Resource.Success -> {
+                            _uiState.update { 
+                                it.copy(
+                                    isLoadingAchievements = false,
+                                    achievements = response.data?.achievements ?: emptyList(),
+                                    error = null
+                                )
+                            }
+                        }
+                        is Resource.Error -> {
+                            _uiState.update { 
+                                it.copy(
+                                    isLoadingAchievements = false,
+                                    error = response.message
+                                )
+                            }
+                        }
+                        is Resource.Loading -> {
+                            // Already handled
+                        }
                     }
                 }
-                is Resource.Error -> {
-                    _uiState.update { 
-                        it.copy(
-                            isLoadingAchievements = false,
-                            error = response.message
-                        )
-                    }
-                }
-                is Resource.Loading -> {
-                    // Already handled
-                }
-            }
         }
     }
     
     fun loadAchievementProgress() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingProgress = true) }
-            when (val response = achievementRepository.getAchievementProgress()) {
-                is Resource.Success -> {
-                    _uiState.update { 
-                        it.copy(
-                            isLoadingProgress = false,
-                            achievementProgress = response.data?.achievements ?: emptyList(),
-                            error = null
-                        )
+            achievementRepository.getAchievementProgress()
+                .collectLatest { response ->
+                    when (response) {
+                        is Resource.Success -> {
+                            _uiState.update { 
+                                it.copy(
+                                    isLoadingProgress = false,
+                                    achievementProgress = response.data?.achievements ?: emptyList(),
+                                    error = null
+                                )
+                            }
+                        }
+                        is Resource.Error -> {
+                            _uiState.update { 
+                                it.copy(
+                                    isLoadingProgress = false,
+                                    error = response.message
+                                )
+                            }
+                        }
+                        is Resource.Loading -> {
+                            // Already handled
+                        }
                     }
                 }
-                is Resource.Error -> {
-                    _uiState.update { 
-                        it.copy(
-                            isLoadingProgress = false,
-                            error = response.message
-                        )
-                    }
-                }
-                is Resource.Loading -> {
-                    // Already handled
-                }
-            }
         }
     }
     
     fun checkNewAchievements() {
         viewModelScope.launch {
             _uiState.update { it.copy(isChecking = true) }
-            when (val response = achievementRepository.checkNewAchievements()) {
-                is Resource.Success -> {
-                    val newAchievements = response.data?.earnedAchievements ?: emptyList()
-                    _uiState.update { 
-                        it.copy(
-                            isChecking = false,
-                            newlyEarnedAchievements = newAchievements,
-                            hasNewAchievements = newAchievements.isNotEmpty(),
-                            error = null
-                        )
+            achievementRepository.checkNewAchievements()
+                .collectLatest { response ->
+                    when (response) {
+                        is Resource.Success -> {
+                            val newAchievements = response.data?.earnedAchievements ?: emptyList()
+                            _uiState.update { 
+                                it.copy(
+                                    isChecking = false,
+                                    newlyEarnedAchievements = newAchievements,
+                                    hasNewAchievements = newAchievements.isNotEmpty(),
+                                    error = null
+                                )
+                            }
+                        }
+                        is Resource.Error -> {
+                            _uiState.update { 
+                                it.copy(
+                                    isChecking = false,
+                                    error = response.message
+                                )
+                            }
+                        }
+                        is Resource.Loading -> {
+                            // Already handled
+                        }
                     }
                 }
-                is Resource.Error -> {
-                    _uiState.update { 
-                        it.copy(
-                            isChecking = false,
-                            error = response.message
-                        )
-                    }
-                }
-                is Resource.Loading -> {
-                    // Already handled
-                }
-            }
         }
     }
     
     fun loadUserAchievements() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingUserAchievements = true) }
-            when (val response = achievementRepository.getUserAchievements()) {
-                is Resource.Success -> {
-                    _uiState.update { 
-                        it.copy(
-                            isLoadingUserAchievements = false,
-                            userAchievements = response.data?.userAchievements ?: emptyList(),
-                            error = null
-                        )
+            achievementRepository.getUserAchievements()
+                .collectLatest { response ->
+                    when (response) {
+                        is Resource.Success -> {
+                            _uiState.update { 
+                                it.copy(
+                                    isLoadingUserAchievements = false,
+                                    userAchievements = response.data?.userAchievements ?: emptyList(),
+                                    error = null
+                                )
+                            }
+                        }
+                        is Resource.Error -> {
+                            _uiState.update { 
+                                it.copy(
+                                    isLoadingUserAchievements = false,
+                                    error = response.message
+                                )
+                            }
+                        }
+                        is Resource.Loading -> {
+                            // Already handled
+                        }
                     }
                 }
-                is Resource.Error -> {
-                    _uiState.update { 
-                        it.copy(
-                            isLoadingUserAchievements = false,
-                            error = response.message
-                        )
-                    }
-                }
-                is Resource.Loading -> {
-                    // Already handled
-                }
-            }
         }
     }
     

@@ -3,6 +3,7 @@ package com.hebit.app.domain.repository
 import com.hebit.app.data.remote.dto.ProductivityInsightsResponse
 import com.hebit.app.data.remote.dto.ProductivityMetricsDto
 import com.hebit.app.domain.model.Resource
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Interface for productivity operations
@@ -11,34 +12,34 @@ interface IProductivityRepository {
     /**
      * Get productivity metrics for a date range
      */
-    suspend fun getProductivityMetrics(
+    fun getProductivityMetrics(
         fromDate: String? = null,
         toDate: String? = null
-    ): Resource<List<ProductivityMetricsDto>>
+    ): Flow<Resource<List<ProductivityMetricsDto>>>
     
     /**
      * Track focus time
      */
-    suspend fun trackFocusTime(
+    fun trackFocusTime(
         minutes: Int,
         taskId: String? = null,
         habitId: String? = null,
         goalId: String? = null,
         notes: String? = null
-    ): Resource<ProductivityMetricsDto>
+    ): Flow<Resource<ProductivityMetricsDto>>
     
     /**
      * Submit day rating
      */
-    suspend fun submitDayRating(
+    fun submitDayRating(
         rating: Int,
         notes: String? = null
-    ): Resource<ProductivityMetricsDto>
+    ): Flow<Resource<ProductivityMetricsDto>>
     
     /**
      * Get productivity insights
      */
-    suspend fun getProductivityInsights(
+    fun getProductivityInsights(
         period: String? = null
-    ): Resource<ProductivityInsightsResponse>
+    ): Flow<Resource<ProductivityInsightsResponse>>
 } 

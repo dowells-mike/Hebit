@@ -18,44 +18,84 @@ class ProductivityRepository @Inject constructor(
     private val apiService: HebitApiService
 ) : IProductivityRepository {
     
-    override suspend fun getProductivityMetrics(
+    override fun getProductivityMetrics(
         fromDate: String?,
         toDate: String?
-    ): Resource<List<ProductivityMetricsDto>> = safeApiCall {
-        apiService.getProductivityMetrics(fromDate, toDate)
+    ): Flow<Resource<List<ProductivityMetricsDto>>> = flow {
+        emit(Resource.Loading())
+        try {
+            val response = apiService.getProductivityMetrics(fromDate, toDate)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error("Failed to get productivity metrics"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.message ?: "An error occurred"))
+        }
     }
     
-    override suspend fun trackFocusTime(
+    override fun trackFocusTime(
         minutes: Int,
         taskId: String?,
         habitId: String?,
         goalId: String?,
         notes: String?
-    ): Resource<ProductivityMetricsDto> = safeApiCall {
-        val request = FocusTimeRequest(
-            minutes = minutes,
-            taskId = taskId,
-            habitId = habitId,
-            goalId = goalId,
-            notes = notes
-        )
-        apiService.trackFocusTime(request)
+    ): Flow<Resource<ProductivityMetricsDto>> = flow {
+        emit(Resource.Loading())
+        try {
+            val request = FocusTimeRequest(
+                minutes = minutes,
+                taskId = taskId,
+                habitId = habitId,
+                goalId = goalId,
+                notes = notes
+            )
+            val response = apiService.trackFocusTime(request)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error("Failed to track focus time"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.message ?: "An error occurred"))
+        }
     }
     
-    override suspend fun submitDayRating(
+    override fun submitDayRating(
         rating: Int,
         notes: String?
-    ): Resource<ProductivityMetricsDto> = safeApiCall {
-        val request = DayRatingRequest(
-            rating = rating,
-            notes = notes
-        )
-        apiService.submitDayRating(request)
+    ): Flow<Resource<ProductivityMetricsDto>> = flow {
+        emit(Resource.Loading())
+        try {
+            val request = DayRatingRequest(
+                rating = rating,
+                notes = notes
+            )
+            val response = apiService.submitDayRating(request)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error("Failed to submit day rating"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.message ?: "An error occurred"))
+        }
     }
     
-    override suspend fun getProductivityInsights(
+    override fun getProductivityInsights(
         period: String?
-    ): Resource<ProductivityInsightsResponse> = safeApiCall {
-        apiService.getProductivityInsights(period)
+    ): Flow<Resource<ProductivityInsightsResponse>> = flow {
+        emit(Resource.Loading())
+        try {
+            val response = apiService.getProductivityInsights(period)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                emit(Resource.Error("Failed to get productivity insights"))
+            }
+        } catch (e: Exception) {
+            emit(Resource.Error(e.message ?: "An error occurred"))
+        }
     }
 } 

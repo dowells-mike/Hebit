@@ -1,4 +1,4 @@
- package com.hebit.app.data.remote.dto
+package com.hebit.app.data.remote.dto
 
 import com.google.gson.annotations.SerializedName
 import com.squareup.moshi.Json
@@ -19,7 +19,8 @@ data class RegisterRequest(
 
 @JsonClass(generateAdapter = true)
 data class RefreshTokenRequest(
-    @SerializedName("refresh_token") val refreshToken: String
+    @SerializedName("refresh_token") val refreshToken: String,
+    @SerializedName("user_id") val userId: String
 )
 
 @JsonClass(generateAdapter = true)

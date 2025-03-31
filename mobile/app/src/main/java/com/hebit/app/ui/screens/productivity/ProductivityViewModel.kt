@@ -10,6 +10,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -52,32 +53,35 @@ class ProductivityViewModel @Inject constructor(
             val fromDateStr = fromDate.format(dateFormatter)
             val toDateStr = toDate.format(dateFormatter)
             
-            when (val result = productivityRepository.getProductivityMetrics(fromDateStr, toDateStr)) {
-                is Resource.Success -> {
-                    _uiState.update {
-                        it.copy(
-                            isLoadingMetrics = false,
-                            metrics = result.data ?: emptyList(),
-                            error = null
-                        )
+            productivityRepository.getProductivityMetrics(fromDateStr, toDateStr)
+                .collectLatest { result ->
+                    when (result) {
+                        is Resource.Success -> {
+                            _uiState.update {
+                                it.copy(
+                                    isLoadingMetrics = false,
+                                    metrics = result.data ?: emptyList(),
+                                    error = null
+                                )
+                            }
+                        }
+                        is Resource.Error -> {
+                            _uiState.update {
+                                it.copy(
+                                    isLoadingMetrics = false,
+                                    error = result.message
+                                )
+                            }
+                        }
+                        is Resource.Loading -> {
+                            _uiState.update {
+                                it.copy(
+                                    isLoadingMetrics = true
+                                )
+                            }
+                        }
                     }
                 }
-                is Resource.Error -> {
-                    _uiState.update {
-                        it.copy(
-                            isLoadingMetrics = false,
-                            error = result.message
-                        )
-                    }
-                }
-                is Resource.Loading -> {
-                    _uiState.update {
-                        it.copy(
-                            isLoadingMetrics = true
-                        )
-                    }
-                }
-            }
         }
     }
     
@@ -85,32 +89,35 @@ class ProductivityViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingInsights = true, selectedPeriod = period) }
             
-            when (val result = productivityRepository.getProductivityInsights(period)) {
-                is Resource.Success -> {
-                    _uiState.update {
-                        it.copy(
-                            isLoadingInsights = false,
-                            insights = result.data,
-                            error = null
-                        )
+            productivityRepository.getProductivityInsights(period)
+                .collectLatest { result ->
+                    when (result) {
+                        is Resource.Success -> {
+                            _uiState.update {
+                                it.copy(
+                                    isLoadingInsights = false,
+                                    insights = result.data,
+                                    error = null
+                                )
+                            }
+                        }
+                        is Resource.Error -> {
+                            _uiState.update {
+                                it.copy(
+                                    isLoadingInsights = false,
+                                    error = result.message
+                                )
+                            }
+                        }
+                        is Resource.Loading -> {
+                            _uiState.update {
+                                it.copy(
+                                    isLoadingInsights = true
+                                )
+                            }
+                        }
                     }
                 }
-                is Resource.Error -> {
-                    _uiState.update {
-                        it.copy(
-                            isLoadingInsights = false,
-                            error = result.message
-                        )
-                    }
-                }
-                is Resource.Loading -> {
-                    _uiState.update {
-                        it.copy(
-                            isLoadingInsights = true
-                        )
-                    }
-                }
-            }
         }
     }
     
@@ -124,33 +131,36 @@ class ProductivityViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isTrackingFocusTime = true) }
             
-            when (val result = productivityRepository.trackFocusTime(duration, taskId, habitId, goalId, notes)) {
-                is Resource.Success -> {
-                    _uiState.update {
-                        it.copy(
-                            isTrackingFocusTime = false,
-                            error = null
-                        )
+            productivityRepository.trackFocusTime(duration, taskId, habitId, goalId, notes)
+                .collectLatest { result ->
+                    when (result) {
+                        is Resource.Success -> {
+                            _uiState.update {
+                                it.copy(
+                                    isTrackingFocusTime = false,
+                                    error = null
+                                )
+                            }
+                            // Refresh metrics
+                            getProductivityMetrics()
+                        }
+                        is Resource.Error -> {
+                            _uiState.update {
+                                it.copy(
+                                    isTrackingFocusTime = false,
+                                    error = result.message
+                                )
+                            }
+                        }
+                        is Resource.Loading -> {
+                            _uiState.update {
+                                it.copy(
+                                    isTrackingFocusTime = true
+                                )
+                            }
+                        }
                     }
-                    // Refresh metrics
-                    getProductivityMetrics()
                 }
-                is Resource.Error -> {
-                    _uiState.update {
-                        it.copy(
-                            isTrackingFocusTime = false,
-                            error = result.message
-                        )
-                    }
-                }
-                is Resource.Loading -> {
-                    _uiState.update {
-                        it.copy(
-                            isTrackingFocusTime = true
-                        )
-                    }
-                }
-            }
         }
     }
     
@@ -158,33 +168,36 @@ class ProductivityViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isSubmittingRating = true) }
             
-            when (val result = productivityRepository.submitDayRating(rating, notes)) {
-                is Resource.Success -> {
-                    _uiState.update {
-                        it.copy(
-                            isSubmittingRating = false,
-                            error = null
-                        )
+            productivityRepository.submitDayRating(rating, notes)
+                .collectLatest { result ->
+                    when (result) {
+                        is Resource.Success -> {
+                            _uiState.update {
+                                it.copy(
+                                    isSubmittingRating = false,
+                                    error = null
+                                )
+                            }
+                            // Refresh metrics
+                            getProductivityMetrics()
+                        }
+                        is Resource.Error -> {
+                            _uiState.update {
+                                it.copy(
+                                    isSubmittingRating = false,
+                                    error = result.message
+                                )
+                            }
+                        }
+                        is Resource.Loading -> {
+                            _uiState.update {
+                                it.copy(
+                                    isSubmittingRating = true
+                                )
+                            }
+                        }
                     }
-                    // Refresh metrics
-                    getProductivityMetrics()
                 }
-                is Resource.Error -> {
-                    _uiState.update {
-                        it.copy(
-                            isSubmittingRating = false,
-                            error = result.message
-                        )
-                    }
-                }
-                is Resource.Loading -> {
-                    _uiState.update {
-                        it.copy(
-                            isSubmittingRating = true
-                        )
-                    }
-                }
-            }
         }
     }
     
