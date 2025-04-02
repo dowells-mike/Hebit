@@ -315,3 +315,44 @@ export const getSubTasks = catchAsync(async (req: AuthRequest, res: Response) =>
   
   res.status(200).json(subTasks);
 });
+
+/**
+ * @desc    Get priority tasks for a user
+ * @route   GET /api/tasks/priority
+ * @access  Private
+ */
+export const getPriorityTasks = catchAsync(async (req: AuthRequest, res: Response) => {
+  const userId = req.user?._id;
+  const limit = req.query.limit ? parseInt(req.query.limit as string) : 5;
+  
+  // Get high priority tasks that aren't completed
+  const priorityTasks = await Task.find({ 
+    user: userId, 
+    priority: 'high',
+    completed: false,
+    status: { $ne: 'archived' }
+  })
+  .sort({ dueDate: 1 }) // Sort by due date ascending (soonest first)
+  .limit(limit);
+  
+  // If not enough high priority tasks, get medium priority ones
+  if (priorityTasks.length < limit) {
+    const mediumPriorityTasks = await Task.find({
+      user: userId,
+      priority: 'medium',
+      completed: false,
+      status: { $ne: 'archived' }
+    })
+    .sort({ dueDate: 1 })
+    .limit(limit - priorityTasks.length);
+    
+    priorityTasks.push(...mediumPriorityTasks);
+  }
+  
+  res.status(200).json({
+    tasks: priorityTasks,
+    total: priorityTasks.length,
+    page: 1,
+    per_page: limit
+  });
+});

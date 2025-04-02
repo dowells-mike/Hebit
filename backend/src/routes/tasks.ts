@@ -7,6 +7,9 @@ const router = express.Router();
 // Protect all routes
 router.use(protect);
 
+// Special routes must come before generic routes
+router.get('/priority', taskController.getPriorityTasks);
+
 // Routes
 router.route('/')
   .get(taskController.getTasks)

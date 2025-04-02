@@ -229,10 +229,14 @@ export const trackHabit = catchAsync(async (req: AuthRequest, res: Response) => 
     // Update productivity metrics
     if (!wasCompletedBefore && completed) {
       // Increment habit completion count
-      await updateProductivityMetrics(userId.toString(), completionDate, { habitsCompleted: 1 });
+      if (userId) {
+        await updateProductivityMetrics(userId.toString(), completionDate, { habitsCompleted: 1 });
+      }
     } else if (wasCompletedBefore && !completed) {
       // Decrement habit completion count
-      await updateProductivityMetrics(userId.toString(), completionDate, { habitsCompleted: -1 });
+      if (userId) {
+        await updateProductivityMetrics(userId.toString(), completionDate, { habitsCompleted: -1 });
+      }
     }
   } else {
     // Add new entry
@@ -244,7 +248,9 @@ export const trackHabit = catchAsync(async (req: AuthRequest, res: Response) => 
     
     // Update productivity metrics
     if (completed) {
-      await updateProductivityMetrics(userId.toString(), completionDate, { habitsCompleted: 1 });
+      if (userId) {
+        await updateProductivityMetrics(userId.toString(), completionDate, { habitsCompleted: 1 });
+      }
     }
   }
   
@@ -276,7 +282,7 @@ export const trackHabit = catchAsync(async (req: AuthRequest, res: Response) => 
   await habit.save();
   
   // Include consistency in response even if not stored in the model
-  const response = habit.toObject();
+  const response = habit.toObject() as any; // Use type assertion here
   response.consistency = consistencyScore;
   
   res.status(200).json(response);
@@ -324,6 +330,74 @@ export const getHabitStats = catchAsync(async (req: AuthRequest, res: Response) 
     completedEntries,
     completionsByDay,
     completionsByTime
+  });
+});
+
+/**
+ * @desc    Get habits for today
+ * @route   GET /api/habits/today
+ * @access  Private
+ */
+export const getTodaysHabits = catchAsync(async (req: AuthRequest, res: Response) => {
+  const userId = req.user?._id;
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  const dateString = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+  
+  // Build a query for habits that are due today based on frequency
+  const habitsQuery = { 
+    user: userId,
+    status: 'active' // Only active habits
+  };
+  
+  // Get all active habits for the user
+  const habits = await Habit.find(habitsQuery);
+  
+  // Filter habits that are due today based on frequency
+  const todaysHabits = habits.filter((habit: HabitDocument) => {
+    // Check if the habit is already completed today
+    const completedToday = habit.completionHistory.some(
+      (entry) => entry.date.toISOString().split('T')[0] === dateString && entry.completed
+    );
+    
+    if (completedToday) {
+      return false; // Skip already completed habits
+    }
+    
+    // Check based on frequency type
+    switch (habit.frequency) {
+      case 'daily':
+        return true; // All daily habits are due every day
+        
+      case 'weekly':
+        // Check if today is one of the scheduled days
+        if (habit.daysOfWeek && habit.daysOfWeek.length > 0) {
+          return habit.daysOfWeek.includes(dayOfWeek);
+        }
+        // Also check the new frequencyConfig if available
+        if (habit.frequencyConfig?.daysOfWeek && habit.frequencyConfig.daysOfWeek.length > 0) {
+          return habit.frequencyConfig.daysOfWeek.includes(dayOfWeek);
+        }
+        return false;
+        
+      case 'monthly':
+        // Check if today's date matches the monthly dates
+        const dayOfMonth = today.getDate();
+        if (habit.frequencyConfig?.datesOfMonth && habit.frequencyConfig.datesOfMonth.length > 0) {
+          return habit.frequencyConfig.datesOfMonth.includes(dayOfMonth);
+        }
+        return false;
+        
+      default:
+        return false;
+    }
+  });
+  
+  res.status(200).json({
+    habits: todaysHabits,
+    total: todaysHabits.length,
+    page: 1,
+    per_page: todaysHabits.length
   });
 });
 
