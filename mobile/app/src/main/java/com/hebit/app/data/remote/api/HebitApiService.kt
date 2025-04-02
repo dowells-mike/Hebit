@@ -19,7 +19,7 @@ interface HebitApiService {
     @POST("auth/refresh")
     suspend fun refreshToken(@Body request: RefreshTokenRequest): Response<RefreshTokenResponse>
     
-    @GET("auth/me")
+    @GET("auth/profile")
     suspend fun getUserProfile(): Response<UserResponse>
     
     @POST("auth/forgot-password")

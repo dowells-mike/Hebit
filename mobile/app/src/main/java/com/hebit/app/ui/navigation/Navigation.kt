@@ -109,7 +109,7 @@ fun HebitNavigation(
         composable(Routes.REGISTER) {
             RegisterScreen(
                 onRegisterSuccess = {
-                    navController.navigate(Routes.DASHBOARD) {
+                    navController.navigate(Routes.LOGIN) {
                         popUpTo(Routes.LOGIN) { inclusive = true }
                     }
                 },

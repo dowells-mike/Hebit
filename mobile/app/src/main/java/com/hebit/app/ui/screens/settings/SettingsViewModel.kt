@@ -4,12 +4,17 @@ import android.annotation.SuppressLint
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hebit.app.data.repository.AuthRepository
+import com.hebit.app.domain.model.Resource
 import com.hebit.app.domain.model.SyncSettings
+import com.hebit.app.domain.model.User
 import com.hebit.app.domain.model.UserPreferences
+import com.hebit.app.domain.repository.IAuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -23,21 +28,26 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: IAuthRepository
 ) : ViewModel() {
 
     // Settings UI state
     private val _settingsState = MutableStateFlow<SettingsUiState>(SettingsUiState.Loading)
     val settingsState: StateFlow<SettingsUiState> = _settingsState.asStateFlow()
     
+    // User state
+    private val _userState = MutableStateFlow<Resource<User?>>(Resource.Loading())
+    val userState: StateFlow<Resource<User?>> = _userState.asStateFlow()
+    
     // Storage metrics
     private val _storageState = MutableStateFlow<StorageMetrics>(StorageMetrics())
     val storageState: StateFlow<StorageMetrics> = _storageState.asStateFlow()
 
     init {
-        // Load mock settings
+        // Load settings
         loadSettings()
         loadStorageMetrics()
+        loadUserProfile()
     }
 
     /**
@@ -45,10 +55,7 @@ class SettingsViewModel @Inject constructor(
      */
     private fun loadSettings() {
         viewModelScope.launch {
-            // Simulate loading delay
-            kotlinx.coroutines.delay(600)
-            
-            // Mock user preferences
+            // Create default preferences
             val preferences = UserPreferences(
                 darkMode = false,
                 notificationsEnabled = true,
@@ -71,13 +78,23 @@ class SettingsViewModel @Inject constructor(
     }
 
     /**
+     * Load user profile
+     */
+    private fun loadUserProfile() {
+        viewModelScope.launch {
+            authRepository.getUserProfile()
+                .onEach { result ->
+                    _userState.value = result
+                }
+                .launchIn(viewModelScope)
+        }
+    }
+
+    /**
      * Load storage metrics
      */
     private fun loadStorageMetrics() {
         viewModelScope.launch {
-            // Simulate loading delay
-            kotlinx.coroutines.delay(800)
-            
             // Mock storage metrics
             val metrics = StorageMetrics(
                 totalStorage = 5.0f,
@@ -122,142 +139,32 @@ class SettingsViewModel @Inject constructor(
                 }
                 
                 _settingsState.value = SettingsUiState.Success(updatedPrefs)
-                
-                // In a real app, we would persist these changes to a repository
-            }
-        }
-    }
-
-    /**
-     * Force sync data now
-     */
-    fun forceSyncNow() {
-        viewModelScope.launch {
-            // Set syncing state
-            _settingsState.update { currentState ->
-                if (currentState is SettingsUiState.Success) {
-                    SettingsUiState.Syncing(currentState.preferences)
-                } else {
-                    currentState
-                }
-            }
-            
-            // Simulate network delay
-            kotlinx.coroutines.delay(2000)
-            
-            // Update last synced time
-            _settingsState.update { currentState ->
-                if (currentState is SettingsUiState.Syncing) {
-                    val updatedPrefs = currentState.preferences.copy(
-                        syncSettings = currentState.preferences.syncSettings.copy(
-                            lastSynced = System.currentTimeMillis()
-                        )
-                    )
-                    SettingsUiState.Success(updatedPrefs)
-                } else {
-                    currentState
-                }
-            }
-        }
-    }
-
-    /**
-     * Clear app cache
-     */
-    fun clearCache() {
-        viewModelScope.launch {
-            // Set clearing cache state
-            _settingsState.update { currentState ->
-                if (currentState is SettingsUiState.Success) {
-                    SettingsUiState.ClearingCache(currentState.preferences)
-                } else {
-                    currentState
-                }
-            }
-            
-            // Simulate operation delay
-            kotlinx.coroutines.delay(1500)
-            
-            // Update storage metrics
-            _storageState.update { currentMetrics ->
-                currentMetrics.copy(
-                    usedStorage = currentMetrics.usedStorage - currentMetrics.cacheSize,
-                    cacheSize = 0f
-                )
-            }
-            
-            // Return to success state
-            _settingsState.update { currentState ->
-                if (currentState is SettingsUiState.ClearingCache) {
-                    SettingsUiState.Success(currentState.preferences)
-                } else {
-                    currentState
-                }
-            }
-        }
-    }
-
-    /**
-     * Clear offline data
-     */
-    fun clearOfflineData() {
-        viewModelScope.launch {
-            // Set clearing offline data state
-            _settingsState.update { currentState ->
-                if (currentState is SettingsUiState.Success) {
-                    SettingsUiState.ClearingOfflineData(currentState.preferences)
-                } else {
-                    currentState
-                }
-            }
-            
-            // Simulate operation delay
-            kotlinx.coroutines.delay(1500)
-            
-            // Update storage metrics
-            _storageState.update { currentMetrics ->
-                currentMetrics.copy(
-                    usedStorage = currentMetrics.usedStorage - currentMetrics.offlineDataSize,
-                    offlineDataSize = 0f
-                )
-            }
-            
-            // Return to success state
-            _settingsState.update { currentState ->
-                if (currentState is SettingsUiState.ClearingOfflineData) {
-                    SettingsUiState.Success(currentState.preferences)
-                } else {
-                    currentState
-                }
             }
         }
     }
     
-/**
- * Log out user
- */
-fun logout() {
-    viewModelScope.launch {
-        // Clear authentication data
-        authRepository.logout()
-        
-        // MainActivity will be restarted to show login screen due to MainActivity.needsRestart flag
+    /**
+     * Log out user
+     */
+    fun logout() {
+        viewModelScope.launch {
+            // Clear authentication data
+            authRepository.logout()
+        }
     }
-}
     
     /**
      * Format last synced time to a human-readable string
      */
     fun formatLastSyncedTime(timestamp: Long): String {
-        val now = System.currentTimeMillis()
-        val diff = now - timestamp
+        val diff = System.currentTimeMillis() - timestamp
         
         return when {
             diff < 60 * 1000 -> "Just now"
             diff < 60 * 60 * 1000 -> "${(diff / (60 * 1000)).toInt()} minutes ago"
             diff < 24 * 60 * 60 * 1000 -> "${(diff / (60 * 60 * 1000)).toInt()} hours ago"
             else -> {
-                val sdf = SimpleDateFormat("MMM d, yyyy 'at' h:mm a", Locale.getDefault())
+                val sdf = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
                 sdf.format(Date(timestamp))
             }
         }
@@ -265,37 +172,34 @@ fun logout() {
 }
 
 /**
- * UI state for settings
+ * Settings UI state
  */
 sealed class SettingsUiState {
-    data object Loading : SettingsUiState()
+    object Loading : SettingsUiState()
     data class Success(val preferences: UserPreferences) : SettingsUiState()
+    data class Error(val message: String) : SettingsUiState()
     data class Syncing(val preferences: UserPreferences) : SettingsUiState()
     data class ClearingCache(val preferences: UserPreferences) : SettingsUiState()
     data class ClearingOfflineData(val preferences: UserPreferences) : SettingsUiState()
-    data class Error(val message: String) : SettingsUiState()
 }
 
 /**
- * Storage metrics for the settings screen
+ * Storage metrics for the app
  */
-@SuppressLint("DefaultLocale")
 data class StorageMetrics(
-    val totalStorage: Float = 0f, // in GB
-    val usedStorage: Float = 0f,  // in GB
-    val cacheSize: Float = 0f,    // in GB
-    val offlineDataSize: Float = 0f, // in GB
+    val totalStorage: Float = 0f,
+    val usedStorage: Float = 0f,
+    val cacheSize: Float = 0f,
+    val offlineDataSize: Float = 0f,
     val appVersion: String = "",
-    val lastUpdated: Long = 0L
+    val lastUpdated: Long = 0
 ) {
-    val usedPercentage: Int
-        get() = if (totalStorage > 0f) {
-            ((usedStorage / totalStorage) * 100).roundToInt()
-        } else 0
-        
-    val cacheSizeMB: Int
-        get() = (cacheSize * 1024).roundToInt()
-        
     val offlineDataSizeGB: String
-        get() = String.format("%.1f", offlineDataSize)
+        get() = String.format("%.2f", offlineDataSize)
+    
+    val cacheSizeMB: String
+        get() = (cacheSize * 1000).roundToInt().toString()
+    
+    val usedPercentage: Float
+        get() = if (totalStorage > 0) (usedStorage / totalStorage) * 100 else 0f
 }

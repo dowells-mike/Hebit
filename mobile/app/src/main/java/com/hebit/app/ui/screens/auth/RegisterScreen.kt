@@ -45,8 +45,10 @@ fun RegisterScreen(
     LaunchedEffect(registerState) {
         when (registerState) {
             is Resource.Success -> {
-                onRegisterSuccess()
-                viewModel.resetRegisterState()
+                if (registerState.data != null) {
+                    onRegisterSuccess()
+                    viewModel.resetRegisterState()
+                }
             }
             is Resource.Error -> {
                 errorMessage = registerState.message

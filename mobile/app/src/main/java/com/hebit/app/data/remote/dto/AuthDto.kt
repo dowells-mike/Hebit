@@ -19,8 +19,8 @@ data class RegisterRequest(
 
 @JsonClass(generateAdapter = true)
 data class RefreshTokenRequest(
-    @SerializedName("refresh_token") val refreshToken: String,
-    @SerializedName("user_id") val userId: String
+    @SerializedName("refreshToken") val refreshToken: String,
+    @SerializedName("userId") val userId: String
 )
 
 @JsonClass(generateAdapter = true)
@@ -31,21 +31,21 @@ data class ForgotPasswordRequest(
 @JsonClass(generateAdapter = true)
 data class LoginResponse(
     val token: String,
-    @SerializedName("refresh_token") val refreshToken: String,
+    @SerializedName("refreshToken") val refreshToken: String,
     val user: UserResponse
 )
 
 @JsonClass(generateAdapter = true)
 data class RegisterResponse(
     val token: String,
-    @SerializedName("refresh_token") val refreshToken: String,
+    @SerializedName("refreshToken") val refreshToken: String,
     val user: UserResponse
 )
 
 @JsonClass(generateAdapter = true)
 data class RefreshTokenResponse(
     val token: String,
-    @SerializedName("refresh_token") val refreshToken: String
+    @SerializedName("refreshToken") val refreshToken: String
 )
 
 @JsonClass(generateAdapter = true)
