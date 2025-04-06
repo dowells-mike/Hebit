@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -40,6 +42,30 @@ import java.time.format.DateTimeFormatter
 import com.hebit.app.domain.model.TaskCreationData
 import com.hebit.app.domain.model.TaskPriority
 
+data class SubTask(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val title: String,
+    val isCompleted: Boolean = false
+)
+
+data class RecurrencePattern(
+    val type: RecurrenceType = RecurrenceType.NONE,
+    val interval: Int = 1,
+    val endDate: LocalDate? = null,
+    val daysOfWeek: List<Int> = emptyList() // For weekly recurrence
+)
+
+enum class RecurrenceType {
+    NONE, DAILY, WEEKLY, MONTHLY, YEARLY
+}
+
+data class ReminderSettings(
+    val isEnabled: Boolean = false,
+    val minutes: Int = 15,
+    val time: LocalTime? = null,
+    val date: LocalDate? = null
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaskCreationScreen(
@@ -48,26 +74,41 @@ fun TaskCreationScreen(
 ) {
     var taskTitle by remember { mutableStateOf("") }
     var taskDescription by remember { mutableStateOf("") }
-    var selectedDate by remember { mutableStateOf(LocalDate.now()) }
-    var selectedTime by remember { mutableStateOf(LocalTime.of(14, 0)) }
+    var selectedDate by remember { mutableStateOf<LocalDate?>(LocalDate.now()) }
+    var selectedTime by remember { mutableStateOf<LocalTime?>(LocalTime.of(14, 0)) }
     var selectedPriority by remember { mutableStateOf(TaskPriority.MEDIUM) }
     var selectedCategory by remember { mutableStateOf("Work") }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     var showCategoryPicker by remember { mutableStateOf(false) }
     
-    // Keep track of formatting options for description
+    // Recurrence settings
+    var showRecurrenceOptions by remember { mutableStateOf(false) }
+    var recurrencePattern by remember { mutableStateOf(RecurrencePattern()) }
+    
+    // Subtasks
+    val subtasks = remember { mutableStateListOf<SubTask>() }
+    var showAddSubtask by remember { mutableStateOf(false) }
+    var newSubtaskTitle by remember { mutableStateOf("") }
+    
+    // Reminder settings
+    var showReminderOptions by remember { mutableStateOf(false) }
+    var reminderSettings by remember { mutableStateOf(ReminderSettings()) }
+    
+    // Text formatting options
     var isBold by remember { mutableStateOf(false) }
     var isItalic by remember { mutableStateOf(false) }
     var isBulletList by remember { mutableStateOf(false) }
     var isNumberedList by remember { mutableStateOf(false) }
     
-    // Mock tags/labels
-    val tags = remember { mutableStateListOf("Design", "Meeting") }
-    var newTag by remember { mutableStateOf("") }
-    var showAddTag by remember { mutableStateOf(false) }
-    
+    // Available categories
     val categories = listOf("Work", "Personal", "Shopping", "Health", "Education")
+    
+    // For date picker
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = selectedDate?.toEpochDay()?.let { it * 24 * 60 * 60 * 1000 } 
+            ?: LocalDate.now().toEpochDay() * 24 * 60 * 60 * 1000
+    )
     
     Scaffold(
         topBar = {
@@ -88,7 +129,10 @@ fun TaskCreationScreen(
                                 dueTime = selectedTime,
                                 priority = selectedPriority,
                                 category = selectedCategory,
-                                labels = tags.toList()
+                                labels = emptyList(),
+                                subtasks = subtasks.toList(),
+                                recurrencePattern = recurrencePattern,
+                                reminderSettings = reminderSettings
                             )
                             onSaveTask(taskData)
                         },
@@ -109,7 +153,7 @@ fun TaskCreationScreen(
         ) {
             Spacer(modifier = Modifier.height(8.dp))
             
-            // Task title input
+            // Task title input - required
             OutlinedTextField(
                 value = taskTitle,
                 onValueChange = { taskTitle = it },
@@ -178,7 +222,7 @@ fun TaskCreationScreen(
             
             Divider()
             
-            // Description input
+            // Description input - optional
             OutlinedTextField(
                 value = taskDescription,
                 onValueChange = { taskDescription = it },
@@ -211,7 +255,7 @@ fun TaskCreationScreen(
                 Spacer(modifier = Modifier.width(8.dp))
                 
                 Text(
-                    text = selectedDate.format(DateTimeFormatter.ofPattern("MMM dd, yyyy")),
+                    text = selectedDate?.format(DateTimeFormatter.ofPattern("MMM dd, yyyy")) ?: "Set due date",
                     modifier = Modifier.clickable { showDatePicker = true }
                 )
                 
@@ -226,7 +270,7 @@ fun TaskCreationScreen(
                 Spacer(modifier = Modifier.width(8.dp))
                 
                 Text(
-                    text = selectedTime.format(DateTimeFormatter.ofPattern("h:mm a")),
+                    text = selectedTime?.format(DateTimeFormatter.ofPattern("h:mm a")) ?: "Set time",
                     modifier = Modifier.clickable { showTimePicker = true }
                 )
             }
@@ -334,136 +378,178 @@ fun TaskCreationScreen(
             
             Divider()
             
-            // Tags/Labels
+            // Recurrence settings
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 16.dp),
+                    .padding(vertical = 16.dp)
+                    .clickable { showRecurrenceOptions = true },
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.Label,
-                    contentDescription = "Labels",
+                    imageVector = Icons.Outlined.Repeat,
+                    contentDescription = "Recurrence",
                     tint = MaterialTheme.colorScheme.primary
                 )
                 
                 Spacer(modifier = Modifier.width(8.dp))
                 
                 Text(
-                    text = "Labels",
+                    text = "Recurrence",
                     style = MaterialTheme.typography.bodyLarge
                 )
-            }
-            
-            // Tags/Labels chips
-            FlowRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp, bottom = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                tags.forEach { tag ->
-                    InputChip(
-                        selected = true,
-                        onClick = { /* Toggle selection */ },
-                        label = { Text(tag) },
-                        trailingIcon = {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = "Remove",
-                                modifier = Modifier.size(16.dp),
-                            )
-                        }
-                    )
-                }
                 
-                // Add label button
-                AssistChip(
-                    onClick = { showAddTag = true },
-                    label = { Text("+ Add Label") }
+                Spacer(modifier = Modifier.weight(1f))
+                
+                Text(
+                    text = when(recurrencePattern.type) {
+                        RecurrenceType.NONE -> "Not repeating"
+                        RecurrenceType.DAILY -> "Daily"
+                        RecurrenceType.WEEKLY -> "Weekly"
+                        RecurrenceType.MONTHLY -> "Monthly"
+                        RecurrenceType.YEARLY -> "Yearly"
+                    },
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                
+                Spacer(modifier = Modifier.width(8.dp))
+                
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = "Select"
                 )
             }
             
             Divider()
             
-            // Additional options
-            Column(
-                modifier = Modifier.fillMaxWidth()
+            // Subtasks section
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                ListItem(
-                    headlineContent = { Text("Reminder") },
-                    leadingContent = {
-                        Icon(
-                            Icons.Outlined.Notifications,
-                            contentDescription = "Reminder",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    },
-                    trailingContent = {
-                        Icon(
-                            Icons.Default.ChevronRight,
-                            contentDescription = "Select"
-                        )
-                    },
-                    modifier = Modifier.clickable { /* Open reminder options */ }
+                Icon(
+                    imageVector = Icons.Outlined.CheckBox,
+                    contentDescription = "Subtasks",
+                    tint = MaterialTheme.colorScheme.primary
                 )
                 
-                ListItem(
-                    headlineContent = { Text("Repeat") },
-                    leadingContent = {
-                        Icon(
-                            Icons.Outlined.Repeat,
-                            contentDescription = "Repeat",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    },
-                    trailingContent = {
-                        Icon(
-                            Icons.Default.ChevronRight,
-                            contentDescription = "Select"
-                        )
-                    },
-                    modifier = Modifier.clickable { /* Open repeat options */ }
+                Spacer(modifier = Modifier.width(8.dp))
+                
+                Text(
+                    text = "Subtasks",
+                    style = MaterialTheme.typography.bodyLarge
                 )
                 
-                ListItem(
-                    headlineContent = { Text("Add attachment") },
-                    leadingContent = {
-                        Icon(
-                            Icons.Outlined.AttachFile,
-                            contentDescription = "Attachment",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    },
-                    trailingContent = {
-                        Icon(
-                            Icons.Default.ChevronRight,
-                            contentDescription = "Select"
-                        )
-                    },
-                    modifier = Modifier.clickable { /* Open attachment options */ }
+                Spacer(modifier = Modifier.weight(1f))
+                
+                IconButton(onClick = { showAddSubtask = true }) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Add Subtask"
+                    )
+                }
+            }
+            
+            // Display existing subtasks
+            if (subtasks.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 32.dp, end = 16.dp, bottom = 16.dp)
+                ) {
+                    subtasks.forEachIndexed { index, subtask ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = subtask.isCompleted,
+                                onCheckedChange = { isChecked ->
+                                    subtasks[index] = subtask.copy(isCompleted = isChecked)
+                                }
+                            )
+                            
+                            Text(
+                                text = subtask.title,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(start = 8.dp)
+                            )
+                            
+                            IconButton(
+                                onClick = {
+                                    subtasks.removeAt(index)
+                                },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Remove",
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            
+            Divider()
+            
+            // Reminder settings
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp)
+                    .clickable { showReminderOptions = true },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Notifications,
+                    contentDescription = "Reminder",
+                    tint = MaterialTheme.colorScheme.primary
                 )
                 
-                ListItem(
-                    headlineContent = { Text("Sub-tasks") },
-                    leadingContent = {
-                        Icon(
-                            Icons.Outlined.CheckBox,
-                            contentDescription = "Sub-tasks",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    },
-                    trailingContent = {
-                        Icon(
-                            Icons.Default.ChevronRight,
-                            contentDescription = "Select"
-                        )
-                    },
-                    modifier = Modifier.clickable { /* Open sub-tasks */ }
+                Spacer(modifier = Modifier.width(8.dp))
+                
+                Text(
+                    text = "Reminder",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                
+                Spacer(modifier = Modifier.weight(1f))
+                
+                // Fix complex expression issue with smart cast
+                val reminder = remember(reminderSettings) {
+                    if (reminderSettings.isEnabled) {
+                        val time = reminderSettings.time
+                        if (time != null) {
+                            "${time.format(DateTimeFormatter.ofPattern("h:mm a"))}"
+                        } else {
+                            "${reminderSettings.minutes} minutes before"
+                        }
+                    } else {
+                        "No reminder"
+                    }
+                }
+                
+                Text(
+                    text = reminder,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                
+                Spacer(modifier = Modifier.width(8.dp))
+                
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = "Select"
                 )
             }
             
-            Spacer(modifier = Modifier.height(16.dp))
+            Divider()
             
             // Bottom buttons
             Row(
@@ -490,7 +576,10 @@ fun TaskCreationScreen(
                             dueTime = selectedTime,
                             priority = selectedPriority,
                             category = selectedCategory,
-                            labels = tags.toList()
+                            labels = emptyList(),
+                            subtasks = subtasks.toList(),
+                            recurrencePattern = recurrencePattern,
+                            reminderSettings = reminderSettings
                         )
                         onSaveTask(taskData)
                     },
@@ -505,25 +594,79 @@ fun TaskCreationScreen(
         }
     }
     
+    // Add Subtask Dialog
+    if (showAddSubtask) {
+        AlertDialog(
+            onDismissRequest = { 
+                showAddSubtask = false
+                newSubtaskTitle = ""
+            },
+            title = { Text("Add Subtask") },
+            text = {
+                OutlinedTextField(
+                    value = newSubtaskTitle,
+                    onValueChange = { newSubtaskTitle = it },
+                    placeholder = { Text("Subtask title") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (newSubtaskTitle.isNotBlank()) {
+                            subtasks.add(SubTask(title = newSubtaskTitle))
+                            newSubtaskTitle = ""
+                        }
+                        showAddSubtask = false
+                    },
+                    enabled = newSubtaskTitle.isNotBlank()
+                ) {
+                    Text("Add")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { 
+                        showAddSubtask = false
+                        newSubtaskTitle = ""
+                    }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+    
     // Date Picker Dialog
     if (showDatePicker) {
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = { 
-                Button(onClick = { showDatePicker = false }) {
+                Button(
+                    onClick = { 
+                        // Extract the selected date from state
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            selectedDate = LocalDate.ofEpochDay(millis / (24 * 60 * 60 * 1000))
+                        }
+                        showDatePicker = false 
+                    }
+                ) {
                     Text("OK")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) {
+                TextButton(
+                    onClick = { 
+                        showDatePicker = false 
+                    }
+                ) {
                     Text("Cancel")
                 }
             }
         ) {
             DatePicker(
-                state = rememberDatePickerState(
-                    initialSelectedDateMillis = selectedDate.toEpochDay() * 24 * 60 * 60 * 1000
-                ),
+                state = datePickerState,
                 title = { Text("Select Date") },
                 showModeToggle = false,
                 modifier = Modifier.padding(16.dp)
@@ -575,36 +718,171 @@ fun TaskCreationScreen(
         )
     }
     
-    // Add Tag Dialog
-    if (showAddTag) {
+    // Recurrence Options Dialog
+    if (showRecurrenceOptions) {
+        var tempRecurrenceType by remember { mutableStateOf(recurrencePattern.type) }
+        var tempInterval by remember { mutableStateOf(recurrencePattern.interval.toString()) }
+        
         AlertDialog(
-            onDismissRequest = { showAddTag = false },
-            title = { Text("Add Label") },
+            onDismissRequest = { showRecurrenceOptions = false },
+            title = { Text("Set Recurrence") },
             text = {
-                OutlinedTextField(
-                    value = newTag,
-                    onValueChange = { newTag = it },
-                    placeholder = { Text("Enter label name") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    // Recurrence type options
+                    Text("Repeat", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Column {
+                        RecurrenceType.values().forEach { type ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        tempRecurrenceType = type
+                                    }
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = tempRecurrenceType == type,
+                                    onClick = {
+                                        tempRecurrenceType = type
+                                    }
+                                )
+                                
+                                Spacer(modifier = Modifier.width(8.dp))
+                                
+                                Text(
+                                    text = when(type) {
+                                        RecurrenceType.NONE -> "Do not repeat"
+                                        RecurrenceType.DAILY -> "Daily"
+                                        RecurrenceType.WEEKLY -> "Weekly"
+                                        RecurrenceType.MONTHLY -> "Monthly"
+                                        RecurrenceType.YEARLY -> "Yearly"
+                                    },
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        }
+                    }
+                    
+                    // Show interval settings if a recurrence type is selected
+                    if (tempRecurrenceType != RecurrenceType.NONE) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Repeat every", style = MaterialTheme.typography.bodyLarge)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        OutlinedTextField(
+                            value = tempInterval,
+                            onValueChange = { 
+                                // Only allow numeric input
+                                if (it.isEmpty() || it.all { char -> char.isDigit() }) {
+                                    tempInterval = it
+                                }
+                            },
+                            label = { 
+                                Text(
+                                    when(tempRecurrenceType) {
+                                        RecurrenceType.DAILY -> "days"
+                                        RecurrenceType.WEEKLY -> "weeks"
+                                        RecurrenceType.MONTHLY -> "months"
+                                        RecurrenceType.YEARLY -> "years"
+                                        else -> ""
+                                    }
+                                ) 
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                    }
+                }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        if (newTag.isNotBlank()) {
-                            tags.add(newTag)
-                            newTag = ""
-                        }
-                        showAddTag = false
-                    },
-                    enabled = newTag.isNotBlank()
+                        recurrencePattern = RecurrencePattern(
+                            type = tempRecurrenceType,
+                            interval = tempInterval.toIntOrNull() ?: 1
+                        )
+                        showRecurrenceOptions = false
+                    }
                 ) {
-                    Text("Add")
+                    Text("Save")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showAddTag = false }) {
+                TextButton(onClick = { showRecurrenceOptions = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+    
+    // Reminder Settings Dialog
+    if (showReminderOptions) {
+        var tempEnabled by remember { mutableStateOf(reminderSettings.isEnabled) }
+        var tempMinutes by remember { mutableStateOf(reminderSettings.minutes.toString()) }
+        
+        AlertDialog(
+            onDismissRequest = { showReminderOptions = false },
+            title = { Text("Set Reminder") },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Enable reminder",
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.weight(1f)
+                        )
+                        
+                        Switch(
+                            checked = tempEnabled,
+                            onCheckedChange = { tempEnabled = it }
+                        )
+                    }
+                    
+                    if (tempEnabled) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        OutlinedTextField(
+                            value = tempMinutes,
+                            onValueChange = { 
+                                // Only allow numeric input
+                                if (it.isEmpty() || it.all { char -> char.isDigit() }) {
+                                    tempMinutes = it
+                                }
+                            },
+                            label = { Text("Minutes before") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        reminderSettings = ReminderSettings(
+                            isEnabled = tempEnabled,
+                            minutes = tempMinutes.toIntOrNull() ?: 15
+                        )
+                        showReminderOptions = false
+                    }
+                ) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showReminderOptions = false }) {
                     Text("Cancel")
                 }
             }

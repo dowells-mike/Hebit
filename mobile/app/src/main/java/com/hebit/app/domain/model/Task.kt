@@ -12,5 +12,6 @@ data class Task(
     val progress: Int,
     val isCompleted: Boolean,
     val createdAt: LocalDateTime,
-    val updatedAt: LocalDateTime
+    val updatedAt: LocalDateTime,
+    val metadata: Map<String, String> = emptyMap() // For storing subtasks, recurrence, reminders, etc.
 ) 

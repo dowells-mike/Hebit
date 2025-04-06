@@ -35,7 +35,7 @@ fun TaskListScreen(
     onTaskClick: (String) -> Unit = {},
     viewModel: TaskViewModel = hiltViewModel()
 ) {
-    var showAddTaskDialog by remember { mutableStateOf(false) }
+    var showAddTaskScreen by remember { mutableStateOf(false) }
     var viewMode by remember { mutableStateOf(TaskViewMode.LIST) }
     var searchQuery by remember { mutableStateOf("") }
     
@@ -47,131 +47,107 @@ fun TaskListScreen(
         viewModel.loadTasks()
     }
     
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Tasks") },
-                actions = {
-                    IconButton(onClick = {}) {
-                        Icon(Icons.Default.Search, contentDescription = "Search")
-                    }
-                    IconButton(onClick = {}) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "More")
-                    }
-                }
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = { showAddTaskDialog = true }) {
-                Icon(Icons.Default.Add, contentDescription = "Add Task")
+    if (showAddTaskScreen) {
+        TaskCreationScreen(
+            onDismiss = { showAddTaskScreen = false },
+            onSaveTask = { taskData ->
+                viewModel.createTask(taskData)
+                showAddTaskScreen = false
             }
-        },
-        bottomBar = {
-            BottomAppBar {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    BottomNavItem(
-                        icon = Icons.Default.Home,
-                        label = "Home",
-                        selected = false,
-                        onClick = onHomeClick
-                    )
-                    
-                    BottomNavItem(
-                        icon = Icons.Default.CheckCircle,
-                        label = "Tasks",
-                        selected = true,
-                        onClick = { /* Already on tasks */ }
-                    )
-                    
-                    BottomNavItem(
-                        icon = Icons.Default.Loop,
-                        label = "Habits",
-                        selected = false,
-                        onClick = onHabitsClick
-                    )
-                    
-                    BottomNavItem(
-                        icon = Icons.Default.Flag,
-                        label = "Goals",
-                        selected = false,
-                        onClick = onGoalsClick
-                    )
-                    
-                    BottomNavItem(
-                        icon = Icons.Default.Person,
-                        label = "Profile",
-                        selected = false,
-                        onClick = onProfileClick
-                    )
-                }
-            }
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            // Search bar
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = { Text("Search tasks...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                singleLine = true
-            )
-            
-            // Task list
-            when (tasksState) {
-                is Resource.Loading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
-                }
-                
-                is Resource.Error -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = "Error loading tasks",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                            Text(
-                                text = (tasksState as Resource.Error).message ?: "Unknown error",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Button(onClick = { viewModel.loadTasks() }) {
-                                Text("Retry")
-                            }
+        )
+    } else {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Tasks") },
+                    actions = {
+                        IconButton(onClick = {}) {
+                            Icon(Icons.Default.Search, contentDescription = "Search")
+                        }
+                        IconButton(onClick = {}) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "More")
                         }
                     }
+                )
+            },
+            floatingActionButton = {
+                FloatingActionButton(onClick = { showAddTaskScreen = true }) {
+                    Icon(Icons.Default.Add, contentDescription = "Add Task")
                 }
+            },
+            bottomBar = {
+                BottomAppBar {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        BottomNavItem(
+                            icon = Icons.Default.Home,
+                            label = "Home",
+                            selected = false,
+                            onClick = onHomeClick
+                        )
+                        
+                        BottomNavItem(
+                            icon = Icons.Default.CheckCircle,
+                            label = "Tasks",
+                            selected = true,
+                            onClick = { /* Already on tasks */ }
+                        )
+                        
+                        BottomNavItem(
+                            icon = Icons.Default.Loop,
+                            label = "Habits",
+                            selected = false,
+                            onClick = onHabitsClick
+                        )
+                        
+                        BottomNavItem(
+                            icon = Icons.Default.Flag,
+                            label = "Goals",
+                            selected = false,
+                            onClick = onGoalsClick
+                        )
+                        
+                        BottomNavItem(
+                            icon = Icons.Default.Person,
+                            label = "Profile",
+                            selected = false,
+                            onClick = onProfileClick
+                        )
+                    }
+                }
+            }
+        ) { paddingValues ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
+                // Search bar
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("Search tasks...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    singleLine = true
+                )
                 
-                is Resource.Success -> {
-                    val tasks = (tasksState as Resource.Success<List<Task>>).data ?: emptyList()
-                    val filteredTasks = tasks.filter {
-                        searchQuery.isEmpty() || 
-                        it.title.contains(searchQuery, ignoreCase = true) ||
-                        it.description.contains(searchQuery, ignoreCase = true)
+                // Task list
+                when (tasksState) {
+                    is Resource.Loading -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
                     }
                     
-                    if (filteredTasks.isEmpty()) {
+                    is Resource.Error -> {
                         Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
@@ -179,67 +155,76 @@ fun TaskListScreen(
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                if (searchQuery.isNotEmpty()) {
-                                    Text(
-                                        text = "No tasks match your search",
-                                        style = MaterialTheme.typography.titleMedium
-                                    )
-                                } else {
-                                    Text(
-                                        text = "No tasks yet",
-                                        style = MaterialTheme.typography.titleMedium
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = "Tap + to create your first task",
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
+                                Text(
+                                    text = "Error loading tasks",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                                Text(
+                                    text = (tasksState as Resource.Error).message ?: "Unknown error",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Button(onClick = { viewModel.loadTasks() }) {
+                                    Text("Retry")
                                 }
                             }
                         }
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(filteredTasks, key = { task -> task.id }) { task ->
-                                TaskItem(
-                                    task = task,
-                                    onTaskClick = { onTaskClick(task.id) },
-                                    onTaskToggle = { viewModel.toggleTaskCompletion(task.id) },
-                                    onTaskDelete = { viewModel.deleteTask(task.id) }
-                                )
+                    }
+                    
+                    is Resource.Success -> {
+                        val tasks = (tasksState as Resource.Success<List<Task>>).data ?: emptyList()
+                        val filteredTasks = tasks.filter {
+                            searchQuery.isEmpty() || 
+                            it.title.contains(searchQuery, ignoreCase = true) ||
+                            it.description.contains(searchQuery, ignoreCase = true)
+                        }
+                        
+                        if (filteredTasks.isEmpty()) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    if (searchQuery.isNotEmpty()) {
+                                        Text(
+                                            text = "No tasks match your search",
+                                            style = MaterialTheme.typography.titleMedium
+                                        )
+                                    } else {
+                                        Text(
+                                            text = "No tasks yet",
+                                            style = MaterialTheme.typography.titleMedium
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = "Tap + to create your first task",
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(filteredTasks, key = { task -> task.id }) { task ->
+                                    TaskItem(
+                                        task = task,
+                                        onTaskClick = { onTaskClick(task.id) },
+                                        onTaskToggle = { viewModel.toggleTaskCompletion(task.id) },
+                                        onTaskDelete = { viewModel.deleteTask(task.id) }
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
-        }
-        
-        // Add task dialog
-        if (showAddTaskDialog) {
-            TaskCreationDialog(
-                onDismiss = { showAddTaskDialog = false },
-                onSaveTask = { taskData ->
-                    if (taskData.title.isNotBlank()) {
-                        viewModel.createTask(
-                            title = taskData.title,
-                            description = taskData.description ?: "",
-                            category = taskData.category ?: "General",
-                            dueDateTime = if (taskData.dueDate != null) {
-                                taskData.dueDate.atTime(taskData.dueTime ?: java.time.LocalTime.now())
-                            } else null,
-                            priority = when (taskData.priority) {
-                                TaskPriority.HIGH -> 3
-                                TaskPriority.MEDIUM -> 2
-                                TaskPriority.LOW -> 1
-                            }
-                        )
-                        showAddTaskDialog = false
-                    }
-                }
-            )
         }
     }
 }
@@ -351,99 +336,6 @@ fun TaskItem(
             }
         )
     }
-}
-
-@Composable
-fun TaskCreationDialog(
-    onDismiss: () -> Unit,
-    onSaveTask: (TaskCreationData) -> Unit
-) {
-    var taskTitle by remember { mutableStateOf("") }
-    var taskDescription by remember { mutableStateOf("") }
-    var selectedPriority by remember { mutableStateOf(TaskPriority.MEDIUM) }
-    var selectedCategory by remember { mutableStateOf("General") }
-    
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Create Task") },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp)
-            ) {
-                // Title
-                OutlinedTextField(
-                    value = taskTitle,
-                    onValueChange = { taskTitle = it },
-                    label = { Text("Title") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // Description
-                OutlinedTextField(
-                    value = taskDescription,
-                    onValueChange = { taskDescription = it },
-                    label = { Text("Description") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 3
-                )
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // Priority selector
-                Text("Priority", style = MaterialTheme.typography.bodyMedium)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    listOf(TaskPriority.LOW, TaskPriority.MEDIUM, TaskPriority.HIGH).forEach { priority ->
-                        FilterChip(
-                            selected = selectedPriority == priority,
-                            onClick = { selectedPriority = priority },
-                            label = { Text(priority.name.lowercase().replaceFirstChar { it.uppercase() }) }
-                        )
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                // Category selector
-                OutlinedTextField(
-                    value = selectedCategory,
-                    onValueChange = { selectedCategory = it },
-                    label = { Text("Category") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    onSaveTask(
-                        TaskCreationData(
-                            title = taskTitle,
-                            description = taskDescription.ifBlank { null },
-                            priority = selectedPriority,
-                            category = selectedCategory.ifBlank { null }
-                        )
-                    )
-                },
-                enabled = taskTitle.isNotBlank()
-            ) {
-                Text("Create")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
 }
 
 // Helper for capitalization
