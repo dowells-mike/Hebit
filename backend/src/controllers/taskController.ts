@@ -237,20 +237,30 @@ export const toggleTaskCompletion = catchAsync(async (req: AuthRequest, res: Res
   const userId = req.user?._id;
   const taskId = req.params.id;
   
+  // First, find the task
   const task = await Task.findOne({ _id: taskId, user: userId });
   
   if (!task) {
     throw new AppError('Task not found', 404);
   }
   
-  // Toggle completion
+  // Determine current completion state and NEW state
+  const currentlyCompleted = Boolean(task.completed);
+  const newCompletionState = !currentlyCompleted;
+  
+  console.log(`Task toggle - ID: ${taskId}`);
+  console.log(`  Current state: completed=${currentlyCompleted}, status=${task.status}`);
+  console.log(`  New state: completed=${newCompletionState}, status=${newCompletionState ? 'completed' : 'todo'}`);
+  
+  // Prepare update object
   const updates: any = {
-    completed: !task.completed,
-    status: !task.completed ? 'completed' : 'todo'
+    completed: newCompletionState,
+    status: newCompletionState ? 'completed' : 'todo'
   };
   
-  // Set completedAt if completing, otherwise clear it
-  if (!task.completed) {
+  // If completing, add completion metadata
+  if (newCompletionState) {
+    // Mark as completed
     updates.completedAt = new Date();
     
     // Record completion context for ML
@@ -272,9 +282,10 @@ export const toggleTaskCompletion = catchAsync(async (req: AuthRequest, res: Res
       { upsert: true, new: true }
     );
   } else {
+    // Mark as incomplete
     updates.completedAt = null;
     
-    // Decrement task completion count from productivity metrics
+    // Decrement task completion count
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -285,12 +296,19 @@ export const toggleTaskCompletion = catchAsync(async (req: AuthRequest, res: Res
     );
   }
   
+  // Perform update with explicit options
   const updatedTask = await Task.findByIdAndUpdate(
     taskId,
-    updates,
-    { new: true }
+    { $set: updates },
+    { 
+      new: true,      // Return the updated document
+      runValidators: true  // Run schema validators
+    }
   );
   
+  console.log(`Task after update - completed=${updatedTask?.completed}, status=${updatedTask?.status}`);
+  
+  // Send response
   res.status(200).json(updatedTask);
 });
 
