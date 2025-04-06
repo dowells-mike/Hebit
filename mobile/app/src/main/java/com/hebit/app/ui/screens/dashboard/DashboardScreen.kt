@@ -48,6 +48,8 @@ fun DashboardScreen(
     onProgressStatsClick: () -> Unit = {},
     onProductivityClick: () -> Unit = {},
     onAchievementsClick: () -> Unit = {},
+    onTaskDetailClick: (String) -> Unit = {},
+    onHabitDetailClick: (String) -> Unit = {},
     taskViewModel: TaskViewModel = hiltViewModel(),
     habitViewModel: HabitViewModel = hiltViewModel()
 ) {
@@ -214,17 +216,17 @@ fun DashboardScreen(
                         fontWeight = FontWeight.SemiBold
                     )
                     
-                    TextButton(onClick = { onTasksClick() }) {
+                    TextButton(onClick = onTasksClick) {
                         Text("See All")
                     }
                 }
                 
                 // Horizontal scrolling task cards
-                PriorityTasksList(onTaskClick = { /* Open task details */ }, tasksState = priorityTasksState)
+                PriorityTasksList(onTaskClick = onTaskDetailClick, tasksState = priorityTasksState)
             }
             
             // Today's Habits Section
-            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -236,24 +238,13 @@ fun DashboardScreen(
                         fontWeight = FontWeight.SemiBold
                     )
                     
-                    // Show completion status only when there are habits
-                    if (todayHabitsState is Resource.Success && todayHabitsState.data?.isNotEmpty() == true) {
-                        val completedCount = todayHabitsState.data?.count { it.completedToday } ?: 0
-                        val totalCount = todayHabitsState.data?.size ?: 0
-                        
-                        Text(
-                            text = "$completedCount/$totalCount Completed",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.outline
-                        )
+                    TextButton(onClick = onHabitsClick) {
+                        Text("See All")
                     }
                 }
                 
                 // Horizontal scrolling habit cards
-                TodayHabitsList(
-                    onHabitClick = { /* Open habit details */ },
-                    habitsState = todayHabitsState
-                )
+                TodayHabitsList(onHabitClick = onHabitDetailClick, habitsState = todayHabitsState)
             }
             
             // Active Goals Section
@@ -402,18 +393,18 @@ fun TaskCard(task: Task, onClick: () -> Unit) {
                     )
                 }
                 
-                if (task.priority > 7) {
+                if (task.priority >= 3) { // High priority
                     Icon(
                         imageVector = Icons.Default.Flag,
                         contentDescription = "High Priority",
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(20.dp)
                     )
                 }
             }
             
             task.dueDateTime?.let {
-                val formattedTime = it.format(DateTimeFormatter.ofPattern("hh:mm a"))
+                val formattedTime = it.format(DateTimeFormatter.ofPattern("MMM d, hh:mm a"))
                 Text(
                     text = "Due $formattedTime",
                     style = MaterialTheme.typography.bodySmall,
@@ -423,12 +414,23 @@ fun TaskCard(task: Task, onClick: () -> Unit) {
             
             if (task.progress > 0) {
                 Column {
-                    LinearProgressIndicator(
-                        progress = { task.progress / 100f },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(4.dp)
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        LinearProgressIndicator(
+                            progress = { task.progress / 100f },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(4.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "${task.progress}%",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
                 }
             }
         }

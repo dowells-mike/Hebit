@@ -1,13 +1,12 @@
 package com.hebit.app.ui.screens.tasks
 
-import android.os.Build
-import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -16,12 +15,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
-import androidx.compose.material3.FilterChip
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.hebit.app.domain.model.Resource
+import com.hebit.app.domain.model.Task
 import com.hebit.app.ui.components.BottomNavItem
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
-@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaskDetailScreen(
@@ -31,37 +32,19 @@ fun TaskDetailScreen(
     onTasksClick: () -> Unit = {},
     onHabitsClick: () -> Unit = {},
     onGoalsClick: () -> Unit = {},
-    onProfileClick: () -> Unit = {}
+    onProfileClick: () -> Unit = {},
+    viewModel: TaskViewModel = hiltViewModel()
 ) {
-    // Mock task data - would come from ViewModel in real app
-    val task = remember {
-        mutableStateOf(
-            TaskDetailItem(
-                id = taskId,
-                title = "Design System Updates",
-                description = "Update the design system components to match the new brand guidelines. Include documentation and examples.",
-                status = TaskStatus.IN_PROGRESS,
-                dueDate = LocalDate.of(2025, 3, 15),
-                category = "Design",
-                createdDate = LocalDate.of(2025, 3, 10),
-                modifiedDate = LocalDate.of(2025, 3, 12),
-                subtasks = mutableStateListOf(
-                    SubTask("1", "Update color palette", true, LocalDate.of(2025, 3, 13)),
-                    SubTask("2", "Review typography", false, LocalDate.of(2025, 3, 14))
-                ),
-                comments = mutableStateListOf(
-                    Comment("1", "Sarah Chen", "Let's review the typography changes tomorrow.", LocalDate.now().atTime(10, 0)),
-                    Comment("2", "Alex Kim", "Updated the due date", LocalDate.now().minusDays(1).atTime(16, 30))
-                )
-            )
-        )
+    LaunchedEffect(key1 = taskId) {
+        viewModel.getTaskById(taskId)
     }
+    
+    val taskState by viewModel.selectedTaskState.collectAsState()
     
     var showCompleteDialog by remember { mutableStateOf(false) }
     var showEditMenu by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
     var expandedDescription by remember { mutableStateOf(false) }
-    var newSubtask by remember { mutableStateOf("") }
-    var newComment by remember { mutableStateOf("") }
     
     Scaffold(
         topBar = {
@@ -69,7 +52,10 @@ fun TaskDetailScreen(
                 title = { Text("Task Details") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back"
+                        )
                     }
                 },
                 actions = {
@@ -87,15 +73,7 @@ fun TaskDetailScreen(
                             leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
                             onClick = { 
                                 showEditMenu = false
-                                // Open edit task
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Share") },
-                            leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
-                            onClick = { 
-                                showEditMenu = false
-                                // Open share dialog
+                                // Open edit task - will be implemented in a future update
                             }
                         )
                         DropdownMenuItem(
@@ -103,7 +81,7 @@ fun TaskDetailScreen(
                             leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
                             onClick = { 
                                 showEditMenu = false
-                                // Show delete confirmation
+                                showDeleteDialog = true
                             }
                         )
                     }
@@ -154,42 +132,194 @@ fun TaskDetailScreen(
             }
         }
     ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp)
-        ) {
-            // Status indicator
-            item {
-                Row(
-                    modifier = Modifier.padding(vertical = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+        when (taskState) {
+            is Resource.Loading -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
+                    contentAlignment = Alignment.Center
                 ) {
-                    FilterChip(
-                        selected = true,
-                        onClick = { /* Toggle status */ },
-                        label = { Text(task.value.status.displayName) },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Flag,
-                                contentDescription = "Status",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    )
+                    CircularProgressIndicator()
                 }
             }
             
-            // Task title
-            item {
-                Text(
-                    text = task.value.title,
-                    style = MaterialTheme.typography.headlineMedium,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                
-                // Due date
+            is Resource.Error -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ErrorOutline,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Error loading task",
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = (taskState as Resource.Error).message ?: "Unknown error",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(onClick = { viewModel.getTaskById(taskId) }) {
+                            Text("Retry")
+                        }
+                    }
+                }
+            }
+            
+            is Resource.Success -> {
+                val task = (taskState as Resource.Success<Task?>).data
+                if (task == null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(paddingValues),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("Task not found")
+                    }
+                } else {
+                    TaskDetailContent(
+                        task = task,
+                        expandedDescription = expandedDescription,
+                        onToggleDescription = { expandedDescription = !expandedDescription },
+                        onToggleComplete = { 
+                            viewModel.toggleTaskCompletion(task.id)
+                        },
+                        onUpdateProgress = { progress ->
+                            val updatedTask = task.copy(progress = progress)
+                            viewModel.updateTask(updatedTask)
+                        },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(paddingValues)
+                    )
+                }
+            }
+        }
+    }
+    
+    // Delete confirmation dialog
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Delete Task") },
+            text = { Text("Are you sure you want to delete this task? This action cannot be undone.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteTask(taskId)
+                        showDeleteDialog = false
+                        onNavigateBack()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun TaskDetailContent(
+    task: Task,
+    expandedDescription: Boolean,
+    onToggleDescription: () -> Unit,
+    onToggleComplete: () -> Unit,
+    onUpdateProgress: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val dateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy")
+    
+    LazyColumn(
+        modifier = modifier.padding(horizontal = 16.dp)
+    ) {
+        // Task status
+        item {
+            Row(
+                modifier = Modifier.padding(vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Task completion toggle
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
+                ) {
+                    Checkbox(
+                        checked = task.isCompleted,
+                        onCheckedChange = { onToggleComplete() }
+                    )
+                    Text(
+                        text = if (task.isCompleted) "Completed" else "Mark as complete",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                    
+                    Spacer(modifier = Modifier.weight(1f))
+                    
+                    // Priority indicator
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(
+                                color = when (task.priority) {
+                                    3 -> MaterialTheme.colorScheme.error
+                                    2 -> MaterialTheme.colorScheme.tertiary
+                                    1 -> MaterialTheme.colorScheme.secondary
+                                    else -> MaterialTheme.colorScheme.tertiary
+                                },
+                                shape = CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = when (task.priority) {
+                                3 -> "H"
+                                2 -> "M"
+                                1 -> "L"
+                                else -> "M"
+                            },
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    }
+                }
+            }
+        }
+        
+        // Task title
+        item {
+            Text(
+                text = task.title,
+                style = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier.padding(bottom = 8.dp),
+                textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None
+            )
+            
+            // Due date
+            if (task.dueDateTime != null) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(bottom = 16.dp)
@@ -200,409 +330,221 @@ fun TaskDetailScreen(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
                     )
-                    
                     Spacer(modifier = Modifier.width(8.dp))
-                    
                     Text(
-                        text = "Due ${task.value.dueDate.format(DateTimeFormatter.ofPattern("MMM d, yyyy"))}",
+                        text = "Due: ${task.dueDateTime.toLocalDate().format(dateFormatter)}",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                }
-                
-                Divider()
-            }
-            
-            // Description
-            item {
-                Column(modifier = Modifier.padding(vertical = 16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Description",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        
-                        IconButton(
-                            onClick = { expandedDescription = !expandedDescription },
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (expandedDescription) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                contentDescription = if (expandedDescription) "Collapse" else "Expand",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                    
-                    if (expandedDescription) {
-                        Text(
-                            text = task.value.description,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
-                    } else {
-                        Text(
-                            text = task.value.description,
-                            style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 2,
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
-                    }
-                }
-                
-                Divider()
-            }
-            
-            // Category
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "Category",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    
-                    Text(
-                        text = task.value.category,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-                
-                Divider()
-            }
-            
-            // Dates
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "Created",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    
-                    Text(
-                        text = task.value.createdDate.format(DateTimeFormatter.ofPattern("MMM d, yyyy")),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-                
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "Modified",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    
-                    Text(
-                        text = task.value.modifiedDate.format(DateTimeFormatter.ofPattern("MMM d, yyyy")),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-                
-                Divider()
-            }
-            
-            // Subtasks
-            item {
-                Column(modifier = Modifier.padding(vertical = 16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Subtasks (${task.value.subtasks.count { it.completed }}/${task.value.subtasks.size})",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        
-                        LinearProgressIndicator(
-                            progress = { 
-                                if (task.value.subtasks.isEmpty()) 0f 
-                                else task.value.subtasks.count { it.completed }.toFloat() / task.value.subtasks.size 
-                            },
-                            modifier = Modifier
-                                .width(100.dp)
-                                .height(6.dp),
-                            strokeCap = StrokeCap.Round
-                        )
-                    }
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    task.value.subtasks.forEach { subtask ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Checkbox(
-                                checked = subtask.completed,
-                                onCheckedChange = { isChecked -> 
-                                    val index = task.value.subtasks.indexOf(subtask)
-                                    if (index != -1) {
-                                        task.value.subtasks[index] = subtask.copy(completed = isChecked)
-                                    }
-                                }
-                            )
-                            
-                            Text(
-                                text = subtask.title,
-                                style = MaterialTheme.typography.bodyMedium,
-                                textDecoration = if (subtask.completed) TextDecoration.LineThrough else TextDecoration.None,
-                                modifier = Modifier.weight(1f)
-                            )
-                            
-                            Text(
-                                text = subtask.date.format(DateTimeFormatter.ofPattern("MMM d")),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                    
-                    OutlinedTextField(
-                        value = newSubtask,
-                        onValueChange = { newSubtask = it },
-                        placeholder = { Text("Add subtask") },
-                        trailingIcon = {
-                            IconButton(
-                                onClick = {
-                                    if (newSubtask.isNotBlank()) {
-                                        task.value.subtasks.add(
-                                            SubTask(
-                                                id = (task.value.subtasks.size + 1).toString(),
-                                                title = newSubtask,
-                                                completed = false,
-                                                date = LocalDate.now()
-                                            )
-                                        )
-                                        newSubtask = ""
-                                    }
-                                },
-                                enabled = newSubtask.isNotBlank()
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = "Add")
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp),
-                        singleLine = true
-                    )
-                }
-                
-                Divider()
-            }
-            
-            // Comments
-            item {
-                Column(modifier = Modifier.padding(vertical = 16.dp)) {
-                    Text(
-                        text = "Comments",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    )
-                    
-                    task.value.comments.forEach { comment ->
-                        CommentItem(comment = comment)
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
-                    
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        // User avatar
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "M",
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
-                        
+                    if (task.dueDateTime.toLocalTime() != LocalTime.MIDNIGHT) {
                         Spacer(modifier = Modifier.width(8.dp))
-                        
-                        OutlinedTextField(
-                            value = newComment,
-                            onValueChange = { newComment = it },
-                            placeholder = { Text("Add comment...") },
-                            trailingIcon = {
-                                IconButton(onClick = { /* Send comment */ }) {
-                                    Icon(Icons.Default.Send, contentDescription = "Send")
-                                }
-                            },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true
+                        Text(
+                            text = "at ${task.dueDateTime.toLocalTime().format(DateTimeFormatter.ofPattern("h:mm a"))}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
-                
-                Spacer(modifier = Modifier.height(16.dp))
             }
         }
         
-        // Bottom action buttons
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            contentAlignment = Alignment.BottomCenter
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                // Edit button
-                OutlinedButton(
-                    onClick = { /* Edit task */ },
-                    modifier = Modifier.weight(1f)
+        // Category
+        if (task.category.isNotBlank()) {
+            item {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(bottom = 16.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Edit",
-                        modifier = Modifier.size(18.dp)
+                        imageVector = Icons.Default.Category,
+                        contentDescription = "Category",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Edit")
-                }
-                
-                Spacer(modifier = Modifier.width(16.dp))
-                
-                // Complete button
-                Button(
-                    onClick = { showCompleteDialog = true },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Complete")
-                }
-            }
-        }
-        
-        // Complete task confirmation dialog
-        if (showCompleteDialog) {
-            AlertDialog(
-                onDismissRequest = { showCompleteDialog = false },
-                title = { Text("Complete Task") },
-                text = { Text("Mark this task as completed?") },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            // Mark task as completed
-                            task.value = task.value.copy(status = TaskStatus.COMPLETED)
-                            showCompleteDialog = false
-                            // Navigate back after delay
-                        }
+                    Surface(
+                        shape = MaterialTheme.shapes.small,
+                        color = MaterialTheme.colorScheme.secondaryContainer
                     ) {
-                        Text("Complete")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showCompleteDialog = false }) {
-                        Text("Cancel")
+                        Text(
+                            text = task.category,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
                     }
                 }
-            )
-        }
-    }
-}
-
-@RequiresApi(Build.VERSION_CODES.O)
-@Composable
-fun CommentItem(comment: Comment) {
-    Column {
-        Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // User avatar
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = comment.author.first().toString(),
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-            }
-            
-            Spacer(modifier = Modifier.width(8.dp))
-            
-            Column {
-                Text(
-                    text = comment.author,
-                    style = MaterialTheme.typography.titleSmall
-                )
-                
-                Text(
-                    text = "${comment.timestamp.toLocalTime().hour}h ago",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
         }
         
-        Text(
-            text = comment.content,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(start = 40.dp, top = 4.dp)
-        )
+        // Progress
+        if (!task.isCompleted) {
+            item {
+                Column(
+                    modifier = Modifier.padding(bottom = 16.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "Progress: ${task.progress}%",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        
+                        Text(
+                            text = "${task.progress}/100",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    LinearProgressIndicator(
+                        progress = { task.progress / 100f },
+                        modifier = Modifier.fillMaxWidth(),
+                        strokeCap = StrokeCap.Round
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // Progress buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        val progressOptions = listOf(0, 25, 50, 75, 100)
+                        progressOptions.forEach { progress ->
+                            OutlinedButton(
+                                onClick = { onUpdateProgress(progress) },
+                                modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
+                                enabled = progress != task.progress
+                            ) {
+                                Text(text = "$progress%")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Description
+        if (task.description.isNotBlank()) {
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Description",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            
+                            IconButton(onClick = onToggleDescription) {
+                                Icon(
+                                    imageVector = if (expandedDescription) 
+                                        Icons.Default.ExpandLess 
+                                    else 
+                                        Icons.Default.ExpandMore,
+                                    contentDescription = if (expandedDescription) 
+                                        "Show less" 
+                                    else 
+                                        "Show more"
+                                )
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Text(
+                            text = task.description,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = if (expandedDescription) Int.MAX_VALUE else 3
+                        )
+                    }
+                }
+            }
+        }
+        
+        // Creation and modification info
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        text = "Task Information",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Created",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = task.createdAt.toLocalDate().format(dateFormatter),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                    
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Last Updated",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = task.updatedAt.toLocalDate().format(dateFormatter),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                    
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Task ID",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = task.id,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+        }
     }
 }
-
-// Domain models
-data class TaskDetailItem(
-    val id: String,
-    val title: String,
-    val description: String,
-    val status: TaskStatus,
-    val dueDate: LocalDate,
-    val category: String,
-    val createdDate: LocalDate,
-    val modifiedDate: LocalDate,
-    val subtasks: MutableList<SubTask>,
-    val comments: MutableList<Comment>
-)
-
-enum class TaskStatus(val displayName: String) {
-    TODO("To Do"),
-    IN_PROGRESS("In Progress"),
-    COMPLETED("Completed")
-}
-
-data class SubTask(
-    val id: String,
-    val title: String,
-    val completed: Boolean,
-    val date: LocalDate
-)
-
-data class Comment(
-    val id: String,
-    val author: String,
-    val content: String,
-    val timestamp: java.time.LocalDateTime
-)

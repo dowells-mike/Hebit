@@ -138,7 +138,9 @@ fun HebitNavigation(
                 onQuickActionsClick = { navController.navigate(Routes.QUICK_ACTIONS) },
                 onProgressStatsClick = { navController.navigate(Routes.PROGRESS_STATS) },
                 onProductivityClick = { navController.navigate(Routes.PRODUCTIVITY) },
-                onAchievementsClick = { navController.navigate(Routes.ACHIEVEMENTS) }
+                onAchievementsClick = { navController.navigate(Routes.ACHIEVEMENTS) },
+                onTaskDetailClick = { taskId -> navController.navigate("${Routes.TASK_DETAIL}/$taskId") },
+                onHabitDetailClick = { habitId -> navController.navigate("${Routes.HABIT_DETAIL}/$habitId") }
             )
         }
         

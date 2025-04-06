@@ -3,6 +3,7 @@ package com.hebit.app.ui.screens.tasks
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -19,9 +20,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.hebit.app.domain.model.TaskPriority
 import com.hebit.app.ui.components.BottomNavItem
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+
+// Define PriorityOptions using the imported TaskPriority enum
+private val PriorityOptions = arrayOf(TaskPriority.LOW, TaskPriority.MEDIUM, TaskPriority.HIGH)
 
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
@@ -231,13 +236,13 @@ fun TaskBoardScreen(
                 Card(
                     modifier = Modifier
                         .width(300.dp)
-                        .height(IntrinsicSize.Min),
-                    onClick = { showAddColumnDialog = true }
+                        .height(IntrinsicSize.Min)
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(24.dp),
+                            .padding(24.dp)
+                            .clickable { showAddColumnDialog = true },
                         contentAlignment = Alignment.Center
                     ) {
                         Column(
@@ -410,98 +415,90 @@ fun BoardTaskCard(
     onClick: () -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onClick
+        modifier = Modifier
+            .fillMaxWidth()
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
+                .clickable(onClick = onClick)
                 .padding(12.dp)
         ) {
-            // Task title
-            Text(
-                text = task.title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            // Due date and priority
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Due date
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.CalendarToday,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(12.dp)
-                    )
-                    
-                    Spacer(modifier = Modifier.width(4.dp))
-                    
+            // Rest of the card content
+            Column {
+                // Task title
+                Text(
+                    text = task.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Due date and priority
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Due date
                     Text(
                         text = task.dueDate.format(DateTimeFormatter.ofPattern("MMM d")),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    
+                    // Priority indicator
+                    val priorityColor = when (task.priority) {
+                        TaskPriority.HIGH -> MaterialTheme.colorScheme.error
+                        TaskPriority.MEDIUM -> MaterialTheme.colorScheme.tertiary
+                        TaskPriority.LOW -> MaterialTheme.colorScheme.secondary
+                    }
+                    
+                    Text(
+                        text = when (task.priority) {
+                            TaskPriority.HIGH -> "High Priority"
+                            TaskPriority.MEDIUM -> "Medium"
+                            TaskPriority.LOW -> "Low"
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = priorityColor
+                    )
                 }
                 
-                // Priority indicator
-                val priorityColor = when (task.priority) {
-                    TaskPriority.HIGH -> MaterialTheme.colorScheme.error
-                    TaskPriority.MEDIUM -> MaterialTheme.colorScheme.tertiary
-                    TaskPriority.LOW -> MaterialTheme.colorScheme.secondary
-                }
+                Spacer(modifier = Modifier.height(8.dp))
                 
-                Text(
-                    text = when (task.priority) {
-                        TaskPriority.HIGH -> "High Priority"
-                        TaskPriority.MEDIUM -> "Medium"
-                        TaskPriority.LOW -> "Low"
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = priorityColor
-                )
-            }
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            // Assignees
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                task.assignees.forEachIndexed { index, initials ->
-                    Box(
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                when (index % 3) {
-                                    0 -> MaterialTheme.colorScheme.primaryContainer
-                                    1 -> MaterialTheme.colorScheme.secondaryContainer
-                                    else -> MaterialTheme.colorScheme.tertiaryContainer
+                // Assignees
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    task.assignees.forEachIndexed { index, initials ->
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    when (index % 3) {
+                                        0 -> MaterialTheme.colorScheme.primaryContainer
+                                        1 -> MaterialTheme.colorScheme.secondaryContainer
+                                        else -> MaterialTheme.colorScheme.tertiaryContainer
+                                    }
+                                )
+                                .offset(x = if (index > 0) ((-8).dp * index) else 0.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = initials,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = when (index % 3) {
+                                    0 -> MaterialTheme.colorScheme.onPrimaryContainer
+                                    1 -> MaterialTheme.colorScheme.onSecondaryContainer
+                                    else -> MaterialTheme.colorScheme.onTertiaryContainer
                                 }
                             )
-                            .offset(x = if (index > 0) ((-8).dp * index) else 0.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = initials,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = when (index % 3) {
-                                0 -> MaterialTheme.colorScheme.onPrimaryContainer
-                                1 -> MaterialTheme.colorScheme.onSecondaryContainer
-                                else -> MaterialTheme.colorScheme.onTertiaryContainer
-                            }
-                        )
+                        }
                     }
                 }
             }
@@ -580,7 +577,7 @@ fun AddBoardTaskDialog(
                         FilterChip(
                             selected = selectedPriority == priority,
                             onClick = { selectedPriority = priority },
-                            label = { Text(priority.name.capitalize()) }
+                            label = { Text(priority.name.lowercase().replaceFirstChar { it.uppercase() }) }
                         )
                     }
                 }
@@ -718,8 +715,8 @@ fun AddColumnDialog(
     )
 }
 
-// Helper for capitalization
-private fun String.capitalize(): String {
+// Helper for capitalization - updated version
+private fun String.capitalizeFirst(): String {
     return this.lowercase().replaceFirstChar { it.uppercase() }
 }
 

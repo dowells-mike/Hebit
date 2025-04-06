@@ -4,6 +4,7 @@ import android.content.Context
 import com.hebit.app.data.local.TokenManager
 import com.hebit.app.data.remote.api.HebitApiService
 import com.hebit.app.data.remote.api.NetworkModule
+import com.squareup.moshi.Moshi
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -26,9 +27,15 @@ object AppModule {
     
     @Provides
     @Singleton
-    fun provideHebitApiService(tokenManager: TokenManager): HebitApiService {
+    fun provideMoshiInstance(): Moshi {
+        return NetworkModule.provideMoshi()
+    }
+    
+    @Provides
+    @Singleton
+    fun provideHebitApiService(tokenManager: TokenManager, moshi: Moshi): HebitApiService {
         val okHttpClient = NetworkModule.provideHttpClient(tokenManager)
-        val retrofit = NetworkModule.provideRetrofit(okHttpClient)
+        val retrofit = NetworkModule.provideRetrofit(okHttpClient, moshi)
         return NetworkModule.provideHebitApiService(retrofit)
     }
 }

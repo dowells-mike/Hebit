@@ -8,7 +8,7 @@ data class Task(
     val description: String,
     val category: String,
     val dueDateTime: LocalDateTime?,
-    val priority: Int,
+    val priority: Int, // 1 = low, 2 = medium, 3 = high (corresponding to backend's 'low', 'medium', 'high')
     val progress: Int,
     val isCompleted: Boolean,
     val createdAt: LocalDateTime,

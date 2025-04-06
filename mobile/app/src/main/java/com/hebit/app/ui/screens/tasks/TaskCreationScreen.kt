@@ -37,8 +37,9 @@ import androidx.compose.ui.unit.dp
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import com.hebit.app.domain.model.TaskCreationData
+import com.hebit.app.domain.model.TaskPriority
 
-@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaskCreationScreen(
@@ -82,7 +83,7 @@ fun TaskCreationScreen(
                         onClick = {
                             val taskData = TaskCreationData(
                                 title = taskTitle,
-                                description = taskDescription,
+                                description = taskDescription.ifBlank { null },
                                 dueDate = selectedDate,
                                 dueTime = selectedTime,
                                 priority = selectedPriority,
@@ -484,7 +485,7 @@ fun TaskCreationScreen(
                     onClick = {
                         val taskData = TaskCreationData(
                             title = taskTitle,
-                            description = taskDescription,
+                            description = taskDescription.ifBlank { null },
                             dueDate = selectedDate,
                             dueTime = selectedTime,
                             priority = selectedPriority,
@@ -610,17 +611,6 @@ fun TaskCreationScreen(
         )
     }
 }
-
-// Helper class to hold task creation data
-data class TaskCreationData(
-    val title: String,
-    val description: String,
-    val dueDate: LocalDate,
-    val dueTime: LocalTime,
-    val priority: TaskPriority,
-    val category: String,
-    val labels: List<String>
-)
 
 // Simple FlowRow implementation
 @Composable

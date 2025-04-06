@@ -1,48 +1,52 @@
 package com.hebit.app.data.remote.dto
 
-import com.google.gson.annotations.SerializedName
+import com.squareup.moshi.Json
+import com.squareup.moshi.JsonClass
 import java.util.Date
 
+@JsonClass(generateAdapter = true)
 data class ProductivityMetricsDto(
     val id: String,
     val date: String,
     
-    @SerializedName("tasksCompleted")
+    @Json(name = "tasksCompleted")
     val tasksCompleted: Int = 0,
     
-    @SerializedName("tasksCreated")
+    @Json(name = "tasksCreated")
     val tasksCreated: Int = 0,
     
-    @SerializedName("habitCompletionRate")
+    @Json(name = "habitCompletionRate")
     val habitCompletionRate: Float = 0f,
     
-    @SerializedName("goalProgress")
+    @Json(name = "goalProgress")
     val goalProgress: List<GoalProgressDto> = emptyList(),
     
-    @SerializedName("focusTime")
+    @Json(name = "focusTime")
     val focusTime: Int = 0,
     
-    @SerializedName("productivityScore")
+    @Json(name = "productivityScore")
     val productivityScore: Float = 0f,
     
-    @SerializedName("dayRating")
+    @Json(name = "dayRating")
     val dayRating: Int? = null,
     
-    @SerializedName("createdAt")
+    @Json(name = "createdAt")
     val createdAt: String,
     
-    @SerializedName("updatedAt")
+    @Json(name = "updatedAt")
     val updatedAt: String
 )
 
+@JsonClass(generateAdapter = true)
 data class GoalProgressDto(
-    @SerializedName("goalId")
+    @Json(name = "goalId")
     val goalId: String,
     
-    @SerializedName("progress")
+    @Json(name = "progress")
     val progress: Float
 )
 
+@JsonClass(generateAdapter = true)
 data class ProductivityListResponse(
     val data: List<ProductivityMetricsDto>,
     val page: Int,
@@ -50,6 +54,7 @@ data class ProductivityListResponse(
     val total: Int
 )
 
+@JsonClass(generateAdapter = true)
 data class FocusTimeRequest(
     val minutes: Int,
     val date: String? = null,
@@ -60,12 +65,14 @@ data class FocusTimeRequest(
     val notes: String? = null
 )
 
+@JsonClass(generateAdapter = true)
 data class DayRatingRequest(
     val rating: Int,
     val date: String? = null,
     val notes: String? = null
 )
 
+@JsonClass(generateAdapter = true)
 data class ProductivityInsightsResponse(
     val averageProductivityScore: Float,
     val totalTasksCompleted: Int,
@@ -79,6 +86,7 @@ data class ProductivityInsightsResponse(
     val monthlyTrend: List<Float>
 )
 
+@JsonClass(generateAdapter = true)
 data class ProductivityDayDto(
     val date: String,
     val score: Float,

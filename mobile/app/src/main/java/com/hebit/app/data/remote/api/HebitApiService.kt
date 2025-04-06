@@ -30,7 +30,7 @@ interface HebitApiService {
     suspend fun getTasks(
         @Query("page") page: Int = 1,
         @Query("per_page") perPage: Int = 20
-    ): Response<TaskListResponse>
+    ): Response<List<TaskDto>>
     
     @GET("tasks/{id}")
     suspend fun getTaskById(@Path("id") id: String): Response<TaskDto>
@@ -46,6 +46,9 @@ interface HebitApiService {
     
     @DELETE("tasks/{id}")
     suspend fun deleteTask(@Path("id") id: String): Response<Void>
+    
+    @PATCH("tasks/{id}/complete")
+    suspend fun toggleTaskCompletion(@Path("id") id: String): Response<TaskDto>
     
     @GET("tasks/priority")
     suspend fun getPriorityTasks(@Query("limit") limit: Int = 5): Response<TaskListResponse>
