@@ -1,7 +1,8 @@
 import { Response } from 'express';
 import { catchAsync, AppError } from '../middleware/errorHandler';
-import { Task, ProductivityMetrics } from '../models';
+import { Task, ProductivityMetrics, User } from '../models';
 import { AuthRequest } from '../types';
+import * as mlService from '../services/mlService';
 
 /**
  * @desc    Get all tasks for a user
@@ -168,14 +169,22 @@ export const updateTask = catchAsync(async (req: AuthRequest, res: Response) => 
     updates.completedAt = new Date();
     updates.status = 'completed';
     
-    // Record completion context for ML
-    updates.metadata = {
-      ...(updates.metadata || {}),
-      completionContext: {
-        timeOfDay: new Date().getHours(),
-        dayOfWeek: new Date().getDay()
+    // Use ML service to collect task completion context
+    try {
+      // Ensure userId is a string
+      if (userId) {
+        const mlContext = await mlService.collectTaskCompletionContext(taskId, userId.toString());
+        
+        // Add the ML context to the updates
+        updates.metadata = {
+          ...(updates.metadata || {}),
+          completionContext: mlContext
+        };
       }
-    };
+    } catch (error) {
+      console.error('ML data collection error:', error);
+      // Continue with update even if ML processing fails
+    }
     
     // Update productivity metrics
     const today = new Date();
@@ -372,5 +381,132 @@ export const getPriorityTasks = catchAsync(async (req: AuthRequest, res: Respons
     total: priorityTasks.length,
     page: 1,
     per_page: limit
+  });
+});
+
+/**
+ * @desc    Get recommended next task based on ML
+ * @route   GET /api/tasks/recommendations/next
+ * @access  Private
+ */
+export const getRecommendedNextTask = catchAsync(async (req: AuthRequest, res: Response) => {
+  const userId = req.user?._id;
+  
+  if (!userId) {
+    throw new AppError('User ID is required', 400);
+  }
+  
+  // Get all incomplete tasks for the user
+  const tasks = await Task.find({
+    user: userId,
+    completed: false,
+    status: { $ne: 'archived' }
+  });
+  
+  if (tasks.length === 0) {
+    return res.status(200).json({
+      message: 'No tasks available for recommendation',
+      tasks: []
+    });
+  }
+  
+  // Get the user's productivity patterns for recommendation
+  const user = await User.findById(userId);
+  const peakHours = user?.productivity?.peakHours || {};
+  
+  // Simple recommendation logic - prioritize by:
+  // 1. Due date (closer dates first)
+  // 2. Priority (high to low)
+  // 3. If current hour is a peak productivity hour, prioritize more complex tasks
+  const currentHour = new Date().getHours().toString();
+  const isPeakHour = peakHours[currentHour] && peakHours[currentHour] > 3;
+  
+  // Sort tasks
+  const sortedTasks = [...tasks].sort((a, b) => {
+    // Due date comparison - null dates go to the end
+    if (a.dueDate && !b.dueDate) return -1;
+    if (!a.dueDate && b.dueDate) return 1;
+    if (a.dueDate && b.dueDate) {
+      const dateComparison = new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      if (dateComparison !== 0) return dateComparison;
+    }
+    
+    // Priority comparison (high to low)
+    const priorityMap: any = { high: 3, medium: 2, low: 1 };
+    const priorityA = priorityMap[a.priority] || 2;
+    const priorityB = priorityMap[b.priority] || 2;
+    if (priorityA !== priorityB) return priorityB - priorityA;
+    
+    // If peak hour, prioritize complex tasks
+    if (isPeakHour) {
+      const complexityA = a.complexity || 3;
+      const complexityB = b.complexity || 3;
+      if (complexityA !== complexityB) return complexityB - complexityA;
+    }
+    
+    return 0;
+  });
+  
+  // Return top 3 recommended tasks
+  const recommendedTasks = sortedTasks.slice(0, 3);
+  
+  res.status(200).json({
+    message: isPeakHour 
+      ? 'Current hour is a peak productivity time for you' 
+      : 'Based on your task priorities and deadlines',
+    isPeakProductivityTime: isPeakHour,
+    tasks: recommendedTasks
+  });
+});
+
+/**
+ * @desc    Get optimal time to work on tasks
+ * @route   GET /api/tasks/recommendations/optimal-time
+ * @access  Private
+ */
+export const getOptimalTaskTime = catchAsync(async (req: AuthRequest, res: Response) => {
+  const userId = req.user?._id;
+  
+  if (!userId) {
+    throw new AppError('User ID is required', 400);
+  }
+  
+  // Use ML service to recommend optimal time
+  const recommendation = await mlService.recommendTaskTime(userId.toString());
+  
+  res.status(200).json({
+    optimalHour: recommendation.hour,
+    confidence: recommendation.confidence,
+    message: `Your most productive time is around ${recommendation.hour}:00`
+  });
+});
+
+/**
+ * @desc    Get estimated duration for a task
+ * @route   GET /api/tasks/stats/duration-estimate
+ * @access  Private
+ */
+export const getTaskDurationEstimate = catchAsync(async (req: AuthRequest, res: Response) => {
+  const userId = req.user?._id;
+  
+  if (!userId) {
+    throw new AppError('User ID is required', 400);
+  }
+  
+  // Get task data from query params
+  const taskData = {
+    category: req.query.category as string,
+    priority: req.query.priority as string,
+    title: req.query.title as string,
+    description: req.query.description as string
+  };
+  
+  // Use ML service to estimate task duration
+  const estimate = await mlService.estimateTaskDuration(taskData, userId.toString());
+  
+  res.status(200).json({
+    estimatedMinutes: estimate.estimatedMinutes,
+    confidence: estimate.confidence,
+    message: `This task will take approximately ${estimate.estimatedMinutes} minutes to complete`
   });
 });

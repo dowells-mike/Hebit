@@ -9,37 +9,44 @@ export interface UserDocument {
   bio?: string;                    // User profile description
   avatarUrl?: string;              // Profile picture
   coverPhotoUrl?: string;          // Profile cover image
-  timezone?: string;               // For time-sensitive features
-  authProviders?: {                // Track authentication methods
-    email?: boolean;
-    google?: boolean;
-    biometric?: boolean;
+  timezone: string;                // For time-sensitive features
+  authProviders: {                // Track authentication methods
+    email: boolean;
+    google: boolean;
+    biometric: boolean;
   };
-  settings?: {                     // User preferences
-    theme?: 'light' | 'dark' | 'system';
-    startScreen?: string;
-    notificationPreferences?: {
-      tasks?: boolean;
-      habits?: boolean;
-      goals?: boolean;
-      system?: boolean;
+  settings: {                     // User preferences
+    theme: 'light' | 'dark' | 'system';
+    startScreen: string;
+    notificationPreferences: {
+      tasks: boolean;
+      habits: boolean;
+      goals: boolean;
+      system: boolean;
     };
-    privacySettings?: {
-      shareActivity?: boolean;
-      allowSuggestions?: boolean;
+    privacySettings: {
+      shareActivity: boolean;
+      allowSuggestions: boolean;
     };
   };
-  productivity?: {                 // ML-related user patterns
-    peakHours?: number[];          // 0-23 hours when most productive
+  productivity: {                 // ML-related user patterns
+    peakHours?: { [hour: string]: number };
+    peakDays?: { [day: string]: number };
     preferredWorkDays?: number[];  // 0-6 days of week
     focusDuration?: number;        // Average focus minutes
     completionRate?: number;       // Task completion rate
+    taskCompletionCount?: number;
+    mlPreferences?: {
+      enableRecommendations: boolean;
+      enablePredictions: boolean;
+      dataCollectionLevel: 'minimal' | 'standard' | 'extensive';
+    };
   };
-  isAdmin?: boolean;
-  lastLogin?: Date;
+  isAdmin: boolean;
+  lastLogin: Date;
+  comparePassword(enteredPassword: string): Promise<boolean>;
   createdAt: Date;
   updatedAt: Date;
-  comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
 export interface TaskDocument {
@@ -77,6 +84,9 @@ export interface TaskDocument {
       location?: string;
       timeOfDay?: number;
       dayOfWeek?: number;
+      completedAt?: Date;          // Exact completion time
+      monthDay?: number;           // Day of month (1-31)
+      month?: number;              // Month (1-12)
     }
   };
   createdAt: Date;

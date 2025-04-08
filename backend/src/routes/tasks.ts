@@ -23,4 +23,9 @@ router.route('/:id')
 router.patch('/:id/complete', taskController.toggleTaskCompletion);
 router.get('/:id/subtasks', taskController.getSubTasks);
 
+// ML recommendation routes
+router.get('/recommendations/next', taskController.getRecommendedNextTask);
+router.get('/recommendations/optimal-time', taskController.getOptimalTaskTime);
+router.get('/stats/duration-estimate', taskController.getTaskDurationEstimate);
+
 export default router;

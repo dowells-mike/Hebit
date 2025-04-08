@@ -12,7 +12,9 @@
     "lint": "eslint . --ext .ts",
     "migration:create": "ts-node migrations/createMigration.ts",
     "migration:up": "npm run build:migrations && node dist/migrations/migrationRunner.js up",
-    "migration:down": "npm run build:migrations && node dist/migrations/migrationRunner.js down"
+    "migration:down": "npm run build:migrations && node dist/migrations/migrationRunner.js down",
+    "db:migrate": "ts-node src/scripts/migrate.ts",
+    "export:ml-data": "ts-node src/scripts/exportMlData.ts"
   },
   "keywords": [],
   "author": "",
