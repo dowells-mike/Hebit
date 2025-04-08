@@ -282,4 +282,78 @@ class TaskViewModel @Inject constructor(
     fun clearSelectedTask() {
         _selectedTaskState.value = Resource.Success(null)
     }
+    
+    fun updateTaskWithData(taskId: String, taskData: TaskCreationData) {
+        viewModelScope.launch {
+            // First get the current task to preserve any values not in the taskData
+            val currentTaskResource = taskRepository.getTaskById(taskId).catch { e ->
+                Resource.Error<Task>(e.message ?: "Unknown error occurred")
+            }.collect { result ->
+                if (result is Resource.Success && result.data != null) {
+                    val currentTask = result.data
+                    
+                    val dueDateTime = if (taskData.dueDate != null) {
+                        taskData.dueDate.atTime(taskData.dueTime ?: java.time.LocalTime.now())
+                    } else null
+                    
+                    val priority = when (taskData.priority) {
+                        com.hebit.app.domain.model.TaskPriority.HIGH -> 3
+                        com.hebit.app.domain.model.TaskPriority.MEDIUM -> 2
+                        com.hebit.app.domain.model.TaskPriority.LOW -> 1
+                    }
+                    
+                    // Convert subtasks to a string format
+                    val subtasksData = if (taskData.subtasks.isNotEmpty()) {
+                        taskData.subtasks.joinToString(",") { "${it.id}:${it.title}:${it.isCompleted}" }
+                    } else null
+                    
+                    // Convert recurrence pattern to a string format
+                    val recurrenceData = taskData.recurrencePattern?.let {
+                        "${it.type.name},${it.interval},${it.endDate ?: ""}"
+                    }
+                    
+                    // Convert reminder settings to a string format
+                    val reminderData = taskData.reminderSettings?.let {
+                        if (it.isEnabled) "${it.minutes},${it.time ?: ""}" else null
+                    }
+                    
+                    // Create metadata map with new values, preserving any existing keys not handled above
+                    val updatedMetadata = currentTask.metadata.toMutableMap()
+                    
+                    // Update only the metadata we're handling
+                    if (subtasksData != null) {
+                        updatedMetadata["subtasks"] = subtasksData
+                    } else {
+                        updatedMetadata.remove("subtasks")
+                    }
+                    
+                    if (recurrenceData != null) {
+                        updatedMetadata["recurrence"] = recurrenceData
+                    } else {
+                        updatedMetadata.remove("recurrence")
+                    }
+                    
+                    if (reminderData != null) {
+                        updatedMetadata["reminder"] = reminderData
+                    } else {
+                        updatedMetadata.remove("reminder")
+                    }
+                    
+                    // Create updated task
+                    val updatedTask = currentTask.copy(
+                        title = taskData.title,
+                        description = taskData.description ?: "",
+                        category = taskData.category ?: "General",
+                        dueDateTime = dueDateTime,
+                        priority = priority,
+                        updatedAt = LocalDateTime.now(),
+                        metadata = updatedMetadata
+                    )
+                    
+                    // Update the task
+                    updateTask(updatedTask)
+                }
+            }
+        }
+    }
 } 

@@ -32,6 +32,7 @@ import com.hebit.app.ui.screens.goals.GoalDetailScreen
 import com.hebit.app.ui.screens.settings.SettingsScreen
 import com.hebit.app.ui.screens.profile.ProfileScreen
 import com.hebit.app.ui.screens.profile.StatisticsScreen
+import com.hebit.app.ui.screens.tasks.TaskCreationScreen
 
 /**
  * Main navigation routes for the app
@@ -51,6 +52,7 @@ object Routes {
     const val TASK_DETAIL = "task_detail"
     const val TASK_CATEGORIES = "task_categories"
     const val TASK_BOARD = "task_board"
+    const val TASK_EDIT = "task_edit"
     const val HABITS = "habits"
     const val HABIT_DETAIL = "habit_detail"
     const val HABIT_STREAK = "habit_streak"
@@ -176,7 +178,25 @@ fun HebitNavigation(
                 onTasksClick = { navController.navigate(Routes.TASKS) },
                 onHabitsClick = { navController.navigate(Routes.HABITS) },
                 onGoalsClick = { navController.navigate(Routes.GOALS) },
-                onProfileClick = { navController.navigate(Routes.PROFILE) }
+                onProfileClick = { navController.navigate(Routes.PROFILE) },
+                onEditTask = { taskId -> 
+                    navController.navigate("${Routes.TASK_EDIT}/$taskId")
+                }
+            )
+        }
+        
+        composable(
+            route = "${Routes.TASK_EDIT}/{taskId}",
+            arguments = listOf(navArgument("taskId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val taskId = backStackEntry.arguments?.getString("taskId") ?: ""
+            TaskCreationScreen(
+                taskId = taskId,
+                isEditMode = true,
+                onSaveComplete = { navController.navigateUp() },
+                onCancel = { navController.navigateUp() },
+                onDismiss = { navController.navigateUp() },
+                onSaveTask = { /* This won't be used in edit mode */ }
             )
         }
         

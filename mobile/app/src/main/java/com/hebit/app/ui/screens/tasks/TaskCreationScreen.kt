@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -41,12 +42,19 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import com.hebit.app.domain.model.TaskCreationData
 import com.hebit.app.domain.model.TaskPriority
-
-data class SubTask(
-    val id: String = java.util.UUID.randomUUID().toString(),
-    val title: String,
-    val isCompleted: Boolean = false
-)
+import android.app.TimePickerDialog
+import android.content.Context
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.window.DialogProperties
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.hebit.app.domain.model.Resource
+import com.hebit.app.ui.screens.tasks.parseRecurrencePattern
+import com.hebit.app.ui.screens.tasks.parseSubtasks
+import com.hebit.app.ui.screens.tasks.parseReminderSettings
 
 data class RecurrencePattern(
     val type: RecurrenceType = RecurrenceType.NONE,
@@ -54,10 +62,6 @@ data class RecurrencePattern(
     val endDate: LocalDate? = null,
     val daysOfWeek: List<Int> = emptyList() // For weekly recurrence
 )
-
-enum class RecurrenceType {
-    NONE, DAILY, WEEKLY, MONTHLY, YEARLY
-}
 
 data class ReminderSettings(
     val isEnabled: Boolean = false,
@@ -69,9 +73,16 @@ data class ReminderSettings(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaskCreationScreen(
-    onDismiss: () -> Unit,
-    onSaveTask: (TaskCreationData) -> Unit
+    taskId: String = "",
+    isEditMode: Boolean = false,
+    onSaveComplete: () -> Unit = {},
+    onCancel: () -> Unit = {},
+    onDismiss: () -> Unit = {},
+    onSaveTask: (TaskCreationData) -> Unit = {},
+    viewModel: TaskViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
+    
     var taskTitle by remember { mutableStateOf("") }
     var taskDescription by remember { mutableStateOf("") }
     var selectedDate by remember { mutableStateOf<LocalDate?>(LocalDate.now()) }
@@ -82,7 +93,7 @@ fun TaskCreationScreen(
     var showTimePicker by remember { mutableStateOf(false) }
     var showCategoryPicker by remember { mutableStateOf(false) }
     
-    // Recurrence settings
+    // Define these state variables before they're used
     var showRecurrenceOptions by remember { mutableStateOf(false) }
     var recurrencePattern by remember { mutableStateOf(RecurrencePattern()) }
     
@@ -94,6 +105,97 @@ fun TaskCreationScreen(
     // Reminder settings
     var showReminderOptions by remember { mutableStateOf(false) }
     var reminderSettings by remember { mutableStateOf(ReminderSettings()) }
+    
+    // Permission states
+    var hasNotificationPermission by remember { 
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
+        ) 
+    }
+    
+    // Load task data if in edit mode
+    LaunchedEffect(taskId) {
+        if (isEditMode && taskId.isNotBlank()) {
+            viewModel.getTaskById(taskId)
+        }
+    }
+    
+    // Observe task data
+    val taskState by viewModel.selectedTaskState.collectAsState()
+    
+    // Update UI with task data if in edit mode
+    LaunchedEffect(taskState) {
+        if (isEditMode && taskState is Resource.Success) {
+            val task = (taskState as? Resource.Success)?.data
+            if (task != null) {
+                taskTitle = task.title
+                taskDescription = task.description ?: ""
+                selectedDate = task.dueDateTime?.toLocalDate()
+                selectedTime = task.dueDateTime?.toLocalTime()
+                selectedPriority = when (task.priority) {
+                    1 -> TaskPriority.LOW
+                    2 -> TaskPriority.MEDIUM
+                    3 -> TaskPriority.HIGH
+                    else -> TaskPriority.MEDIUM
+                }
+                selectedCategory = task.category
+                
+                // Load recurrence pattern if available
+                task.metadata["recurrence"]?.let {
+                    recurrencePattern = RecurrencePattern(
+                        type = parseRecurrencePattern(it) ?: RecurrenceType.NONE
+                    )
+                }
+                
+                // Load reminder settings if available
+                task.metadata["reminder"]?.let { reminderStr ->
+                    val parts = reminderStr.split(",")
+                    if (parts.isNotEmpty()) {
+                        val minutes = parts[0].toIntOrNull() ?: 15
+                        val timeString = parts.getOrNull(1) ?: ""
+                        
+                        if (timeString.isNotBlank()) {
+                            reminderSettings = ReminderSettings(
+                                isEnabled = true,
+                                minutes = 0,
+                                time = try {
+                                    LocalTime.parse(timeString, DateTimeFormatter.ofPattern("h:mm a"))
+                                } catch (e: Exception) {
+                                    null
+                                }
+                            )
+                        } else {
+                            reminderSettings = ReminderSettings(
+                                isEnabled = true,
+                                minutes = minutes
+                            )
+                        }
+                    }
+                }
+                
+                // Load subtasks if available
+                task.metadata["subtasks"]?.let {
+                    subtasks.clear()
+                    subtasks.addAll(parseSubtasks(it))
+                }
+            }
+        }
+    }
+    
+    // Permission launcher
+    val requestPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { isGranted ->
+            hasNotificationPermission = isGranted
+        }
+    )
     
     // Text formatting options
     var isBold by remember { mutableStateOf(false) }
@@ -110,12 +212,32 @@ fun TaskCreationScreen(
             ?: LocalDate.now().toEpochDay() * 24 * 60 * 60 * 1000
     )
     
+    // Time picker handler
+    fun showTimePickerDialog() {
+        val currentTime = selectedTime ?: LocalTime.now()
+        TimePickerDialog(
+            context,
+            { _, hourOfDay, minute ->
+                selectedTime = LocalTime.of(hourOfDay, minute)
+            },
+            currentTime.hour,
+            currentTime.minute,
+            false
+        ).show()
+    }
+    
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("New Task") },
+                title = { Text(if (isEditMode) "Edit Task" else "New Task") },
                 navigationIcon = {
-                    IconButton(onClick = onDismiss) {
+                    IconButton(onClick = { 
+                        if (isEditMode) {
+                            onCancel()
+                        } else {
+                            onDismiss()
+                        }
+                    }) {
                         Icon(Icons.Default.Close, contentDescription = "Close")
                     }
                 },
@@ -134,7 +256,13 @@ fun TaskCreationScreen(
                                 recurrencePattern = recurrencePattern,
                                 reminderSettings = reminderSettings
                             )
-                            onSaveTask(taskData)
+                            
+                            if (isEditMode) {
+                                viewModel.updateTaskWithData(taskId, taskData)
+                                onSaveComplete()
+                            } else {
+                                onSaveTask(taskData)
+                            }
                         },
                         enabled = taskTitle.isNotBlank()
                     ) {
@@ -429,7 +557,7 @@ fun TaskCreationScreen(
                     .padding(top = 16.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
+                            Icon(
                     imageVector = Icons.Outlined.CheckBox,
                     contentDescription = "Subtasks",
                     tint = MaterialTheme.colorScheme.primary
@@ -454,7 +582,7 @@ fun TaskCreationScreen(
             
             // Display existing subtasks
             if (subtasks.isNotEmpty()) {
-                Column(
+            Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(start = 32.dp, end = 16.dp, bottom = 16.dp)
@@ -486,7 +614,7 @@ fun TaskCreationScreen(
                                 },
                                 modifier = Modifier.size(24.dp)
                             ) {
-                                Icon(
+                        Icon(
                                     imageVector = Icons.Default.Close,
                                     contentDescription = "Remove",
                                     modifier = Modifier.size(16.dp)
@@ -504,14 +632,21 @@ fun TaskCreationScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 16.dp)
-                    .clickable { showReminderOptions = true },
+                    .clickable { 
+                        // Request notification permission if needed before showing reminder options
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotificationPermission) {
+                            requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            showReminderOptions = true
+                        }
+                    },
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
+                        Icon(
                     imageVector = Icons.Outlined.Notifications,
                     contentDescription = "Reminder",
-                    tint = MaterialTheme.colorScheme.primary
-                )
+                            tint = MaterialTheme.colorScheme.primary
+                        )
                 
                 Spacer(modifier = Modifier.width(8.dp))
                 
@@ -543,9 +678,9 @@ fun TaskCreationScreen(
                 
                 Spacer(modifier = Modifier.width(8.dp))
                 
-                Icon(
+                        Icon(
                     imageVector = Icons.Default.ChevronRight,
-                    contentDescription = "Select"
+                            contentDescription = "Select"
                 )
             }
             
@@ -591,6 +726,14 @@ fun TaskCreationScreen(
                     Text("Save Task")
                 }
             }
+        }
+    }
+    
+    // Handle time picker dialog
+    LaunchedEffect(showTimePicker) {
+        if (showTimePicker) {
+            showTimePickerDialog()
+            showTimePicker = false
         }
     }
     
@@ -663,7 +806,8 @@ fun TaskCreationScreen(
                 ) {
                     Text("Cancel")
                 }
-            }
+            },
+            properties = DialogProperties(dismissOnClickOutside = true)
         ) {
             DatePicker(
                 state = datePickerState,
@@ -774,7 +918,7 @@ fun TaskCreationScreen(
                         Text("Repeat every", style = MaterialTheme.typography.bodyLarge)
                         Spacer(modifier = Modifier.height(8.dp))
                         
-                        OutlinedTextField(
+                OutlinedTextField(
                             value = tempInterval,
                             onValueChange = { 
                                 // Only allow numeric input
@@ -793,9 +937,9 @@ fun TaskCreationScreen(
                                     }
                                 ) 
                             },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
-                        )
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
                     }
                 }
             },
@@ -824,6 +968,29 @@ fun TaskCreationScreen(
     if (showReminderOptions) {
         var tempEnabled by remember { mutableStateOf(reminderSettings.isEnabled) }
         var tempMinutes by remember { mutableStateOf(reminderSettings.minutes.toString()) }
+        var tempTime by remember { mutableStateOf(reminderSettings.time ?: LocalTime.now()) }
+        var showReminderTimePicker by remember { mutableStateOf(false) }
+        
+        // Function to show time picker
+        fun showReminderTimePickerDialog() {
+            TimePickerDialog(
+                context,
+                { _, hourOfDay, minute ->
+                    tempTime = LocalTime.of(hourOfDay, minute)
+                },
+                tempTime.hour,
+                tempTime.minute,
+                false
+            ).show()
+        }
+        
+        // Handle reminder time picker
+        LaunchedEffect(showReminderTimePicker) {
+            if (showReminderTimePicker) {
+                showReminderTimePickerDialog()
+                showReminderTimePicker = false
+            }
+        }
         
         AlertDialog(
             onDismissRequest = { showReminderOptions = false },
@@ -853,18 +1020,91 @@ fun TaskCreationScreen(
                     if (tempEnabled) {
                         Spacer(modifier = Modifier.height(16.dp))
                         
-                        OutlinedTextField(
-                            value = tempMinutes,
-                            onValueChange = { 
-                                // Only allow numeric input
-                                if (it.isEmpty() || it.all { char -> char.isDigit() }) {
-                                    tempMinutes = it
-                                }
-                            },
-                            label = { Text("Minutes before") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
-                        )
+                        // Option type selection
+                        Text("Reminder Type", style = MaterialTheme.typography.bodyLarge)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        var useExactTime by remember { mutableStateOf(reminderSettings.time != null) }
+                        
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = !useExactTime,
+                                onClick = { useExactTime = false }
+                            )
+                            
+                            Spacer(modifier = Modifier.width(8.dp))
+                            
+                            Text(
+                                text = "Minutes before due date",
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.clickable { useExactTime = false }
+                            )
+                        }
+                        
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = useExactTime,
+                                onClick = { useExactTime = true }
+                            )
+                            
+                            Spacer(modifier = Modifier.width(8.dp))
+                            
+                            Text(
+                                text = "At specific time",
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.clickable { useExactTime = true }
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        if (useExactTime) {
+                            // Specific time selection
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showReminderTimePicker = true }
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Schedule,
+                                    contentDescription = "Time",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                
+                                Spacer(modifier = Modifier.width(8.dp))
+                                
+                                Text(
+                                    text = tempTime.format(DateTimeFormatter.ofPattern("h:mm a")),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        } else {
+                            // Minutes before selection
+                            OutlinedTextField(
+                                value = tempMinutes,
+                                onValueChange = { 
+                                    // Only allow numeric input
+                                    if (it.isEmpty() || it.all { char -> char.isDigit() }) {
+                                        tempMinutes = it
+                                    }
+                                },
+                                label = { Text("Minutes before") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true
+                            )
+                        }
                     }
                 }
             },
@@ -873,7 +1113,8 @@ fun TaskCreationScreen(
                     onClick = {
                         reminderSettings = ReminderSettings(
                             isEnabled = tempEnabled,
-                            minutes = tempMinutes.toIntOrNull() ?: 15
+                            minutes = tempMinutes.toIntOrNull() ?: 15,
+                            time = if (tempEnabled && reminderSettings.time != null) tempTime else null
                         )
                         showReminderOptions = false
                     }
@@ -947,3 +1188,36 @@ fun FlowRow(
         }
     }
 }
+
+// Move all these duplicate function definitions to a common utility file
+// For now, import them from TaskDetailScreen
+// Helper function to parse recurrence pattern from metadata string
+/*
+fun parseRecurrencePattern(recurrenceStr: String): RecurrenceType? {
+    val parts = recurrenceStr.split(",")
+    if (parts.isNotEmpty()) {
+        return try {
+            RecurrenceType.valueOf(parts[0])
+        } catch (e: Exception) {
+            null
+        }
+    }
+    return null
+}
+
+// Helper function to parse subtasks from metadata string
+fun parseSubtasks(subtasksStr: String): List<SubTask> {
+    if (subtasksStr.isBlank()) return emptyList()
+    
+    return subtasksStr.split(",").mapNotNull { subTaskStr ->
+        val parts = subTaskStr.split(":")
+        if (parts.size >= 3) {
+            SubTask(
+                id = parts[0],
+                title = parts[1],
+                isCompleted = parts[2].toBoolean()
+            )
+        } else null
+    }
+}
+*/
