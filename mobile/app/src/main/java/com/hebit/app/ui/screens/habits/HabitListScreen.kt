@@ -254,6 +254,7 @@ fun HabitListScreen(
                                         onHabitClick = { onHabitClick(habit.id) },
                                         onToggleComplete = { habitId, currentState ->
                                             // Call ViewModel function
+                                            android.util.Log.d("HabitList", "onToggleComplete lambda called for habit: $habitId, current state: $currentState")
                                             viewModel.toggleHabitCompletion(habitId, currentState)
                                         }
                                     )
@@ -494,7 +495,10 @@ fun HabitListItem(
             // Completion indicator - Use completedToday from Habit model
             IconButton(
                 // Call lambda with id and *current* completion state
-                onClick = { onToggleComplete(habit.id, habit.completedToday) },
+                onClick = { 
+                    android.util.Log.d("HabitList", "Toggle button clicked for habit: ${habit.id}, current state: ${habit.completedToday}")
+                    onToggleComplete(habit.id, habit.completedToday)
+                },
                 modifier = Modifier.size(48.dp)
             ) {
                 Icon(

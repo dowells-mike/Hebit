@@ -459,11 +459,20 @@ fun TodayHabitsList(onHabitClick: (String) -> Unit, habitsState: Resource<List<H
                         .height(100.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "No habits tracked yet",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.outline
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "No habits tracked yet",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        
+                        // Debug information to see what's being returned
+                        Text(
+                            text = "Debug: ${habits.size} habits found",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
             } else {
                 Row(

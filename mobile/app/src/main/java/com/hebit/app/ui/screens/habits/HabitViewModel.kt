@@ -28,30 +28,34 @@ class HabitViewModel @Inject constructor(
     private val habitRepository: HabitRepository
 ) : ViewModel() {
     
+    // States for habits list
     private val _habitsState = MutableStateFlow<Resource<List<Habit>>>(Resource.Loading())
-    val habitsState: StateFlow<Resource<List<Habit>>> = _habitsState.asStateFlow()
+    val habitsState = _habitsState.asStateFlow()
     
+    // State for today's habits
     private val _todayHabitsState = MutableStateFlow<Resource<List<Habit>>>(Resource.Loading())
-    val todayHabitsState: StateFlow<Resource<List<Habit>>> = _todayHabitsState.asStateFlow()
+    val todayHabitsState = _todayHabitsState.asStateFlow()
     
-    private val _selectedHabitState = MutableStateFlow<Resource<Habit?>>(Resource.Success(null))
-    val selectedHabitState: StateFlow<Resource<Habit?>> = _selectedHabitState.asStateFlow()
+    // State for selected habit
+    private val _selectedHabitState = MutableStateFlow<Resource<Habit?>>(Resource.Loading())
+    val selectedHabitState = _selectedHabitState.asStateFlow()
     
-    // StateFlow for habit statistics
+    // State for habit stats
     private val _habitStatsState = MutableStateFlow<Resource<HabitStats>>(Resource.Loading())
-    val habitStatsState: StateFlow<Resource<HabitStats>> = _habitStatsState.asStateFlow()
+    val habitStatsState = _habitStatsState.asStateFlow()
     
-    // Placeholder StateFlows for additional analytics
-    private val _performanceInsightsState = MutableStateFlow<Resource<List<HabitPerformanceInsight>>>(Resource.Success(emptyList()))
-    val performanceInsightsState: StateFlow<Resource<List<HabitPerformanceInsight>>> = _performanceInsightsState.asStateFlow()
-
-    private val _relatedAchievementsState = MutableStateFlow<Resource<List<HabitAchievement>>>(Resource.Success(emptyList()))
-    val relatedAchievementsState: StateFlow<Resource<List<HabitAchievement>>> = _relatedAchievementsState.asStateFlow()
-
-    private val _suggestionsState = MutableStateFlow<Resource<List<HabitSuggestion>>>(Resource.Success(emptyList()))
-    val suggestionsState: StateFlow<Resource<List<HabitSuggestion>>> = _suggestionsState.asStateFlow()
+    // States for additional habit detail sections
+    private val _performanceInsightsState = MutableStateFlow<Resource<List<HabitPerformanceInsight>>>(Resource.Loading())
+    val performanceInsightsState = _performanceInsightsState.asStateFlow()
+    
+    private val _relatedAchievementsState = MutableStateFlow<Resource<List<HabitAchievement>>>(Resource.Loading())
+    val relatedAchievementsState = _relatedAchievementsState.asStateFlow()
+    
+    private val _suggestionsState = MutableStateFlow<Resource<List<HabitSuggestion>>>(Resource.Loading())
+    val suggestionsState = _suggestionsState.asStateFlow()
     
     init {
+        android.util.Log.d("HabitViewModel", "Initializing HabitViewModel - loading data")
         loadHabits()
         loadTodayHabits()
     }
@@ -67,9 +71,21 @@ class HabitViewModel @Inject constructor(
     }
     
     fun loadTodayHabits() {
+        android.util.Log.d("HabitViewModel", "Loading today's habits...")
         viewModelScope.launch {
             habitRepository.getTodaysHabits()
                 .onEach { result ->
+                    when(result) {
+                        is Resource.Success -> {
+                            android.util.Log.d("HabitViewModel", "Today's habits loaded successfully: ${result.data?.size ?: 0} habits")
+                        }
+                        is Resource.Error -> {
+                            android.util.Log.e("HabitViewModel", "Error loading today's habits: ${result.message}")
+                        }
+                        is Resource.Loading -> {
+                            android.util.Log.d("HabitViewModel", "Loading today's habits...")
+                        }
+                    }
                     _todayHabitsState.value = result
                 }
                 .launchIn(this)
@@ -178,12 +194,23 @@ class HabitViewModel @Inject constructor(
     }
     
     fun toggleHabitCompletion(id: String, completed: Boolean) {
+        android.util.Log.d("HabitViewModel", "Toggling habit $id completion to: ${!completed}")
         viewModelScope.launch {
-            habitRepository.completeHabitForToday(id)
+            // Pass the inverse of the current state to toggle it
+            habitRepository.completeHabitForToday(id, !completed)
                 .onEach { result ->
-                    if (result is Resource.Success) {
-                        loadHabits()
-                        loadTodayHabits()
+                    when(result) {
+                        is Resource.Success -> {
+                            android.util.Log.d("HabitViewModel", "Successfully toggled habit completion")
+                            loadHabits()
+                            loadTodayHabits()
+                        }
+                        is Resource.Error -> {
+                            android.util.Log.e("HabitViewModel", "Error toggling habit: ${result.message}")
+                        }
+                        is Resource.Loading -> {
+                            android.util.Log.d("HabitViewModel", "Toggling habit completion...")
+                        }
                     }
                 }
                 .launchIn(this)

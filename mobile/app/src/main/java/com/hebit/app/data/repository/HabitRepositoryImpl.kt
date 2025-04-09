@@ -161,10 +161,16 @@ class HabitRepositoryImpl @Inject constructor(
             val response = apiService.getTodaysHabits()
             
             if (response.isSuccessful && response.body() != null) {
-                val habits = response.body()!!.habits.map { mapHabitDtoToDomain(it) }
+                val responseBody = response.body()!!
+                android.util.Log.d("HabitRepo", "Today's habits API response: ${responseBody.habits.size} habits found")
+                android.util.Log.d("HabitRepo", "Response details: total=${responseBody.total}, page=${responseBody.page}, perPage=${responseBody.perPage}")
+                
+                val habits = responseBody.habits.map { mapHabitDtoToDomain(it) }
+                android.util.Log.d("HabitRepo", "Mapped to ${habits.size} domain habits")
                 emit(Resource.Success(habits))
             } else {
                 val errorMessage = response.errorBody()?.string() ?: "Unknown error occurred"
+                android.util.Log.e("HabitRepo", "Error fetching today's habits: $errorMessage")
                 emit(Resource.Error(errorMessage))
             }
         } catch (e: HttpException) {
@@ -176,12 +182,12 @@ class HabitRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun completeHabitForToday(id: String): Flow<Resource<Habit>> = flow {
+    override suspend fun completeHabitForToday(id: String, completed: Boolean): Flow<Resource<Habit>> = flow {
         emit(Resource.Loading())
         
         try {
             val currentDate = java.time.LocalDate.now().toString()
-            val request = HabitCompletionRequest(completed = true, date = currentDate)
+            val request = HabitCompletionRequest(completed = completed, date = currentDate)
             val response = apiService.completeHabitForToday(id, request)
             
             if (response.isSuccessful && response.body() != null) {

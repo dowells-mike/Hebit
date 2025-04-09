@@ -13,7 +13,7 @@ interface HabitRepository {
     suspend fun updateHabit(habit: Habit): Flow<Resource<Habit>>
     suspend fun deleteHabit(id: String): Flow<Resource<Boolean>>
     suspend fun getTodaysHabits(): Flow<Resource<List<Habit>>>
-    suspend fun completeHabitForToday(id: String): Flow<Resource<Habit>>
+    suspend fun completeHabitForToday(id: String, completed: Boolean): Flow<Resource<Habit>>
     suspend fun getHabitStats(id: String): Flow<Resource<HabitStats>>
 
     /**
