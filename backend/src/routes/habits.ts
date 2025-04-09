@@ -20,7 +20,7 @@ router.route('/:id')
   .put(habitController.updateHabit)
   .delete(habitController.deleteHabit);
 
-router.post('/:id/track', habitController.trackHabit);
+router.put('/:id/track', habitController.trackHabit);
 router.get('/:id/stats', habitController.getHabitStats);
 
 export default router;

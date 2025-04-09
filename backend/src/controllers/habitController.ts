@@ -382,6 +382,8 @@ export const getTodaysHabits = catchAsync(async (req: AuthRequest, res: Response
   const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
   const dateString = today.toISOString().split('T')[0]; // YYYY-MM-DD format
   
+  console.log(`Getting today's habits for user ${userId}, date: ${dateString}, day of week: ${dayOfWeek}`);
+  
   // Build a query for habits that are due today based on frequency
   const habitsQuery = { 
     user: userId,
@@ -390,52 +392,32 @@ export const getTodaysHabits = catchAsync(async (req: AuthRequest, res: Response
   
   // Get all active habits for the user
   const habits = await Habit.find(habitsQuery);
+  console.log(`Found ${habits.length} active habits for user`);
   
-  // Filter habits that are due today based on frequency
-  const todaysHabits = habits.filter((habit: HabitDocument) => {
-    // Check if the habit is already completed today
+  // For debugging, we'll return all active habits without filtering by frequency
+  const todaysHabits = habits;
+  
+  console.log(`Returning ${todaysHabits.length} habits for today`);
+  
+  // Add completed_today information to each habit
+  const todaysHabitsWithCompletion = todaysHabits.map(habit => {
+    const habitObj = habit.toObject();
+    // Check if the habit is completed today
     const completedToday = habit.completionHistory.some(
-      (entry) => entry.date.toISOString().split('T')[0] === dateString && entry.completed
+      (entry: any) => entry.date.toISOString().split('T')[0] === dateString && entry.completed
     );
     
-    if (completedToday) {
-      return false; // Skip already completed habits
-    }
-    
-    // Check based on frequency type
-    switch (habit.frequency) {
-      case 'daily':
-        return true; // All daily habits are due every day
-        
-      case 'weekly':
-        // Check if today is one of the scheduled days
-        if (habit.daysOfWeek && habit.daysOfWeek.length > 0) {
-          return habit.daysOfWeek.includes(dayOfWeek);
-        }
-        // Also check the new frequencyConfig if available
-        if (habit.frequencyConfig?.daysOfWeek && habit.frequencyConfig.daysOfWeek.length > 0) {
-          return habit.frequencyConfig.daysOfWeek.includes(dayOfWeek);
-        }
-        return false;
-        
-      case 'monthly':
-        // Check if today's date matches the monthly dates
-        const dayOfMonth = today.getDate();
-        if (habit.frequencyConfig?.datesOfMonth && habit.frequencyConfig.datesOfMonth.length > 0) {
-          return habit.frequencyConfig.datesOfMonth.includes(dayOfMonth);
-        }
-        return false;
-        
-      default:
-        return false;
-    }
+    return {
+      ...habitObj,
+      completed_today: completedToday
+    };
   });
   
   res.status(200).json({
-    habits: todaysHabits,
-    total: todaysHabits.length,
+    habits: todaysHabitsWithCompletion,
+    total: todaysHabitsWithCompletion.length,
     page: 1,
-    per_page: todaysHabits.length
+    per_page: todaysHabitsWithCompletion.length
   });
 });
 
