@@ -41,10 +41,36 @@ export const getHabits = catchAsync(async (req: AuthRequest, res: Response) => {
     sort = { [sortField]: sortDirection };
   }
   
+  // Pagination
+  const page = parseInt(req.query.page as string) || 1;
+  const perPage = parseInt(req.query.per_page as string) || 20;
+  
   // Execute the query with filters and sort
   const habits = await Habit.find(filter).sort(sort);
   
-  res.status(200).json(habits);
+  // Add completed_today field to each habit
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+  
+  const habitsWithCompletedToday = habits.map(habit => {
+    const habitObj = habit.toObject();
+    // Check if the habit is completed today
+    const completedToday = habit.completionHistory.some(
+      (entry: any) => entry.date.toISOString().split('T')[0] === today && entry.completed
+    );
+    
+    return {
+      ...habitObj,
+      completed_today: completedToday
+    };
+  });
+  
+  // Return in the same format as other habit endpoints
+  res.status(200).json({
+    habits: habitsWithCompletedToday,
+    total: habits.length,
+    page: page,
+    per_page: perPage
+  });
 });
 
 /**
@@ -62,7 +88,19 @@ export const getHabitById = catchAsync(async (req: AuthRequest, res: Response) =
     throw new AppError('Habit not found', 404);
   }
   
-  res.status(200).json(habit);
+  // Check if the habit is completed today
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+  const completedToday = habit.completionHistory.some(
+    (entry: any) => entry.date.toISOString().split('T')[0] === today && entry.completed
+  );
+  
+  // Create a response object with the completed_today field
+  const habitResponse = {
+    ...habit.toObject(),
+    completed_today: completedToday
+  };
+  
+  res.status(200).json(habitResponse);
 });
 
 /**
