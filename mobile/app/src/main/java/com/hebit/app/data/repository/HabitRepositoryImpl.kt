@@ -269,7 +269,10 @@ class HabitRepositoryImpl @Inject constructor(
             currentStreak = dto.currentStreak,
             longestStreak = dto.longestStreak,
             completionRate = dto.completionRate / 100f, // Convert from 0-100 to 0-1
-            totalCompletions = dto.totalCompletions
+            totalCompletions = dto.completedEntries,
+            completionsByDay = dto.completionsByDay,
+            completionsByTime = dto.completionsByTime,
+            consistency = dto.consistency / 100f // Convert from 0-100 to 0-1
         )
     }
 
