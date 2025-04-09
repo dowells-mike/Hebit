@@ -2,11 +2,17 @@ package com.hebit.app.data.repository
 
 import com.hebit.app.data.remote.api.HebitApiService
 import com.hebit.app.data.remote.dto.CreateHabitRequest
+import com.hebit.app.data.remote.dto.CreateNoteRequest
 import com.hebit.app.data.remote.dto.HabitCompletionRequest
 import com.hebit.app.data.remote.dto.HabitDto
 import com.hebit.app.data.remote.dto.UpdateHabitRequest
+import com.hebit.app.data.remote.dto.HabitStatsDto
+import com.hebit.app.data.remote.dto.NoteDto
 import com.hebit.app.domain.model.Habit
 import com.hebit.app.domain.model.Resource
+import com.hebit.app.domain.model.CompletionHistoryEntry
+import com.hebit.app.domain.model.HabitStats
+import com.hebit.app.domain.model.Note
 import com.hebit.app.domain.repository.HabitRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -16,6 +22,7 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import javax.inject.Singleton
+import java.util.UUID
 
 @Singleton
 class HabitRepositoryImpl @Inject constructor(
@@ -75,7 +82,7 @@ class HabitRepositoryImpl @Inject constructor(
             val createHabitRequest = CreateHabitRequest(
                 title = habit.title,
                 description = habit.description,
-                iconName = habit.iconName,
+                iconName = habit.iconName ?: "default_icon",
                 frequency = habit.frequency
             )
             
@@ -173,7 +180,8 @@ class HabitRepositoryImpl @Inject constructor(
         emit(Resource.Loading())
         
         try {
-            val request = HabitCompletionRequest(completed = true)
+            val currentDate = java.time.LocalDate.now().toString()
+            val request = HabitCompletionRequest(completed = true, date = currentDate)
             val response = apiService.completeHabitForToday(id, request)
             
             if (response.isSuccessful && response.body() != null) {
@@ -191,18 +199,137 @@ class HabitRepositoryImpl @Inject constructor(
             emit(Resource.Error("Unexpected error: ${e.localizedMessage ?: "An unexpected error occurred"}"))
         }
     }
+
+    override suspend fun getHabitStats(id: String): Flow<Resource<HabitStats>> = flow {
+        emit(Resource.Loading())
+        try {
+            val response = apiService.getHabitStats(id)
+            
+            if (response.isSuccessful && response.body() != null) {
+                val statsDomain = mapHabitStatsDtoToDomain(response.body()!!)
+                emit(Resource.Success(statsDomain))
+            } else {
+                val errorMessage = response.errorBody()?.string() ?: "Failed to get habit stats"
+                emit(Resource.Error(errorMessage))
+            }
+        } catch (e: HttpException) {
+            emit(Resource.Error("Server error fetching stats: ${e.message()}"))
+        } catch (e: IOException) {
+            emit(Resource.Error("Network error fetching stats: ${e.localizedMessage ?: "Check connection"}"))
+        } catch (e: Exception) {
+            emit(Resource.Error("Unexpected error fetching stats: ${e.localizedMessage ?: "Unknown error"}"))
+        }
+    }
     
     private fun mapHabitDtoToDomain(dto: HabitDto): Habit {
+        // Check if the habit is completed today using completion history
+        val completedToday = if (dto.completedToday != null) {
+            dto.completedToday
+        } else {
+            // Check completionHistory if completed_today field is missing
+            val today = java.time.LocalDate.now().toString()
+            dto.completionHistory.any { entry ->
+                val entryDate = entry.date.split("T")[0] // Get YYYY-MM-DD part
+                entryDate == today && entry.completed
+            }
+        }
+
+        // Use current time as fallback for missing date fields
+        val now = LocalDateTime.now()
+        
         return Habit(
             id = dto.id,
             title = dto.title,
             description = dto.description,
             iconName = dto.iconName,
             frequency = dto.frequency,
-            completedToday = dto.completedToday,
+            completedToday = completedToday,
             streak = dto.streak,
-            createdAt = LocalDateTime.parse(dto.createdAt, dateFormatter),
-            updatedAt = LocalDateTime.parse(dto.updatedAt, dateFormatter)
+            completionHistory = dto.completionHistory.mapNotNull { entryDto ->
+                try {
+                    CompletionHistoryEntry(
+                        date = LocalDateTime.parse(entryDto.date, dateFormatter),
+                        completed = entryDto.completed,
+                        value = entryDto.value,
+                        notes = entryDto.notes,
+                        mood = entryDto.mood,
+                        skipReason = entryDto.skipReason
+                    )
+                } catch (e: Exception) {
+                    null
+                }
+            },
+            createdAt = if (dto.createdAt != null) LocalDateTime.parse(dto.createdAt, dateFormatter) else now,
+            updatedAt = if (dto.updatedAt != null) LocalDateTime.parse(dto.updatedAt, dateFormatter) else now
+        )
+    }
+
+    private fun mapHabitStatsDtoToDomain(dto: HabitStatsDto): HabitStats {
+        return HabitStats(
+            currentStreak = dto.currentStreak,
+            longestStreak = dto.longestStreak,
+            completionRate = dto.completionRate / 100f, // Convert from 0-100 to 0-1
+            totalCompletions = dto.totalCompletions
+        )
+    }
+
+    override fun getNotesForHabit(habitId: String): Flow<Resource<List<Note>>> = flow {
+        emit(Resource.Loading())
+
+        try {
+            val response = apiService.getNotesForHabit(habitId)
+            
+            if (response.isSuccessful && response.body() != null) {
+                val notes = response.body()!!.notes.map { mapNoteDtoToDomain(it) }
+                emit(Resource.Success(notes))
+            } else {
+                val errorMessage = response.errorBody()?.string() ?: "Failed to fetch notes"
+                emit(Resource.Error(message = errorMessage, data = emptyList()))
+            }
+        } catch (e: HttpException) {
+            emit(Resource.Error(message = "HTTP Error: ${e.message()}", data = emptyList()))
+        } catch (e: IOException) {
+            emit(Resource.Error(message = "Network Error: Could not reach server.", data = emptyList()))
+        } catch (e: Exception) {
+            emit(Resource.Error(message = "An unexpected error occurred: ${e.localizedMessage}", data = emptyList()))
+        }
+    }
+
+    override fun addNoteForHabit(habitId: String, content: String): Flow<Resource<Note>> = flow {
+        emit(Resource.Loading())
+
+        try {
+            if (content.isBlank()) {
+                throw IllegalArgumentException("Note content cannot be empty.")
+            }
+            
+            val request = CreateNoteRequest(habitId = habitId, content = content)
+            val response = apiService.addNoteForHabit(request)
+            
+            if (response.isSuccessful && response.body() != null) {
+                val createdNote = mapNoteDtoToDomain(response.body()!!)
+                emit(Resource.Success(createdNote))
+            } else {
+                val errorMessage = response.errorBody()?.string() ?: "Failed to add note"
+                emit(Resource.Error(message = errorMessage))
+            }
+        } catch(e: IllegalArgumentException) {
+            emit(Resource.Error(message = e.message ?: "Invalid input."))
+        } catch (e: HttpException) {
+            emit(Resource.Error(message = "HTTP Error: ${e.message()}"))
+        } catch (e: IOException) {
+            emit(Resource.Error(message = "Network Error: Could not save note."))
+        } catch (e: Exception) {
+            emit(Resource.Error(message = "An unexpected error occurred: ${e.localizedMessage}"))
+        }
+    }
+    
+    private fun mapNoteDtoToDomain(dto: NoteDto): Note {
+        return Note(
+            id = dto.id,
+            habitId = dto.habitId,
+            content = dto.content,
+            createdAt = LocalDateTime.parse(dto.createdAt, dateFormatter)
         )
     }
 } 

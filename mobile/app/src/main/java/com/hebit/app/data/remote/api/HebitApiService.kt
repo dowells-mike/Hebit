@@ -81,11 +81,20 @@ interface HebitApiService {
     @GET("habits/today")
     suspend fun getTodaysHabits(): Response<HabitListResponse>
     
-    @PUT("habits/{id}/complete")
+    @PUT("habits/{id}/track")
     suspend fun completeHabitForToday(
         @Path("id") id: String,
         @Body request: HabitCompletionRequest
     ): Response<HabitDto>
+    
+    @GET("habits/{id}/stats")
+    suspend fun getHabitStats(@Path("id") id: String): Response<HabitStatsDto>
+    
+    @GET("habits/{id}/notes")
+    suspend fun getNotesForHabit(@Path("id") habitId: String): Response<NotesResponse>
+    
+    @POST("habits/notes")
+    suspend fun addNoteForHabit(@Body request: CreateNoteRequest): Response<NoteDto>
     
     // Goal Endpoints
     @GET("goals")

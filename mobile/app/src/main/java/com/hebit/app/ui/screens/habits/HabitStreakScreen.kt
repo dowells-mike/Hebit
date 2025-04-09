@@ -1,8 +1,6 @@
 package com.hebit.app.ui.screens.habits
 
 import android.annotation.SuppressLint
-import android.os.Build
-import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -10,6 +8,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,6 +19,10 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.hebit.app.domain.model.Habit
+import com.hebit.app.domain.model.HabitStats
+import com.hebit.app.domain.model.Resource
 import com.hebit.app.ui.components.BottomNavItem
 import java.time.LocalDate
 import java.time.YearMonth
@@ -27,7 +30,26 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.*
 
-@RequiresApi(Build.VERSION_CODES.O)
+// Define DayStatus enum here or in a common place
+enum class DayStatus {
+    PERFECT, PARTIAL, MISSED, NONE
+}
+
+// Mock data classes to be removed/replaced later
+data class Achievement(
+    val id: String,
+    val title: String,
+    val description: String,
+    val date: LocalDate
+)
+
+data class Suggestion(
+    val id: String,
+    val title: String,
+    val description: String
+)
+
+@SuppressLint("RememberReturnType")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HabitStreakScreen(
@@ -37,80 +59,83 @@ fun HabitStreakScreen(
     onTasksClick: () -> Unit = {},
     onHabitsClick: () -> Unit = {},
     onGoalsClick: () -> Unit = {},
-    onProfileClick: () -> Unit = {}
+    onProfileClick: () -> Unit = {},
+    // Inject ViewModel
+    viewModel: HabitViewModel = hiltViewModel()
 ) {
-    // Mock data - would come from ViewModel in real app
-    val currentStreak = remember { 28 }
-    val previousBest = remember { 32 }
-    val successRate = remember { 85 }
-    val points = remember { 2450 }
-    val pointsToNextLevel = remember { 50 }
-    val rewards = remember { 2 }
-    
-    // Month calendar data
-    val currentMonth = remember { YearMonth.now() }
+    // Observe state from ViewModel
+    val selectedHabitState by viewModel.selectedHabitState.collectAsState()
+    val habitStatsState by viewModel.habitStatsState.collectAsState()
+    // Observe new states
+    val performanceInsightsState by viewModel.performanceInsightsState.collectAsState()
+    val relatedAchievementsState by viewModel.relatedAchievementsState.collectAsState()
+    val suggestionsState by viewModel.suggestionsState.collectAsState()
+
+    // Fetch data when habitId changes
+    LaunchedEffect(key1 = habitId) {
+        viewModel.getHabitById(habitId) // This will trigger stats loading too
+    }
+
+    // Clean up selected state on exit
+    DisposableEffect(Unit) {
+        onDispose { viewModel.clearSelectedHabit() }
+    }
+
+    // Month calendar state
+    val today = remember { LocalDate.now() }
+    val currentMonth = remember { YearMonth.from(today) }
     var selectedMonth by remember { mutableStateOf(currentMonth) }
-    
-    // Calendar completion data (mock)
-    val calendarData = remember {
+
+    // Calculate calendar data based on selected habit's history
+    val calendarData = remember(selectedHabitState, selectedMonth) {
+        val habit = (selectedHabitState as? Resource.Success)?.data
+        val historyMap = habit?.completionHistory?.associateBy {
+            it.date.toLocalDate()
+        } ?: emptyMap()
+
         val daysInMonth = selectedMonth.lengthOfMonth()
-        val currentDay = LocalDate.now().dayOfMonth
-        
-        List(daysInMonth) { day ->
-            // Only mark days up to today in the current month
-            if (selectedMonth == currentMonth && day + 1 > currentDay) {
-                DayStatus.NONE
+        val firstDayOfMonth = selectedMonth.atDay(1)
+        val firstDayOfWeekValue = firstDayOfMonth.dayOfWeek.value // 1 (Mon) to 7 (Sun)
+        val emptyStartDays = firstDayOfWeekValue - 1
+
+        List(daysInMonth + emptyStartDays) { index ->
+            if (index < emptyStartDays) {
+                 null // Placeholder for days before the 1st
             } else {
-                // Random completion for the mock
-                when ((0..10).random()) {
-                    in 0..6 -> DayStatus.PERFECT // 70% perfect
-                    in 7..8 -> DayStatus.PARTIAL // 20% partial
-                    else -> DayStatus.MISSED // 10% missed
+                val dayOfMonth = index - emptyStartDays + 1
+                val date = selectedMonth.atDay(dayOfMonth)
+                val status = when {
+                    // Future days or future months
+                    date.isAfter(today) -> DayStatus.NONE
+                    // Check history for past/present days
+                    historyMap.containsKey(date) -> {
+                        if (historyMap[date]?.completed == true) DayStatus.PERFECT
+                        else DayStatus.MISSED // Assuming non-completed entry means missed
+                        // TODO: Add logic for PARTIAL if needed/possible
+                    }
+                    // Past days with no history entry
+                    else -> DayStatus.MISSED
                 }
+                 Pair(dayOfMonth, status)
             }
         }
     }
-    
-    // Performance data (mock)
-    val bestDay = remember { "Monday" }
-    val bestDaySuccess = remember { 92 }
-    val peakTime = remember { "Morning" }
-    val peakTimeWindow = remember { "6-8 AM" }
-    
-    // Achievements
-    val achievements = remember {
-        listOf(
-            Achievement(
-                id = "1",
-                title = "30-Day Streak",
-                description = "Personal Best Achievement",
-                date = LocalDate.now().minusDays(5)
-            )
-        )
-    }
-    
-    // Suggestions
-    val suggestions = remember {
-        listOf(
-            Suggestion(
-                id = "1",
-                title = "Morning Routine Optimization",
-                description = "Your success rate is 20% higher when you start before 7 AM."
-            )
-        )
-    }
-    
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Streak Analytics") },
+                title = { Text((selectedHabitState as? Resource.Success)?.data?.title ?: "Streak Analytics") }, // Show title
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* Share analytics */ }) {
+                    // Share button - Enable when loaded
+                     IconButton(
+                         onClick = { /* Share analytics */ },
+                         enabled = selectedHabitState is Resource.Success && habitStatsState is Resource.Success
+                     ) {
                         Icon(
                             imageVector = Icons.Default.Share,
                             contentDescription = "Share"
@@ -163,594 +188,400 @@ fun HabitStreakScreen(
             }
         }
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
-        ) {
-            // Current streak
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "Current Streak",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.LocalFireDepartment,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(48.dp)
-                        )
-                        
-                        Text(
-                            text = "$currentStreak",
-                            style = MaterialTheme.typography.displayLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        
-                        Text(
-                            text = "days",
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.padding(start = 8.dp)
-                        )
-                    }
-                    
-                    Text(
-                        text = "Previous best: $previousBest days",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            
-            // Success rate
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+            // Handle Loading/Error states for primary data (habit + stats)
+             val isLoading = selectedHabitState is Resource.Loading || (selectedHabitState is Resource.Success && habitStatsState is Resource.Loading)
+             val hasError = selectedHabitState is Resource.Error || habitStatsState is Resource.Error
+             val primaryErrorMessage = (selectedHabitState as? Resource.Error)?.message ?: (habitStatsState as? Resource.Error)?.message
+
+            if (isLoading) {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            } else if (hasError) {
+                 Text(
+                     text = "Error: ${primaryErrorMessage ?: "Unknown error"}",
+                     color = MaterialTheme.colorScheme.error,
+                     modifier = Modifier.align(Alignment.Center).padding(16.dp)
+                 )
+            } else if (selectedHabitState is Resource.Success && habitStatsState is Resource.Success) {
+                val habit = (selectedHabitState as Resource.Success<Habit?>).data
+                val stats = (habitStatsState as Resource.Success<HabitStats>).data
+
+                if (habit != null && stats != null) {
+                    // Main content
                     Column(
-                        modifier = Modifier.weight(2f)
-                    ) {
-                        Text(
-                            text = "Success Rate",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        
-                        Text(
-                            text = "30-day average",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        
-                        Text(
-                            text = "$successRate%",
-                            style = MaterialTheme.typography.displayMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    
-                    Box(
                         modifier = Modifier
-                            .weight(1f)
-                            .aspectRatio(1f)
-                            .padding(8.dp),
-                        contentAlignment = Alignment.Center
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp)
                     ) {
-                        CircularProgressIndicator(
-                            progress = { successRate / 100f },
-                            modifier = Modifier.fillMaxSize(),
-                            strokeWidth = 8.dp
-                        )
-                        
-                        Text(
-                            text = "$successRate%",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-            
-            // Points
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(
-                            text = "Points",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        
-                        Text(
-                            text = "$points",
-                            style = MaterialTheme.typography.displaySmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        
-                        Text(
-                            text = "$pointsToNextLevel points to next level",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    
-                    Badge(
-                        modifier = Modifier.padding(8.dp)
-                    ) {
-                        Text(
-                            text = "$rewards rewards",
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-            }
-            
-            // Month calendar
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-            ) {
-                // Month selector with navigation
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(
-                        onClick = { 
-                            selectedMonth = selectedMonth.minusMonths(1)
+                        // Current streak card - Use real data
+                        Card(
+                             modifier = Modifier
+                                 .fillMaxWidth()
+                                 .padding(vertical = 16.dp)
+                        ) {
+                             Column(
+                                 modifier = Modifier
+                                     .fillMaxWidth()
+                                     .padding(16.dp),
+                                 horizontalAlignment = Alignment.CenterHorizontally
+                             ) {
+                                 Text(
+                                     text = "Current Streak",
+                                     style = MaterialTheme.typography.titleMedium
+                                 )
+                                 Row(verticalAlignment = Alignment.CenterVertically) {
+                                     Icon(
+                                         imageVector = Icons.Default.LocalFireDepartment,
+                                         contentDescription = null,
+                                         tint = MaterialTheme.colorScheme.error,
+                                         modifier = Modifier.size(48.dp)
+                                     )
+                                     Text(
+                                         text = stats.currentStreak.toString(), // Use stats
+                                         style = MaterialTheme.typography.displayLarge,
+                                         fontWeight = FontWeight.Bold,
+                                         color = MaterialTheme.colorScheme.primary
+                                     )
+                                     Text("days", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 8.dp))
+                                 }
+                                 Text(
+                                     text = "Previous best: ${stats.longestStreak} days", // Use stats
+                                     style = MaterialTheme.typography.bodyMedium,
+                                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                                 )
+                             }
                         }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ChevronLeft,
-                            contentDescription = "Previous Month"
-                        )
-                    }
-                    
-                    Text(
-                        text = "${selectedMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault())} ${selectedMonth.year}",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    
-                    IconButton(
-                        onClick = { 
-                            if (selectedMonth.isBefore(currentMonth)) {
-                                selectedMonth = selectedMonth.plusMonths(1)
+
+                        // Success rate card - Use real data
+                        Card(
+                             modifier = Modifier
+                                 .fillMaxWidth()
+                                 .padding(bottom = 16.dp)
+                        ) {
+                             Row(
+                                 modifier = Modifier
+                                     .fillMaxWidth()
+                                     .padding(16.dp),
+                                 verticalAlignment = Alignment.CenterVertically
+                             ) {
+                                 Column(modifier = Modifier.weight(2f)) {
+                                     Text("Success Rate", style = MaterialTheme.typography.titleMedium)
+                                     Text("30-day average", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                     Text(
+                                         text = "${(stats.completionRate * 100).toInt()}%", // Use stats
+                                         style = MaterialTheme.typography.displayMedium,
+                                         fontWeight = FontWeight.Bold
+                                     )
+                                 }
+                                 Box(modifier = Modifier.weight(1f).aspectRatio(1f).padding(8.dp), contentAlignment = Alignment.Center) {
+                                     CircularProgressIndicator(
+                                         progress = { stats.completionRate }, // Use stats
+                                         modifier = Modifier.fillMaxSize(),
+                                         strokeWidth = 8.dp
+                                     )
+                                     Text("${(stats.completionRate * 100).toInt()}%", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                 }
+                             }
+                        }
+
+                        // Points card - Placeholder for now
+                         Card(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                             Row(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                                 Column(Modifier.weight(1f)) {
+                                     Text("Points", style = MaterialTheme.typography.titleMedium)
+                                     Text("--", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
+                                     Text("-- points to next level", style = MaterialTheme.typography.bodySmall)
+                                 }
+                                 Badge { Text("-- rewards") }
+                             }
+                         }
+
+                        // Month calendar
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 16.dp)
+                        ) {
+                             // Month selector
+                             Row(
+                                 modifier = Modifier
+                                     .fillMaxWidth()
+                                     .padding(vertical = 8.dp),
+                                 horizontalArrangement = Arrangement.SpaceBetween,
+                                 verticalAlignment = Alignment.CenterVertically
+                             ) {
+                                 IconButton(onClick = { selectedMonth = selectedMonth.minusMonths(1) }) {
+                                     Icon(
+                                         imageVector = Icons.Default.ChevronLeft,
+                                         contentDescription = "Previous Month"
+                                     )
+                                 }
+                                 Text(
+                                     text = "${selectedMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault())} ${selectedMonth.year}",
+                                     style = MaterialTheme.typography.titleMedium
+                                 )
+                                 IconButton(onClick = { if (selectedMonth.isBefore(currentMonth)) selectedMonth = selectedMonth.plusMonths(1) }, enabled = selectedMonth.isBefore(currentMonth)) {
+                                     Icon(
+                                         imageVector = Icons.Default.ChevronRight,
+                                         contentDescription = "Next Month"
+                                     )
+                                 }
+                             }
+
+                             // Days of week header
+                             Row(
+                                 modifier = Modifier.fillMaxWidth(),
+                                 horizontalArrangement = Arrangement.SpaceEvenly
+                             ) {
+                                 for (dayOfWeek in listOf("M", "T", "W", "T", "F", "S", "S")) {
+                                     Text(
+                                         text = dayOfWeek,
+                                         modifier = Modifier.weight(1f),
+                                         textAlign = TextAlign.Center,
+                                         style = MaterialTheme.typography.labelMedium
+                                     )
+                                 }
+                             }
+
+                             Spacer(modifier = Modifier.height(4.dp))
+
+                            // Calendar grid
+                            Column {
+                                val chunkSize = 7
+                                calendarData.chunked(chunkSize).forEach { weekData ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceEvenly
+                                    ) {
+                                        for (dayData in weekData) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .aspectRatio(1f)
+                                                    .padding(2.dp)
+                                                    .clip(RectangleShape)
+                                                    .background(
+                                                        when (dayData?.second) { // Access status from Pair
+                                                            DayStatus.PERFECT -> MaterialTheme.colorScheme.primary
+                                                            DayStatus.PARTIAL -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f)
+                                                            DayStatus.MISSED -> MaterialTheme.colorScheme.error.copy(alpha = 0.5f)
+                                                            else -> Color.Transparent // NONE or null
+                                                        }
+                                                    ),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                 if (dayData != null && dayData.second != DayStatus.NONE) {
+                                                     Text(
+                                                         text = dayData.first.toString(), // Access day from Pair
+                                                         color = if (dayData.second == DayStatus.PERFECT) Color.White else MaterialTheme.colorScheme.onBackground,
+                                                         style = MaterialTheme.typography.labelSmall
+                                                     )
+                                                 }
+                                            }
+                                        }
+                                        // Add spacers if row has less than 7 items (last row)
+                                        repeat(chunkSize - weekData.size) {
+                                             Spacer(modifier = Modifier.weight(1f).aspectRatio(1f))
+                                        }
+                                    }
+                                }
                             }
-                        },
-                        enabled = selectedMonth.isBefore(currentMonth)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ChevronRight,
-                            contentDescription = "Next Month"
-                        )
-                    }
-                }
-                
-                // Days of week header
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    for (dayOfWeek in listOf("M", "T", "W", "T", "F", "S", "S")) {
-                        Text(
-                            text = dayOfWeek,
-                            modifier = Modifier.weight(1f),
-                            textAlign = TextAlign.Center,
-                            style = MaterialTheme.typography.labelMedium
-                        )
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(4.dp))
-                
-                // Calendar grid (simplified version)
-                // In a real app, you'd calculate the actual grid layout with correct day spacing
-                val weeks = (calendarData.size + 6) / 7 // Ceiling division for number of weeks
-                
-                for (weekIndex in 0 until weeks) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        for (dayOfWeek in 0 until 7) {
-                            val dayIndex = weekIndex * 7 + dayOfWeek
-                            
-                            if (dayIndex < calendarData.size) {
-                                val status = calendarData[dayIndex]
-                                val dayOfMonth = dayIndex + 1
+
+                            // Legend
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp),
+                                horizontalArrangement = Arrangement.Start,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(12.dp)
+                                        .clip(RectangleShape)
+                                        .background(MaterialTheme.colorScheme.primary)
+                                )
+                                
+                                Text(
+                                    text = "Perfect",
+                                    modifier = Modifier.padding(start = 4.dp, end = 12.dp),
+                                    style = MaterialTheme.typography.labelSmall
+                                )
                                 
                                 Box(
                                     modifier = Modifier
-                                        .weight(1f)
-                                        .aspectRatio(1f)
-                                        .padding(2.dp)
+                                        .size(12.dp)
                                         .clip(RectangleShape)
-                                        .background(
-                                            when (status) {
-                                                DayStatus.PERFECT -> MaterialTheme.colorScheme.primary
-                                                DayStatus.PARTIAL -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f)
-                                                DayStatus.MISSED -> MaterialTheme.colorScheme.error.copy(alpha = 0.5f)
-                                                DayStatus.NONE -> Color.Transparent
+                                        .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f))
+                                )
+                                
+                                Text(
+                                    text = "Partial",
+                                    modifier = Modifier.padding(start = 4.dp, end = 12.dp),
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                                
+                                Box(
+                                    modifier = Modifier
+                                        .size(12.dp)
+                                        .clip(RectangleShape)
+                                        .background(MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
+                                )
+                                
+                                Text(
+                                    text = "Missed",
+                                    modifier = Modifier.padding(start = 4.dp),
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
+                        }
+
+                        // Performance analysis - Observe state
+                        Text("Performance Analysis", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(vertical = 8.dp))
+                        Card(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth().padding(16.dp).heightIn(min = 100.dp)) {
+                                when(performanceInsightsState) {
+                                    is Resource.Loading -> CircularProgressIndicator()
+                                    is Resource.Error -> Text("Could not load insights: ${(performanceInsightsState as Resource.Error).message}", color = MaterialTheme.colorScheme.error)
+                                    is Resource.Success -> {
+                                        val insights = (performanceInsightsState as Resource.Success).data
+                                        if (insights.isNullOrEmpty()) {
+                                            Text("No performance insights available yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        } else {
+                                            // TODO: Display insights (e.g., list, chart placeholder)
+                                            Column {
+                                                 insights.forEach { insight ->
+                                                      Text("- ${insight.insight}", style = MaterialTheme.typography.bodyMedium)
+                                                 }
+                                                 // Placeholder for chart
+                                                  Box(modifier = Modifier.fillMaxWidth().height(150.dp).background(MaterialTheme.colorScheme.surface).padding(top = 8.dp), contentAlignment = Alignment.Center){
+                                                       Text("Performance Chart (TODO)")
+                                                  }
                                             }
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (status != DayStatus.NONE) {
-                                        Text(
-                                            text = "$dayOfMonth",
-                                            color = if (status == DayStatus.PERFECT) Color.White else Color.Black,
-                                            style = MaterialTheme.typography.labelSmall
-                                        )
+                                        }
                                     }
                                 }
-                            } else {
-                                // Empty space for days beyond month end
-                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+
+                        // Recent achievements - Observe state
+                        Text("Recent Achievements", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(vertical = 8.dp))
+                        Card(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth().padding(16.dp).heightIn(min = 60.dp)) {
+                                 when(relatedAchievementsState) {
+                                      is Resource.Loading -> CircularProgressIndicator()
+                                      is Resource.Error -> Text("Could not load achievements: ${(relatedAchievementsState as Resource.Error).message}", color = MaterialTheme.colorScheme.error)
+                                      is Resource.Success -> {
+                                          val achievements = (relatedAchievementsState as Resource.Success).data
+                                          if (achievements.isNullOrEmpty()) {
+                                              Text("No related achievements unlocked yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                          } else {
+                                              // TODO: Use AchievementCard with HabitAchievement data
+                                               Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                    achievements.forEach { ach ->
+                                                        Text("${ach.title} - Earned: ${ach.earnedDate?.format(DateTimeFormatter.ISO_DATE) ?: "N/A"}")
+                                                    }
+                                               }
+                                          }
+                                      }
+                                 }
+                             }
+                        }
+
+                        // Suggestions - Observe state
+                        Text("Suggestions", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(vertical = 8.dp))
+                         Card(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                              Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth().padding(16.dp).heightIn(min = 60.dp)) {
+                                   when(suggestionsState) {
+                                        is Resource.Loading -> CircularProgressIndicator()
+                                        is Resource.Error -> Text("Could not load suggestions: ${(suggestionsState as Resource.Error).message}", color = MaterialTheme.colorScheme.error)
+                                        is Resource.Success -> {
+                                            val suggestions = (suggestionsState as Resource.Success).data
+                                            if (suggestions.isNullOrEmpty()) {
+                                                Text("No suggestions available right now.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            } else {
+                                                 // TODO: Use SuggestionCard with HabitSuggestion data
+                                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                      suggestions.forEach { sug ->
+                                                           Text("${sug.title}: ${sug.description}")
+                                                      }
+                                                 }
+                                            }
+                                        }
+                                   }
+                               }
+                          }
+
+                         Spacer(modifier = Modifier.height(16.dp))
+
+                        // Stats Summary
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp)
+                            ) {
+                                Text(
+                                    "Streak Statistics",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                                
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Current streak", style = MaterialTheme.typography.bodyMedium)
+                                    Text(
+                                        "${stats.currentStreak} days",
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                
+                                // ... rest of the code ...
                             }
                         }
                     }
-                }
-                
-                // Legend
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.Start,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(12.dp)
-                            .clip(RectangleShape)
-                            .background(MaterialTheme.colorScheme.primary)
-                    )
-                    
+                } else {
                     Text(
-                        text = "Perfect",
-                        modifier = Modifier.padding(start = 4.dp, end = 12.dp),
-                        style = MaterialTheme.typography.labelSmall
-                    )
-                    
-                    Box(
-                        modifier = Modifier
-                            .size(12.dp)
-                            .clip(RectangleShape)
-                            .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f))
-                    )
-                    
-                    Text(
-                        text = "Partial",
-                        modifier = Modifier.padding(start = 4.dp, end = 12.dp),
-                        style = MaterialTheme.typography.labelSmall
-                    )
-                    
-                    Box(
-                        modifier = Modifier
-                            .size(12.dp)
-                            .clip(RectangleShape)
-                            .background(MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
-                    )
-                    
-                    Text(
-                        text = "Missed",
-                        modifier = Modifier.padding(start = 4.dp),
-                        style = MaterialTheme.typography.labelSmall
+                        if (habit == null) "Habit not found." else "Failed to load habit stats.",
+                        modifier = Modifier.align(Alignment.Center)
                     )
                 }
-            }
-            
-            // Performance analysis
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    Text(
-                        text = "Performance Analysis",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-                    
-                    // Placeholder for performance chart
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(150.dp)
-                            .clip(MaterialTheme.shapes.medium)
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .padding(16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Performance Chart",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    // Best performing days/times
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text(
-                                text = "Best day: $bestDay",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            
-                            Text(
-                                text = "Peak time: $peakTime",
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.padding(top = 8.dp)
-                            )
-                        }
-                        
-                        Column(
-                            horizontalAlignment = Alignment.End
-                        ) {
-                            Text(
-                                text = "$bestDaySuccess% success",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            
-                            Text(
-                                text = "$peakTimeWindow",
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.padding(top = 8.dp)
-                            )
-                        }
-                    }
-                }
-            }
-            
-            // Recent achievements
-            Text(
-                text = "Recent Achievements",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(vertical = 8.dp)
-            )
-            
-            if (achievements.isEmpty()) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "No achievements yet. Keep going!",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            } else {
-                achievements.forEach { achievement ->
-                    AchievementCard(
-                        achievement = achievement,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 12.dp)
-                    )
-                }
-            }
-            
-            // Suggestions
-            Text(
-                text = "Suggestions",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(vertical = 8.dp)
-            )
-            
-            if (suggestions.isEmpty()) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "No suggestions yet. Keep tracking!",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            } else {
-                suggestions.forEach { suggestion ->
-                    SuggestionCard(
-                        suggestion = suggestion,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 12.dp)
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-    }
+            } // End of Success state check
+        } // End of Box
+    } // End of Scaffold
 }
 
-@SuppressLint("NewApi")
+// Commented out unused functions 
+/*
 @Composable
-fun AchievementCard(
-    achievement: Achievement,
-    modifier: Modifier = Modifier
-) {
-    Card(modifier = modifier) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Achievement icon
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.EmojiEvents,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = achievement.title,
-                    style = MaterialTheme.typography.titleMedium
-                )
-                
-                Text(
-                    text = achievement.description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                
-                Text(
-                    text = achievement.date.format(DateTimeFormatter.ofPattern("MMM d, yyyy")),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            }
-            
-            Icon(
-                imageVector = Icons.Default.Verified,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp)
-            )
-        }
+fun AchievementCard(achievement: HabitAchievement) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        // Card content
     }
 }
 
 @Composable
-fun SuggestionCard(
-    suggestion: Suggestion,
-    modifier: Modifier = Modifier
-) {
-    Card(modifier = modifier) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(bottom = 8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Lightbulb,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                
-                Spacer(modifier = Modifier.width(8.dp))
-                
-                Text(
-                    text = suggestion.title,
-                    style = MaterialTheme.typography.titleMedium
-                )
-            }
-            
-            Text(
-                text = suggestion.description,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-            
-            Button(
-                onClick = { /* Apply suggestion */ },
-                modifier = Modifier.align(Alignment.End)
-            ) {
-                Text("Apply Suggestion")
-            }
-        }
+fun SuggestionCard(suggestion: HabitSuggestion) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        // Card content
     }
 }
-
-// Helper classes
-enum class DayStatus {
-    PERFECT, PARTIAL, MISSED, NONE
-}
-
-data class Achievement(
-    val id: String,
-    val title: String,
-    val description: String,
-    val date: LocalDate
-)
-
-data class Suggestion(
-    val id: String,
-    val title: String,
-    val description: String
-)
+*/

@@ -106,7 +106,7 @@ class ProfileViewModel @Inject constructor(
                     dailyAverage = 0f,
                     successRate = 0f
                 ),
-                habitStats = HabitStats(
+                habitStats = HabitStatsSummary(
                     total = 0,
                     active = 0,
                     longestStreak = 0,

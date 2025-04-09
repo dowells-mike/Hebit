@@ -74,12 +74,22 @@ object NetworkModule {
             val token = tokenManager.getToken()
             
             if (token.isNullOrEmpty()) {
+                println("DEBUG: No auth token available for request: ${originalRequest.url}")
                 return@Interceptor chain.proceed(originalRequest)
             }
+            
+            println("DEBUG: Adding auth token to request: ${originalRequest.url}")
             
             val newRequest = originalRequest.newBuilder()
                 .header("Authorization", "Bearer $token")
                 .build()
+            
+            val authHeader = newRequest.header("Authorization")
+            if (authHeader.isNullOrEmpty()) {
+                println("DEBUG: Failed to add Authorization header to request")
+            } else {
+                println("DEBUG: Authorization header added successfully: ${authHeader.take(15)}...")
+            }
             
             chain.proceed(newRequest)
         }

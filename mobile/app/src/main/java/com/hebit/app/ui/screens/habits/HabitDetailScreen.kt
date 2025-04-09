@@ -1,641 +1,103 @@
 package com.hebit.app.ui.screens.habits
 
-import android.annotation.SuppressLint
-import android.os.Build
-import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.hebit.app.domain.model.Habit
+import com.hebit.app.domain.model.HabitStats
+import com.hebit.app.domain.model.Resource
 import com.hebit.app.ui.components.BottomNavItem
-import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.*
+import com.hebit.app.ui.screens.habits.getIconByName
+import com.hebit.app.ui.screens.habits.getCategoryUIFromIcon
+import com.hebit.app.ui.screens.habits.getFrequencyUI
 
-@RequiresApi(Build.VERSION_CODES.O)
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun HabitDetailScreen(
-    habitId: String,
-    onNavigateBack: () -> Unit,
-    onHomeClick: () -> Unit = {},
-    onTasksClick: () -> Unit = {},
-    onHabitsClick: () -> Unit = {},
-    onGoalsClick: () -> Unit = {},
-    onProfileClick: () -> Unit = {},
-    onStreakClick: () -> Unit = {}
-) {
-    // Mock habit data - would come from ViewModel in real app
-    val habit = remember {
-        mutableStateOf(
-            HabitItem(
-                id = habitId,
-                title = "Morning Workout",
-                category = HabitCategory.FITNESS,
-                frequency = HabitFrequency.DAILY,
-                time = "6:00 AM",
-                streak = 5,
-                completedToday = false,
-                description = "30 minutes of strength training followed by a 10-minute stretch routine."
-            )
-        )
-    }
-    
-    // For the week view
-    val currentDate = remember { LocalDate.now() }
-    val weekDays = remember {
-        val days = mutableListOf<DayInfo>()
-        var dayIterator = currentDate.minusDays(currentDate.dayOfWeek.value.toLong() - 1)
-        
-        // Generate week days (Mon-Sun)
-        for (i in 0 until 7) {
-            val isCompleted = if (dayIterator.isBefore(currentDate)) {
-                // Random completion status for past days (for the mock)
-                listOf(true, true, false, true).random()
-            } else if (dayIterator.isEqual(currentDate)) {
-                habit.value.completedToday
-            } else {
-                false
-            }
-            
-            days.add(
-                DayInfo(
-                    date = dayIterator,
-                    isCompleted = isCompleted
-                )
-            )
-            dayIterator = dayIterator.plusDays(1)
-        }
-        days
-    }
-    
-    // For the notes section
-    val notes = remember {
-        mutableStateListOf(
-            NoteItem(
-                id = "1",
-                date = LocalDate.now().minusDays(1),
-                content = "Increased weights for bench press. Feeling stronger!"
-            ),
-            NoteItem(
-                id = "2",
-                date = LocalDate.now().minusDays(3),
-                content = "Added 10 minutes of HIIT to my routine."
-            )
-        )
-    }
-    
-    var showAddNoteDialog by remember { mutableStateOf(false) }
-    var showShareDialog by remember { mutableStateOf(false) }
-    var showEditMenu by remember { mutableStateOf(false) }
-    
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { /* Share habit */ showShareDialog = true }) {
-                        Icon(
-                            imageVector = Icons.Default.Share,
-                            contentDescription = "Share"
-                        )
-                    }
-                    
-                    IconButton(onClick = { showEditMenu = true }) {
-                        Icon(
-                            imageVector = Icons.Default.MoreVert,
-                            contentDescription = "More options"
-                        )
-                    }
-                    
-                    DropdownMenu(
-                        expanded = showEditMenu,
-                        onDismissRequest = { showEditMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Edit Habit") },
-                            leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
-                            onClick = { 
-                                showEditMenu = false
-                                // Open edit dialog
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Delete") },
-                            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
-                            onClick = { 
-                                showEditMenu = false
-                                // Show delete confirmation
-                            }
-                        )
-                    }
-                }
-            )
-        },
-        bottomBar = {
-            BottomAppBar {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    BottomNavItem(
-                        icon = Icons.Default.Home,
-                        label = "Home",
-                        selected = false,
-                        onClick = onHomeClick
-                    )
-                    
-                    BottomNavItem(
-                        icon = Icons.Default.CheckCircle,
-                        label = "Tasks",
-                        selected = false,
-                        onClick = onTasksClick
-                    )
-                    
-                    BottomNavItem(
-                        icon = Icons.Default.Loop,
-                        label = "Habits",
-                        selected = true,
-                        onClick = onHabitsClick
-                    )
-                    
-                    BottomNavItem(
-                        icon = Icons.Default.Flag,
-                        label = "Goals",
-                        selected = false,
-                        onClick = onGoalsClick
-                    )
-                    
-                    BottomNavItem(
-                        icon = Icons.Default.Person,
-                        label = "Profile",
-                        selected = false,
-                        onClick = onProfileClick
-                    )
-                }
-            }
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-        ) {
-            // Habit header section
-            HabitHeader(
-                habit = habit.value,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-            
-            // This Week section
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-            ) {
-                Text(
-                    text = "This Week",
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                
-                Text(
-                    text = currentDate.format(DateTimeFormatter.ofPattern("MMMM d, yyyy")),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
-                
-                // Days of week with completion status
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 24.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    weekDays.forEach { dayInfo ->
-                        DayIndicator(
-                            dayName = dayInfo.date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
-                            isCompleted = dayInfo.isCompleted,
-                            isToday = dayInfo.date.isEqual(currentDate)
-                        )
-                    }
-                }
-                
-                // Statistics section
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 24.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    // Current Streak
-                    StatItem(
-                        icon = Icons.Default.LocalFireDepartment,
-                        title = "Current Streak",
-                        value = "5",
-                        unit = "days",
-                        modifier = Modifier.weight(1f),
-                        onClick = onStreakClick
-                    )
-                    
-                    // Best Streak
-                    StatItem(
-                        icon = Icons.Default.EmojiEvents,
-                        title = "Best Streak",
-                        value = "12",
-                        unit = "days",
-                        modifier = Modifier.weight(1f),
-                        onClick = onStreakClick
-                    )
-                }
-                
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 24.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    // Completion Rate
-                    StatItem(
-                        icon = Icons.Default.ShowChart,
-                        title = "Completion Rate",
-                        value = "85%",
-                        unit = null,
-                        modifier = Modifier.weight(1f)
-                    )
-                    
-                    // Average Time
-                    StatItem(
-                        icon = Icons.Default.Schedule,
-                        title = "Average Time",
-                        value = "6:30",
-                        unit = null,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 24.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    // Total Completions
-                    StatItem(
-                        icon = Icons.Default.CheckCircle,
-                        title = "Total Completions",
-                        value = "45",
-                        unit = null,
-                        modifier = Modifier.weight(1f)
-                    )
-                    
-                    // Points Earned
-                    StatItem(
-                        icon = Icons.Default.Star,
-                        title = "Points Earned",
-                        value = "250",
-                        unit = null,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                
-                // Notes section
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Notes",
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                    
-                    IconButton(onClick = { showAddNoteDialog = true }) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Add note"
-                        )
-                    }
-                }
-                
-                // Notes list
-                if (notes.isEmpty()) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 16.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(24.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "No notes yet. Tap + to add one.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                } else {
-                    notes.forEach { note ->
-                        NoteCard(
-                            note = note,
-                            onDeleteNote = { noteId ->
-                                notes.removeIf { it.id == noteId }
-                            },
-                            modifier = Modifier.padding(bottom = 12.dp)
-                        )
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(24.dp))
-                
-                // Action buttons
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 24.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = { /* Skip for today */ },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Skip")
-                    }
-                    
-                    Button(
-                        onClick = { 
-                            habit.value = habit.value.copy(
-                                completedToday = true,
-                                streak = habit.value.streak + 1
-                            )
-                        },
-                        enabled = !habit.value.completedToday,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Complete")
-                    }
-                }
-            }
-        }
-        
-        // Add note dialog
-        if (showAddNoteDialog) {
-            AddNoteDialog(
-                onDismiss = { showAddNoteDialog = false },
-                onAddNote = { content ->
-                    if (content.isNotBlank()) {
-                        notes.add(
-                            0,
-                            NoteItem(
-                                id = (notes.size + 1).toString(),
-                                date = LocalDate.now(),
-                                content = content
-                            )
-                        )
-                        showAddNoteDialog = false
-                    }
-                }
-            )
-        }
-        
-        // Share dialog
-        if (showShareDialog) {
-            AlertDialog(
-                onDismissRequest = { showShareDialog = false },
-                title = { Text("Share Habit") },
-                text = { 
-                    Text(
-                        "Share your '${habit.value.title}' streak progress (${habit.value.streak} days) with friends!"
-                    ) 
-                },
-                confirmButton = {
-                    TextButton(onClick = { 
-                        showShareDialog = false
-                        // Implement actual sharing
-                    }) {
-                        Text("Share")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showShareDialog = false }) {
-                        Text("Cancel")
-                    }
-                }
-            )
-        }
-    }
-}
+// Data classes needed for this screen
+data class DayInfo(
+    val date: LocalDate,
+    val isCompleted: Boolean
+)
+
+data class NoteItem(
+    val id: String,
+    val date: LocalDate,
+    val content: String
+)
 
 @Composable
 fun HabitHeader(
-    habit: HabitItem,
+    habit: Habit, // Use Habit domain model
     modifier: Modifier = Modifier
 ) {
-    Box(
+    // Use helpers from list screen
+    val categoryUI = getCategoryUIFromIcon(habit.iconName)
+    val frequencyUI = getFrequencyUI(habit.frequency)
+    val icon = getIconByName(habit.iconName)
+
+    // Basic header, styling can be enhanced
+    Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(Color.Black)
+            .background(MaterialTheme.colorScheme.surfaceVariant) // Changed background
+            .padding(16.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
+        Row(
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Icon and category row
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = habit.category.icon,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-                
-                Spacer(modifier = Modifier.width(16.dp))
-                
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color.White.copy(alpha = 0.2f)
-                    ),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Text(
-                        text = habit.category.title,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                }
-                
-                Spacer(modifier = Modifier.width(8.dp))
-                
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color.White.copy(alpha = 0.2f)
-                    ),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Timer,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "${habit.streak} days",
-                            color = Color.White,
-                            style = MaterialTheme.typography.labelMedium
-                        )
-                    }
-                }
-            }
-            
-            // Habit title
-            Text(
-                text = habit.title,
-                color = Color.White,
-                style = MaterialTheme.typography.headlineLarge,
-                modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+            Icon(
+                imageVector = icon,
+                contentDescription = categoryUI.title,
+                tint = categoryUI.color,
+                modifier = Modifier.size(40.dp)
             )
-            
-            // Frequency and time
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = when(habit.frequency) {
-                        HabitFrequency.DAILY -> Icons.Default.Today
-                        HabitFrequency.WEEKLY -> Icons.Default.DateRange
-                        HabitFrequency.MONTHLY -> Icons.Default.CalendarToday
-                        HabitFrequency.CUSTOM -> Icons.Default.Schedule
-                    },
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.7f),
-                    modifier = Modifier.size(16.dp)
-                )
-                
-                Spacer(modifier = Modifier.width(4.dp))
-                
+            Spacer(modifier = Modifier.width(16.dp))
+            Column {
                 Text(
-                    text = habit.frequency.title,
-                    color = Color.White.copy(alpha = 0.7f),
-                    style = MaterialTheme.typography.bodyMedium
+                    text = habit.title,
+                    style = MaterialTheme.typography.headlineSmall, // Adjusted size
+                    fontWeight = FontWeight.Bold
                 )
-                
-                habit.time?.let {
-                    Text(
-                        text = " • $it",
-                        color = Color.White.copy(alpha = 0.7f),
-                        style = MaterialTheme.typography.bodyMedium
+                 Row(verticalAlignment = Alignment.CenterVertically) {
+                     Text(
+                        text = frequencyUI.title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                }
-            }
-            
-            // Description
-            habit.description?.let {
-                Text(
-                    text = it,
-                    color = Color.White.copy(alpha = 0.7f),
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
+                    // Display streak
+                     Text(
+                         text = " • Streak: ${habit.streak}d",
+                         style = MaterialTheme.typography.bodyMedium,
+                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                     )
+                 }
             }
         }
-    }
-}
 
-@Composable
-fun DayIndicator(
-    dayName: String,
-    isCompleted: Boolean,
-    isToday: Boolean
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        // Day name (Mon, Tue, etc.)
-        Text(
-            text = dayName,
-            style = MaterialTheme.typography.labelMedium,
-            color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-        )
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        // Day indicator circle
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(CircleShape)
-                .background(
-                    if (isCompleted) 
-                        MaterialTheme.colorScheme.primary 
-                    else if (isToday)
-                        MaterialTheme.colorScheme.surfaceVariant
-                    else 
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            if (isCompleted) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = "Completed",
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(16.dp)
-                )
-            } else if (isToday) {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
-                )
-            }
+        // Description
+        if (habit.description.isNotBlank()) {
+            Text(
+                text = habit.description,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(top = 8.dp)
+            )
         }
     }
 }
@@ -649,135 +111,281 @@ fun StatItem(
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {}
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier.clickable(onClick = onClick)
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary
-        )
-        
-        Spacer(modifier = Modifier.height(4.dp))
-        
-        Text(
-            text = title,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-        
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
-        )
-        
-        unit?.let {
-            Text(
-                text = it,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-        }
-    }
+     Column(
+         horizontalAlignment = Alignment.CenterHorizontally,
+         modifier = modifier.clickable(onClick = onClick)
+     ) {
+         Icon(
+             imageVector = icon,
+             contentDescription = null,
+             tint = MaterialTheme.colorScheme.primary
+         )
+
+         Spacer(modifier = Modifier.height(4.dp))
+
+         Text(
+             text = title,
+             style = MaterialTheme.typography.labelMedium,
+             color = MaterialTheme.colorScheme.onSurfaceVariant,
+             textAlign = TextAlign.Center
+         )
+
+         Text(
+             text = value,
+             style = MaterialTheme.typography.titleLarge,
+             fontWeight = FontWeight.Bold,
+             textAlign = TextAlign.Center
+         )
+
+         unit?.let {
+             Text(
+                 text = it,
+                 style = MaterialTheme.typography.bodySmall,
+                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                 textAlign = TextAlign.Center
+             )
+         }
+     }
 }
 
-@SuppressLint("NewApi")
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NoteCard(
-    note: NoteItem,
-    onDeleteNote: (String) -> Unit,
-    modifier: Modifier = Modifier
+fun HabitDetailScreen(
+    habitId: String,
+    onNavigateBack: () -> Unit,
+    onHomeClick: () -> Unit = {},
+    onTasksClick: () -> Unit = {},
+    onHabitsClick: () -> Unit = {},
+    onGoalsClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {},
+    onStreakClick: (String) -> Unit = {},
+    viewModel: HabitViewModel = hiltViewModel()
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = note.date.format(DateTimeFormatter.ofPattern("MMMM d, yyyy")),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+    // Observe selected habit state from ViewModel
+    val selectedHabitState by viewModel.selectedHabitState.collectAsState()
+    // Observe habit stats state from ViewModel
+    val habitStatsState by viewModel.habitStatsState.collectAsState()
+
+    // Fetch habit details when the screen is composed or habitId changes
+    LaunchedEffect(key1 = habitId) {
+        viewModel.getHabitById(habitId)
+    }
+
+    val currentDate = remember { LocalDate.now() }
+
+    // Calculate week dates and completion status from real data
+    @Suppress("UNUSED_VARIABLE")
+    val weekDaysWithStatus = remember(selectedHabitState) { // Recompute when state changes
+        val days = mutableListOf<DayInfo>()
+        val firstDayOfWeek = currentDate.minusDays(currentDate.dayOfWeek.value.toLong() - 1)
+        val currentHabit = (selectedHabitState as? Resource.Success<Habit?>)?.data
+        val historyMap = currentHabit?.completionHistory?.associateBy {
+            it.date.toLocalDate() // Map by LocalDate for easy lookup
+        } ?: emptyMap()
+
+        for (i in 0 until 7) {
+            val dateIterator = firstDayOfWeek.plusDays(i.toLong())
+            // Check history map first for past/present days
+            val historyEntry = historyMap[dateIterator]
+            val isCompleted = historyEntry?.completed ?: false // Default to false if no entry
+
+            days.add(
+                DayInfo(
+                    date = dateIterator,
+                    isCompleted = isCompleted
                 )
-                
-                IconButton(
-                    onClick = { onDeleteNote(note.id) },
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MoreVert,
-                        contentDescription = "More options",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            
-            Text(
-                text = note.content,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 8.dp)
             )
         }
+        days
+    }
+
+    // Mock notes - Replace with actual data fetching later
+    // val notes = remember { mutableStateListOf<NoteItem>() } // Start empty, load later
+    // TODO: Fetch notes for the habit
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Habit Detail") },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        },
+        bottomBar = {
+             // Restore BottomAppBar structure
+             BottomAppBar {
+                 Row(
+                     modifier = Modifier.fillMaxWidth(),
+                     horizontalArrangement = Arrangement.SpaceEvenly
+                 ) {
+                     BottomNavItem(
+                         icon = Icons.Default.Home,
+                         label = "Home",
+                         selected = false,
+                         onClick = onHomeClick
+                     )
+                     BottomNavItem(
+                         icon = Icons.Default.CheckCircle,
+                         label = "Tasks",
+                         selected = false,
+                         onClick = onTasksClick
+                     )
+                     BottomNavItem(
+                         icon = Icons.Default.Loop,
+                         label = "Habits",
+                         selected = true, // Mark Habits as selected
+                         onClick = onHabitsClick
+                     )
+                     BottomNavItem(
+                         icon = Icons.Default.Flag,
+                         label = "Goals",
+                         selected = false,
+                         onClick = onGoalsClick
+                     )
+                     BottomNavItem(
+                         icon = Icons.Default.Person,
+                         label = "Profile",
+                         selected = false,
+                         onClick = onProfileClick
+                     )
+                 }
+             }
+        }
+    ) { paddingValues ->
+        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+            // Use combined loading state check
+            if (selectedHabitState is Resource.Loading || (selectedHabitState is Resource.Success && habitStatsState is Resource.Loading)) {
+                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            } else if (selectedHabitState is Resource.Error) {
+                 Text(
+                     "Error: ${(selectedHabitState as Resource.Error<Habit?>).message}",
+                     color = MaterialTheme.colorScheme.error,
+                     modifier = Modifier.align(Alignment.Center)
+                 )
+            } else if (habitStatsState is Resource.Error) {
+                 Text(
+                     "Error loading stats: ${(habitStatsState as Resource.Error<HabitStats>).message}",
+                     color = MaterialTheme.colorScheme.error,
+                     modifier = Modifier.align(Alignment.Center).padding(16.dp)
+                 )
+            } else if (selectedHabitState is Resource.Success && habitStatsState is Resource.Success) {
+                 val habit = (selectedHabitState as Resource.Success<Habit?>).data
+                 val stats = (habitStatsState as Resource.Success<HabitStats>).data
+
+                 if (habit != null && stats != null) {
+                    // Main content column
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                         HabitHeader(
+                             habit = habit,
+                             modifier = Modifier.padding(bottom = 16.dp)
+                         )
+
+                         Column(
+                             modifier = Modifier
+                                 .fillMaxWidth()
+                                 .padding(horizontal = 16.dp)
+                         ) {
+                            // ... Weekly View using weekDaysWithStatus ...
+
+                            // Statistics section - Use real data from 'stats'
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 24.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                // Current Streak (already using habit.streak)
+                                StatItem(
+                                    icon = Icons.Default.LocalFireDepartment,
+                                    title = "Current Streak",
+                                    value = habit.streak.toString(),
+                                    unit = "days",
+                                    modifier = Modifier.weight(1f),
+                                    onClick = { onStreakClick(habit.id) }
+                                )
+
+                                // Best Streak
+                                StatItem(
+                                    icon = Icons.Default.EmojiEvents,
+                                    title = "Best Streak",
+                                    value = stats.longestStreak.toString(), // Use stats data
+                                    unit = "days",
+                                    modifier = Modifier.weight(1f),
+                                    onClick = { onStreakClick(habit.id) }
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 24.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                // Completion Rate
+                                StatItem(
+                                    icon = Icons.Default.QueryStats,
+                                    title = "Completion Rate",
+                                    value = "${(stats.completionRate * 100).toInt()}%", // Use stats data
+                                    unit = null,
+                                    modifier = Modifier.weight(1f)
+                                )
+
+                                // Average Time - Placeholder
+                                StatItem(
+                                    icon = Icons.Default.Schedule,
+                                    title = "Average Time",
+                                    value = "--",
+                                    unit = null,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 24.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                // Total Completions
+                                StatItem(
+                                    icon = Icons.Default.CheckCircle,
+                                    title = "Total Completions",
+                                    value = stats.totalCompletions.toString(), // Use stats data
+                                    unit = null,
+                                    modifier = Modifier.weight(1f)
+                                )
+
+                                // Points Earned - Placeholder
+                                StatItem(
+                                    icon = Icons.Default.Star,
+                                    title = "Points Earned",
+                                    value = "--",
+                                    unit = null,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+
+                            // ... Notes Section (Placeholder remains) ...
+                            // ... Action Buttons ...
+                        }
+                    }
+                 } else {
+                     // Handle case where habit or stats are null even on success
+                     Text(
+                         if (habit == null) "Habit not found." else "Failed to load habit stats.",
+                         modifier = Modifier.align(Alignment.Center)
+                     )
+                 }
+            } // End of when statement
+        } // End of Box
     }
 }
 
-@Composable
-fun AddNoteDialog(
-    onDismiss: () -> Unit,
-    onAddNote: (String) -> Unit
-) {
-    var noteText by remember { mutableStateOf("") }
-    
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Add Note") },
-        text = {
-            OutlinedTextField(
-                value = noteText,
-                onValueChange = { noteText = it },
-                placeholder = { Text("Write your note here...") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 120.dp),
-                minLines = 3
-            )
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onAddNote(noteText) },
-                enabled = noteText.isNotBlank()
-            ) {
-                Text("Add")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
-}
-
-// Helper classes
-data class DayInfo(
-    val date: LocalDate,
-    val isCompleted: Boolean
-)
-
-data class NoteItem(
-    val id: String,
-    val date: LocalDate,
-    val content: String
-)
+   

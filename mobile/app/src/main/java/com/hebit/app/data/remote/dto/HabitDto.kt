@@ -2,18 +2,31 @@ package com.hebit.app.data.remote.dto
 
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
+import java.time.LocalDateTime
+
+// DTO for individual completion history entry
+@JsonClass(generateAdapter = true)
+data class CompletionHistoryEntryDto(
+    val date: String, // Assuming ISO date string
+    val completed: Boolean,
+    val value: Float? = null,
+    val notes: String? = null,
+    val mood: Int? = null,
+    val skipReason: String? = null
+)
 
 @JsonClass(generateAdapter = true)
 data class HabitDto(
     @Json(name = "_id") val id: String,
     val title: String,
     val description: String,
-    @Json(name = "icon_name") val iconName: String,
+    @Json(name = "icon_name") val iconName: String? = "default_icon",
     val frequency: String,
-    @Json(name = "completed_today") val completedToday: Boolean,
+    @Json(name = "completed_today") val completedToday: Boolean? = false,
     val streak: Int,
-    @Json(name = "created_at") val createdAt: String,
-    @Json(name = "updated_at") val updatedAt: String
+    val completionHistory: List<CompletionHistoryEntryDto> = emptyList(),
+    @Json(name = "created_at") val createdAt: String? = null,
+    @Json(name = "updated_at") val updatedAt: String? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -42,5 +55,7 @@ data class UpdateHabitRequest(
 
 @JsonClass(generateAdapter = true)
 data class HabitCompletionRequest(
-    val completed: Boolean
+    val completed: Boolean,
+    val date: String,
+    val notes: String? = null
 ) 

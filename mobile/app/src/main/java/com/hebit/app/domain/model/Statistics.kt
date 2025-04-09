@@ -8,7 +8,7 @@ import java.time.LocalDate
 data class Statistics(
     val userId: String,
     val taskStats: TaskStats = TaskStats(),
-    val habitStats: HabitStats = HabitStats(),
+    val habitStats: HabitStatsSummary = HabitStatsSummary(),
     val goalStats: GoalStats = GoalStats(),
     val categoryDistribution: Map<String, Float> = emptyMap(),
     val timeAnalysis: TimeAnalysis = TimeAnalysis(),
@@ -32,7 +32,7 @@ data class TaskStats(
 /**
  * Statistics related to habits
  */
-data class HabitStats(
+data class HabitStatsSummary(
     val total: Int = 0,
     val active: Int = 0,
     val paused: Int = 0,

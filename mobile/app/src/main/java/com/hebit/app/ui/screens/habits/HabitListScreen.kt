@@ -10,21 +10,89 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.hebit.app.domain.model.Habit
+import com.hebit.app.domain.model.Resource
 import com.hebit.app.ui.components.BottomNavItem
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
-@RequiresApi(Build.VERSION_CODES.O)
+// Define enums for UI representation (can be moved later)
+enum class HabitFrequencyUI(val title: String) {
+    DAILY("Daily"),
+    WEEKLY("Weekly"),
+    MONTHLY("Monthly"),
+    CUSTOM("Custom")
+}
+
+enum class HabitCategoryUI(val title: String, val icon: ImageVector, val color: Color) {
+    HEALTH("Health", Icons.Default.Favorite, Color(0xFFE91E63)),
+    FITNESS("Fitness", Icons.Default.FitnessCenter, Color(0xFF2196F3)),
+    MINDFULNESS("Mindfulness", Icons.Default.SelfImprovement, Color(0xFF9C27B0)),
+    PRODUCTIVITY("Productivity", Icons.Default.Schedule, Color(0xFF4CAF50)),
+    EDUCATION("Education", Icons.Default.School, Color(0xFFFF9800)),
+    CREATIVITY("Creativity", Icons.Default.Palette, Color(0xFF795548)),
+    SOCIAL("Social", Icons.Default.People, Color(0xFF3F51B5)),
+    OTHER("Other", Icons.Default.Circle, Color.Gray) // Default/fallback
+}
+
+// Helper function to map icon names to icons (can be expanded)
+fun getIconByName(iconName: String?): ImageVector {
+    return when (iconName?.lowercase()) {
+        null, "", "default_icon" -> Icons.Default.TaskAlt // Default icon for null or empty
+        "water_drop" -> Icons.Outlined.WaterDrop
+        "book", "menu_book" -> Icons.AutoMirrored.Filled.MenuBook
+        "meditation", "self_improvement" -> Icons.Default.SelfImprovement
+        "exercise", "fitness_center" -> Icons.Default.FitnessCenter
+        "journal", "edit" -> Icons.Default.Edit
+        "favorite" -> Icons.Default.Favorite
+        "schedule" -> Icons.Default.Schedule
+        "school" -> Icons.Default.School
+        "palette" -> Icons.Default.Palette
+        "people" -> Icons.Default.People
+        else -> Icons.Default.TaskAlt // Default icon
+    }
+}
+
+// Helper function to map frequency string to UI enum
+fun getFrequencyUI(frequency: String?): HabitFrequencyUI {
+    return when (frequency?.lowercase()) {
+        "daily" -> HabitFrequencyUI.DAILY
+        "weekly" -> HabitFrequencyUI.WEEKLY
+        "monthly" -> HabitFrequencyUI.MONTHLY
+        else -> HabitFrequencyUI.CUSTOM // Treat unknown as custom for now
+    }
+}
+
+// Helper function to map icon name to category UI (simple mapping for now)
+fun getCategoryUIFromIcon(iconName: String?): HabitCategoryUI {
+     return when (iconName?.lowercase()) {
+        null, "", "default_icon" -> HabitCategoryUI.OTHER
+        "water_drop", "favorite" -> HabitCategoryUI.HEALTH
+        "exercise", "fitness_center" -> HabitCategoryUI.FITNESS
+        "meditation", "self_improvement" -> HabitCategoryUI.MINDFULNESS
+        "schedule" -> HabitCategoryUI.PRODUCTIVITY
+        "book", "menu_book", "school" -> HabitCategoryUI.EDUCATION
+        "palette" -> HabitCategoryUI.CREATIVITY
+        "journal", "edit" -> HabitCategoryUI.MINDFULNESS // Or create specific
+        "people" -> HabitCategoryUI.SOCIAL
+        else -> HabitCategoryUI.OTHER
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HabitListScreen(
@@ -33,79 +101,36 @@ fun HabitListScreen(
     onHomeClick: () -> Unit = {},
     onTasksClick: () -> Unit = {},
     onGoalsClick: () -> Unit = {},
-    onProfileClick: () -> Unit = {}
+    onProfileClick: () -> Unit = {},
+    // Inject ViewModel
+    viewModel: HabitViewModel = hiltViewModel()
 ) {
-    // Mock habits data - would come from ViewModel in real app
-    val habits = remember {
-        mutableStateListOf(
-            HabitItem(
-                id = "1",
-                title = "Morning Workout",
-                category = HabitCategory.FITNESS,
-                frequency = HabitFrequency.DAILY,
-                time = "6:00 AM",
-                streak = 5,
-                completedToday = false
-            ),
-            HabitItem(
-                id = "2",
-                title = "Read 30 minutes",
-                category = HabitCategory.EDUCATION,
-                frequency = HabitFrequency.DAILY,
-                time = "Evening",
-                streak = 12,
-                completedToday = true
-            ),
-            HabitItem(
-                id = "3",
-                title = "Weekly Review",
-                category = HabitCategory.PRODUCTIVITY,
-                frequency = HabitFrequency.WEEKLY,
-                time = null,
-                streak = 4,
-                completedToday = false
-            ),
-            HabitItem(
-                id = "4",
-                title = "Meditation",
-                category = HabitCategory.MINDFULNESS,
-                frequency = HabitFrequency.DAILY,
-                time = "8:00 AM",
-                streak = 8,
-                completedToday = true
-            ),
-            HabitItem(
-                id = "5",
-                title = "Drink Water",
-                category = HabitCategory.HEALTH,
-                frequency = HabitFrequency.DAILY,
-                time = null,
-                streak = 9,
-                completedToday = false
-            ),
-            HabitItem(
-                id = "6",
-                title = "Journal",
-                category = HabitCategory.MINDFULNESS,
-                frequency = HabitFrequency.DAILY,
-                time = "9:30 PM",
-                streak = 3,
-                completedToday = false
-            )
-        )
-    }
-    
+    // Remove mock data
+    // val habits = remember { ... }
+
+    // Observe state from ViewModel
+    val habitsState by viewModel.habitsState.collectAsState()
+
     var showAddHabitDialog by remember { mutableStateOf(false) }
-    var selectedCategory by remember { mutableStateOf<HabitCategory?>(null) }
-    
-    // Calculate completed habits
-    val completedHabits = habits.count { it.completedToday }
-    val totalHabits = habits.size
-    val completionRate = if (totalHabits > 0) completedHabits.toFloat() / totalHabits else 0f
-    
+    // Use HabitCategoryUI for filtering state
+    var selectedCategoryFilter by remember { mutableStateOf<HabitCategoryUI?>(null) }
+
+    // Calculate progress based on ViewModel data (when successful)
+    val (completedHabits, totalHabits, completionRate) = remember(habitsState) {
+        if (habitsState is Resource.Success) {
+            val habitList = (habitsState as Resource.Success<List<Habit>>).data ?: emptyList()
+            val completed = habitList.count { it.completedToday }
+            val total = habitList.size
+            val rate = if (total > 0) completed.toFloat() / total else 0f
+            Triple(completed, total, rate)
+        } else {
+            Triple(0, 0, 0f)
+        }
+    }
+
     val currentDate = remember { LocalDate.now() }
     val dateFormatter = remember { DateTimeFormatter.ofPattern("MMMM d, yyyy") }
-    
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -183,61 +208,76 @@ fun HabitListScreen(
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp)
         ) {
-            // Category tabs
+            // Category tabs - Use HabitCategoryUI
             CategoriesRow(
-                selectedCategory = selectedCategory,
-                onCategorySelected = { selectedCategory = it }
+                selectedCategory = selectedCategoryFilter,
+                onCategorySelected = { selectedCategoryFilter = it }
             )
-            
-            // Progress card
+
+            // Progress card - Use calculated values
             ProgressCard(
                 date = currentDate.format(dateFormatter),
                 completedCount = completedHabits,
                 totalCount = totalHabits,
                 completionRate = completionRate
             )
-            
-            // Habit list
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                val filteredHabits = if (selectedCategory != null) {
-                    habits.filter { it.category == selectedCategory }
-                } else {
-                    habits
-                }
-                
-                items(filteredHabits, key = { it.id }) { habit ->
-                    HabitListItem(
-                        habit = habit,
-                        onHabitClick = { onHabitClick(habit.id) },
-                        onToggleComplete = { habitId ->
-                            val index = habits.indexOfFirst { it.id == habitId }
-                            if (index != -1) {
-                                // Toggle completed status
-                                val updatedHabit = habits[index].copy(
-                                    completedToday = !habits[index].completedToday,
-                                    // Increment streak if completing, don't decrement if uncompleting
-                                    streak = if (!habits[index].completedToday) habits[index].streak + 1 else habits[index].streak
-                                )
-                                habits[index] = updatedHabit
+
+            // Habit list - Observe ViewModel state
+            Box(modifier = Modifier.fillMaxSize()) { // Use Box for alignment
+                when (habitsState) {
+                    is Resource.Loading -> {
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    }
+                    is Resource.Success -> {
+                        val habitList = (habitsState as Resource.Success<List<Habit>>).data ?: emptyList()
+                        if (habitList.isEmpty()) {
+                             Text(
+                                 "No habits found. Add one using the '+' button.",
+                                 modifier = Modifier.align(Alignment.Center),
+                                 textAlign = TextAlign.Center
+                             )
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxWidth(),
+                                contentPadding = PaddingValues(vertical = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                val filteredHabits = if (selectedCategoryFilter != null) {
+                                    habitList.filter { getCategoryUIFromIcon(it.iconName) == selectedCategoryFilter }
+                                } else {
+                                    habitList
+                                }
+
+                                items(filteredHabits, key = { it.id }) { habit ->
+                                    HabitListItem(
+                                        habit = habit, // Use Habit domain model
+                                        onHabitClick = { onHabitClick(habit.id) },
+                                        onToggleComplete = { habitId, currentState ->
+                                            // Call ViewModel function
+                                            viewModel.toggleHabitCompletion(habitId, currentState)
+                                        }
+                                    )
+                                }
                             }
                         }
-                    )
+                    }
+                    is Resource.Error -> {
+                        Text(
+                            "Error: ${(habitsState as Resource.Error<List<Habit>>).message}",
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+                    }
                 }
             }
         }
-        
-        // Add habit dialog
+
+        // Add habit dialog - Pass ViewModel
         if (showAddHabitDialog) {
             HabitCreationDialog(
-                onDismiss = { showAddHabitDialog = false },
-                onHabitCreate = { newHabit ->
-                    habits.add(0, newHabit.copy(id = (habits.size + 1).toString()))
-                    showAddHabitDialog = false
-                }
+                viewModel = viewModel, // Pass the viewmodel
+                onDismiss = { showAddHabitDialog = false }
+                // onHabitCreate removed, call viewModel directly
             )
         }
     }
@@ -245,8 +285,9 @@ fun HabitListScreen(
 
 @Composable
 fun CategoriesRow(
-    selectedCategory: HabitCategory?,
-    onCategorySelected: (HabitCategory?) -> Unit
+    // Use HabitCategoryUI for state
+    selectedCategory: HabitCategoryUI?,
+    onCategorySelected: (HabitCategoryUI?) -> Unit
 ) {
     LazyRow(
         modifier = Modifier
@@ -254,7 +295,7 @@ fun CategoriesRow(
             .padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // "All" option
+        // \"All\" option
         item {
             FilterChip(
                 selected = selectedCategory == null,
@@ -262,9 +303,9 @@ fun CategoriesRow(
                 label = { Text("All Habits") }
             )
         }
-        
-        // Category options
-        items(HabitCategory.values()) { category ->
+
+        // Category options - Use HabitCategoryUI
+        items(HabitCategoryUI.values()) { category ->
             FilterChip(
                 selected = selectedCategory == category,
                 onClick = { onCategorySelected(category) },
@@ -372,34 +413,39 @@ fun ProgressCard(
 
 @Composable
 fun HabitListItem(
-    habit: HabitItem,
+    habit: Habit, // Use Habit domain model
     onHabitClick: () -> Unit,
-    onToggleComplete: (String) -> Unit
+    onToggleComplete: (String, Boolean) -> Unit // Pass current state
 ) {
+    // Map icon name and frequency from Habit model
+    val categoryUI = getCategoryUIFromIcon(habit.iconName)
+    val frequencyUI = getFrequencyUI(habit.frequency)
+    val icon = getIconByName(habit.iconName) // Use helper
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onHabitClick),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Category icon
+        // Category icon based on mapping
         Box(
             modifier = Modifier
                 .size(40.dp)
                 .clip(CircleShape)
-                .background(habit.category.color.copy(alpha = 0.2f)),
+                .background(categoryUI.color.copy(alpha = 0.2f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = habit.category.icon,
-                contentDescription = habit.category.title,
-                tint = habit.category.color
+                imageVector = icon, // Use resolved icon
+                contentDescription = categoryUI.title,
+                tint = categoryUI.color
             )
         }
         
         Spacer(modifier = Modifier.width(16.dp))
         
-        // Habit info
+        // Habit info - Use fields from Habit model
         Column(
             modifier = Modifier.weight(1f)
         ) {
@@ -412,18 +458,13 @@ fun HabitListItem(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Daily",
+                    // Display frequency from mapped enum
+                    text = frequencyUI.title,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                
-                habit.time?.let {
-                    Text(
-                        text = " • $it",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                // Optionally display time if available/needed from model
+                // habit.time?.let { ... } // Habit model doesn't have time field directly
             }
             
             Row(
@@ -433,13 +474,13 @@ fun HabitListItem(
                     imageVector = Icons.Default.LocalFireDepartment,
                     contentDescription = "Streak",
                     modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.error
+                    tint = MaterialTheme.colorScheme.error // Or dynamic based on streak > 0
                 )
                 
                 Spacer(modifier = Modifier.width(4.dp))
                 
                 Text(
-                    text = "Streak: ${habit.streak}d",
+                    text = "Streak: ${habit.streak}d", // Use streak from Habit model
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -450,9 +491,10 @@ fun HabitListItem(
         Column(
             horizontalAlignment = Alignment.End
         ) {
-            // Completion indicator
+            // Completion indicator - Use completedToday from Habit model
             IconButton(
-                onClick = { onToggleComplete(habit.id) },
+                // Call lambda with id and *current* completion state
+                onClick = { onToggleComplete(habit.id, habit.completedToday) },
                 modifier = Modifier.size(48.dp)
             ) {
                 Icon(
@@ -462,13 +504,13 @@ fun HabitListItem(
                 )
             }
             
-            // Progress indicator for the habit (simplified version)
+            // Progress indicator - Use streak from Habit model (adjust logic as needed)
             LinearProgressIndicator(
-                progress = { habit.streak.toFloat() / 10f }, // Simplified progress calculation
+                progress = { habit.streak.toFloat().coerceAtMost(30f) / 30f }, // Example: progress based on streak up to 30 days
                 modifier = Modifier
                     .width(80.dp)
                     .padding(top = 4.dp),
-                color = habit.category.color
+                color = categoryUI.color // Use color from mapped category
             )
         }
     }
@@ -477,14 +519,19 @@ fun HabitListItem(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HabitCreationDialog(
-    onDismiss: () -> Unit,
-    onHabitCreate: (HabitItem) -> Unit
+    viewModel: HabitViewModel, // Inject ViewModel
+    onDismiss: () -> Unit
+    // onHabitCreate removed, call viewModel directly
 ) {
     var habitName by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf(HabitCategory.HEALTH) }
-    var selectedFrequency by remember { mutableStateOf(HabitFrequency.DAILY) }
-    var habitTime by remember { mutableStateOf("") }
-    
+    // Use UI enums for dialog state
+    var selectedCategory by remember { mutableStateOf(HabitCategoryUI.HEALTH) }
+    var selectedFrequency by remember { mutableStateOf(HabitFrequencyUI.DAILY) }
+    // Add description state
+    var habitDescription by remember { mutableStateOf("") }
+    // Time is not part of the simplified Habit model or basic create call, handle later if needed
+    // var habitTime by remember { mutableStateOf("") }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("New Habit") },
@@ -492,30 +539,38 @@ fun HabitCreationDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp)
+                    .padding(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp) // Added spacing
             ) {
                 // Habit name
                 OutlinedTextField(
                     value = habitName,
                     onValueChange = { habitName = it },
-                    label = { Text("Habit name") },
+                    label = { Text("Habit name*") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // Category selector chips
+
+                 // Habit description (Optional)
+                OutlinedTextField(
+                    value = habitDescription,
+                    onValueChange = { habitDescription = it },
+                    label = { Text("Description (Optional)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2
+                )
+
+                // Category selector chips - Use UI enum
                 Text(
-                    text = "Category",
+                    text = "Category*",
                     style = MaterialTheme.typography.titleSmall
                 )
-                
+
                 LazyRow(
-                    modifier = Modifier.padding(vertical = 8.dp),
+                    modifier = Modifier.padding(vertical = 0.dp), // Reduced padding
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(HabitCategory.values()) { category ->
+                    items(HabitCategoryUI.values()) { category ->
                         FilterChip(
                             selected = selectedCategory == category,
                             onClick = { selectedCategory = category },
@@ -524,89 +579,69 @@ fun HabitCreationDialog(
                                 Icon(
                                     imageVector = category.icon,
                                     contentDescription = null,
+                                    // Use category color for icon tint
                                     tint = category.color
                                 )
                             }
                         )
                     }
                 }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // Frequency selector
+
+
+                // Frequency selector - Use UI enum
                 Text(
-                    text = "Frequency",
+                    text = "Frequency*",
                     style = MaterialTheme.typography.titleSmall
                 )
-                
-                Row(
+
+                // Use Row with selectable Text or Buttons
+                 Row(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly
+                        .fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp) // Added spacing
                 ) {
-                    HabitFrequency.values().forEach { frequency ->
-                        Button(
-                            onClick = { selectedFrequency = frequency },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (selectedFrequency == frequency) 
-                                    MaterialTheme.colorScheme.primaryContainer
-                                else 
-                                    MaterialTheme.colorScheme.surface
-                            ),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(
-                                text = frequency.title,
-                                color = if (selectedFrequency == frequency)
-                                    MaterialTheme.colorScheme.onPrimaryContainer
-                                else
-                                    MaterialTheme.colorScheme.onSurface
-                            )
-                        }
+                    HabitFrequencyUI.values().filter { it != HabitFrequencyUI.CUSTOM }.forEach { frequency -> // Exclude Custom for now
+                        FilterChip(
+                             selected = selectedFrequency == frequency,
+                             onClick = { selectedFrequency = frequency },
+                             label = { Text(frequency.title) }
+                         )
                     }
                 }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // Time preference
-                Text(
-                    text = "Time Preference (Optional)",
-                    style = MaterialTheme.typography.titleSmall
-                )
-                
-                OutlinedTextField(
-                    value = habitTime,
-                    onValueChange = { habitTime = it },
-                    label = { Text("e.g., Morning, 8:00 AM") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    trailingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Schedule,
-                            contentDescription = "Time"
-                        )
-                    }
-                )
+
+
+                // Time preference removed for now, add back if needed
             }
         },
         confirmButton = {
             Button(
-                onClick = { 
+                onClick = {
                     if (habitName.isNotBlank()) {
-                        val newHabit = HabitItem(
-                            id = "temp",
+                        // Map UI selections back to strings for ViewModel
+                        val frequencyString = selectedFrequency.name.lowercase() // e.g., "daily"
+                        // Map selected category icon name (or title) for the backend
+                        // This mapping might need refinement based on what backend expects
+                        val iconName = when(selectedCategory) {
+                            HabitCategoryUI.HEALTH -> "favorite"
+                            HabitCategoryUI.FITNESS -> "fitness_center"
+                            HabitCategoryUI.MINDFULNESS -> "self_improvement"
+                            HabitCategoryUI.PRODUCTIVITY -> "schedule"
+                            HabitCategoryUI.EDUCATION -> "school"
+                            HabitCategoryUI.CREATIVITY -> "palette"
+                            HabitCategoryUI.SOCIAL -> "people"
+                            HabitCategoryUI.OTHER -> "circle" // Default/fallback
+                        }
+
+                        viewModel.createHabit(
                             title = habitName,
-                            category = selectedCategory,
-                            frequency = selectedFrequency,
-                            time = if (habitTime.isBlank()) null else habitTime,
-                            streak = 0,
-                            completedToday = false
+                            description = habitDescription, // Pass description
+                            iconName = iconName, // Pass mapped icon name
+                            frequency = frequencyString // Pass mapped frequency string
                         )
-                        onHabitCreate(newHabit)
+                        onDismiss() // Close dialog after calling create
                     }
                 },
-                enabled = habitName.isNotBlank()
+                enabled = habitName.isNotBlank() // Enable only if name is entered
             ) {
                 Text("Save Habit")
             }
@@ -619,31 +654,7 @@ fun HabitCreationDialog(
     )
 }
 
-// Domain models
-data class HabitItem(
-    val id: String,
-    val title: String,
-    val category: HabitCategory,
-    val frequency: HabitFrequency,
-    val time: String? = null,
-    val streak: Int = 0,
-    val completedToday: Boolean = false,
-    val description: String? = null
-)
-
-enum class HabitFrequency(val title: String) {
-    DAILY("Daily"),
-    WEEKLY("Weekly"),
-    MONTHLY("Monthly"),
-    CUSTOM("Custom")
-}
-
-enum class HabitCategory(val title: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val color: Color) {
-    HEALTH("Health", Icons.Default.Favorite, Color(0xFFE91E63)),
-    FITNESS("Fitness", Icons.Default.FitnessCenter, Color(0xFF2196F3)),
-    MINDFULNESS("Mindfulness", Icons.Default.SelfImprovement, Color(0xFF9C27B0)),
-    PRODUCTIVITY("Productivity", Icons.Default.Schedule, Color(0xFF4CAF50)),
-    EDUCATION("Education", Icons.Default.School, Color(0xFFFF9800)),
-    CREATIVITY("Creativity", Icons.Default.Palette, Color(0xFF795548)),
-    SOCIAL("Social", Icons.Default.People, Color(0xFF3F51B5))
-}
+// Remove local data classes HabitItem, HabitFrequency, HabitCategory
+// data class HabitItem(...)
+// enum class HabitFrequency(...)
+// enum class HabitCategory(...)

@@ -30,6 +30,7 @@ import androidx.compose.material3.FilterChipDefaults
 import com.hebit.app.domain.model.StatPeriod
 import com.hebit.app.domain.model.Statistics
 import com.hebit.app.domain.model.StreakRecord
+import com.hebit.app.domain.model.HabitStatsSummary
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter

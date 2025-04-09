@@ -215,4 +215,40 @@ class AuthViewModel @Inject constructor(
     fun resetPasswordResetState() {
         _resetPasswordState.value = Resource.Success(false)
     }
+    
+    /**
+     * Force a reauthentication - for testing API connection issues
+     */
+    fun refreshAuthentication() {
+        viewModelScope.launch {
+            println("DEBUG: Forcing authentication refresh check")
+            
+            // First check if token exists
+            if (!authRepository.isLoggedIn()) {
+                println("DEBUG: No authentication token found")
+                _loginState.value = Resource.Error("Not logged in")
+                return@launch
+            }
+            
+            // Try to get user profile to validate token
+            authRepository.getUserProfile()
+                .onEach { result ->
+                    when(result) {
+                        is Resource.Success -> {
+                            println("DEBUG: Authentication refresh successful")
+                            _loginState.value = result
+                        }
+                        is Resource.Error -> {
+                            println("DEBUG: Authentication refresh failed: ${result.message}")
+                            _loginState.value = result
+                        }
+                        is Resource.Loading -> {
+                            println("DEBUG: Authentication refresh loading")
+                            _loginState.value = result
+                        }
+                    }
+                }
+                .launchIn(viewModelScope)
+        }
+    }
 }
