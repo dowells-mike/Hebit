@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.hebit.app.domain.model.Goal
 import com.hebit.app.ui.components.BottomNavItem
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -44,16 +45,27 @@ fun GoalDetailScreen(
     onEditClick: () -> Unit = {},
     onShareClick: () -> Unit = {}
 ) {
-    // Mock goal data - would come from ViewModel in real app
+    // Mock goal data - Replace with ViewModel state
+    // Use Goal domain model for mock data structure
     val goal = remember {
-        GoalItem(
+        Goal(
             id = goalId,
             title = "Learn Spanish",
             description = "Complete B2 level certification and be able to hold conversations",
             targetDate = LocalDate.now().plusMonths(6),
             progress = 45,
-            status = GoalStatus.IN_PROGRESS
+            category = "Education", // Added example category
+            isCompleted = false,     // Added isCompleted
+            createdAt = LocalDate.now().minusMonths(1), // Added example dates
+            updatedAt = LocalDate.now()
         )
+    }
+    
+    // Determine GoalStatus based on Goal properties
+    val goalStatus = when {
+        goal.isCompleted -> GoalStatus.COMPLETED
+        goal.progress > 0 -> GoalStatus.IN_PROGRESS
+        else -> GoalStatus.NOT_STARTED
     }
     
     val milestones = remember {
@@ -212,6 +224,7 @@ fun GoalDetailScreen(
             item {
                 GoalDetailHeader(
                     goal = goal,
+                    goalStatus = goalStatus,
                     onUpdateClick = { /* Update progress dialog */ },
                     onMilestoneClick = { /* Add milestone dialog */ },
                     onShareClick = onShareClick,
@@ -471,7 +484,8 @@ fun GoalDetailScreen(
 
 @Composable
 fun GoalDetailHeader(
-    goal: GoalItem,
+    goal: Goal,
+    goalStatus: GoalStatus,
     onUpdateClick: () -> Unit,
     onMilestoneClick: () -> Unit,
     onShareClick: () -> Unit,
@@ -500,7 +514,7 @@ fun GoalDetailHeader(
                     modifier = Modifier.wrapContentSize()
                 ) {
                     Text(
-                        text = "Personal",
+                        text = goal.category,
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSecondaryContainer,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
@@ -522,10 +536,10 @@ fun GoalDetailHeader(
                 style = MaterialTheme.typography.headlineMedium
             )
             
-            goal.description?.let {
+            if (goal.description.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = it,
+                    text = goal.description,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

@@ -101,7 +101,7 @@ interface HebitApiService {
     suspend fun getGoals(
         @Query("page") page: Int = 1,
         @Query("per_page") perPage: Int = 20
-    ): Response<GoalListResponse>
+    ): Response<List<GoalDto>>
     
     @GET("goals/{id}")
     suspend fun getGoalById(@Path("id") id: String): Response<GoalDto>

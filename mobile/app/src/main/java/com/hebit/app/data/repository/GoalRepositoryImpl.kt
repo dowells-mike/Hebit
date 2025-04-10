@@ -31,7 +31,7 @@ class GoalRepositoryImpl @Inject constructor(
             val response = apiService.getGoals()
             
             if (response.isSuccessful && response.body() != null) {
-                val goals = response.body()!!.goals.map { mapGoalDtoToDomain(it) }
+                val goals = response.body()!!.map { mapGoalDtoToDomain(it) }
                 emit(Resource.Success(goals))
             } else {
                 val errorMessage = response.errorBody()?.string() ?: "Unknown error occurred"

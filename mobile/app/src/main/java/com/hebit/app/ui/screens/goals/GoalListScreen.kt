@@ -25,6 +25,10 @@ import com.hebit.app.ui.components.BottomNavItem
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.hebit.app.domain.model.Goal
+import com.hebit.app.ui.screens.goals.viewmodel.GoalListViewModel
+import com.hebit.app.ui.screens.goals.viewmodel.GoalListState
 
 enum class GoalViewMode {
     LIST_VIEW, TIMELINE
@@ -38,6 +42,7 @@ enum class GoalCategory {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GoalListScreen(
+    viewModel: GoalListViewModel = hiltViewModel(),
     onNavigateBack: () -> Unit,
     onGoalClick: (String) -> Unit = {},
     onHomeClick: () -> Unit = {},
@@ -45,52 +50,8 @@ fun GoalListScreen(
     onHabitsClick: () -> Unit = {},
     onProfileClick: () -> Unit = {}
 ) {
-    // Mock goals data - would come from ViewModel in real app
-    val goals = remember {
-        mutableStateListOf(
-            GoalItem(
-                id = "1",
-                title = "Learn Kotlin Compose",
-                description = "Complete advanced course and build portfolio project",
-                targetDate = LocalDate.now().plusMonths(2),
-                progress = 35,
-                status = GoalStatus.IN_PROGRESS
-            ),
-            GoalItem(
-                id = "2",
-                title = "Run 5K",
-                description = "Train for and complete a 5K run",
-                targetDate = LocalDate.now().plusMonths(1),
-                progress = 60,
-                status = GoalStatus.IN_PROGRESS
-            ),
-            GoalItem(
-                id = "3",
-                title = "Read 12 Books",
-                description = "Read one book per month",
-                targetDate = LocalDate.now().plusMonths(12),
-                progress = 25,
-                status = GoalStatus.IN_PROGRESS
-            ),
-            GoalItem(
-                id = "4",
-                title = "Launch Side Project",
-                description = "Complete development and launch productivity app",
-                targetDate = LocalDate.now().plusMonths(3),
-                progress = 15,
-                status = GoalStatus.IN_PROGRESS
-            ),
-            GoalItem(
-                id = "5",
-                title = "Learn Spanish Basics",
-                description = "Complete beginner course and practice conversation",
-                targetDate = LocalDate.now().plusMonths(6),
-                progress = 10,
-                status = GoalStatus.IN_PROGRESS
-            )
-        )
-    }
-    
+    val state = viewModel.state.value
+
     var showAddGoalDialog by remember { mutableStateOf(false) }
     var expandedGoalId by remember { mutableStateOf<String?>(null) }
     
@@ -100,14 +61,12 @@ fun GoalListScreen(
 
     // Filter goals based on selected category
     val filteredGoals = when (selectedCategory) {
-        GoalCategory.ALL -> goals
-        // In a real app, goals would have a category property
-        // For mock data, we'll distribute them across categories
-        GoalCategory.PERSONAL -> goals.filter { it.id.toInt() % 5 == 1 }
-        GoalCategory.CAREER -> goals.filter { it.id.toInt() % 5 == 2 }
-        GoalCategory.HEALTH -> goals.filter { it.id.toInt() % 5 == 3 }
-        GoalCategory.EDUCATION -> goals.filter { it.id.toInt() % 5 == 4 }
-        GoalCategory.FINANCIAL -> goals.filter { it.id.toInt() % 5 == 0 }
+        GoalCategory.ALL -> state.goals
+        GoalCategory.PERSONAL -> state.goals.filter { it.id.toIntOrNull()?.rem(5) == 1 }
+        GoalCategory.CAREER -> state.goals.filter { it.id.toIntOrNull()?.rem(5) == 2 }
+        GoalCategory.HEALTH -> state.goals.filter { it.id.toIntOrNull()?.rem(5) == 3 }
+        GoalCategory.EDUCATION -> state.goals.filter { it.id.toIntOrNull()?.rem(5) == 4 }
+        GoalCategory.FINANCIAL -> state.goals.filter { it.id.toIntOrNull()?.rem(5) == 0 }
     }
 
     Scaffold(
@@ -288,79 +247,97 @@ fun GoalListScreen(
                 }
             }
             
-            if (viewMode == GoalViewMode.LIST_VIEW) {
-                // List view - goals list
-                LazyColumn(
+            // Loading Indicator
+            if (state.isLoading) {
+                Box(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    contentAlignment = Alignment.Center
                 ) {
-                    items(filteredGoals, key = { it.id }) { goal ->
-                        GoalCard(
-                            goal = goal,
-                            isExpanded = expandedGoalId == goal.id,
-                            onToggleExpand = { 
-                                expandedGoalId = if (expandedGoalId == goal.id) null else goal.id
-                            },
-                            onUpdateProgress = { goalId, newProgress ->
-                                // Update the goal progress
-                                val index = goals.indexOfFirst { it.id == goalId }
-                                if (index != -1) {
-                                    // Update progress and status if completed
-                                    val status = if (newProgress >= 100) 
-                                        GoalStatus.COMPLETED 
-                                    else 
-                                        GoalStatus.IN_PROGRESS
-                                    
-                                    goals[index] = goals[index].copy(
-                                        progress = newProgress,
-                                        status = status
-                                    )
-                                }
-                            },
-                            onDeleteGoal = { goalId ->
-                                // Remove goal from list
-                                goals.removeIf { it.id == goalId }
-                            }
-                        )
-                    }
+                    CircularProgressIndicator()
                 }
-            } else {
-                // Timeline view
-                TimelineView(
-                    goals = filteredGoals,
-                    onGoalClick = onGoalClick,
-                    modifier = Modifier.fillMaxSize()
-                )
+            }
+            // Error Message
+            else if (state.error.isNotBlank()) {
+                 Box(
+                    modifier = Modifier.fillMaxSize().padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Error: ${state.error}",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+            }
+            // Empty State Message
+            else if (state.goals.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No goals yet. Tap the '+' button to add one!",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            // Content (List or Timeline)
+            else {
+                if (viewMode == GoalViewMode.LIST_VIEW) {
+                    // List view - goals list
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(filteredGoals, key = { it.id }) { goal ->
+                            GoalCard(
+                                goal = goal,
+                                isExpanded = expandedGoalId == goal.id,
+                                onToggleExpand = { 
+                                    expandedGoalId = if (expandedGoalId == goal.id) null else goal.id
+                                },
+                                onUpdateProgress = { goalId, newProgress ->
+                                    // TODO: Implement progress update via ViewModel
+                                    // Example: viewModel.updateGoalProgress(goalId, newProgress)
+                                },
+                                onDeleteGoal = { goalId ->
+                                    // TODO: Implement delete goal via ViewModel
+                                    // Example: viewModel.deleteGoal(goalId)
+                                }
+                            )
+                        }
+                    }
+                } else {
+                    // Timeline view
+                    TimelineView(
+                        goals = filteredGoals,
+                        onGoalClick = onGoalClick,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
         }
         
         // Multi-step goal creation dialog
-        if (showAddGoalDialog) {
-            GoalCreationDialog(
-                onDismiss = { showAddGoalDialog = false },
-                onGoalAdd = { title, description, targetDateMonths ->
-                    if (title.isNotBlank()) {
-                        val newGoal = GoalItem(
-                            id = (goals.size + 1).toString(),
-                            title = title,
-                            description = description,
-                            targetDate = LocalDate.now().plusMonths(targetDateMonths.toLong()),
-                            progress = 0,
-                            status = GoalStatus.NOT_STARTED
-                        )
-                        goals.add(0, newGoal)
-                        showAddGoalDialog = false
-                    }
-                }
-            )
-        }
+        // TODO: Update GoalCreationDialog to interact with ViewModel
+        // if (showAddGoalDialog) {
+        //     GoalCreationDialog(
+        //         onDismiss = { showAddGoalDialog = false },
+        //         onGoalAdd = { title, description, targetDateMonths ->
+        //             // TODO: Call ViewModel to create goal
+        //             // Example: viewModel.createGoal(...)
+        //             showAddGoalDialog = false
+        //         }
+        //     )
+        // }
     }
 }
 
 @Composable
 fun GoalsSummaryCard(
-    goals: List<GoalItem>,
+    goals: List<Goal>,
     modifier: Modifier = Modifier
 ) {
     Card(modifier = modifier) {
@@ -388,7 +365,7 @@ fun GoalsSummaryCard(
             
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = goals.count { it.status == GoalStatus.COMPLETED }.toString(),
+                    text = goals.count { it.isCompleted }.toString(),
                     style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.secondary
                 )
@@ -404,7 +381,7 @@ fun GoalsSummaryCard(
             
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = goals.count { it.status == GoalStatus.IN_PROGRESS }.toString(),
+                    text = goals.count { !it.isCompleted }.toString(),
                     style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.tertiary
                 )
@@ -418,7 +395,7 @@ fun GoalsSummaryCard(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GoalCard(
-    goal: GoalItem,
+    goal: Goal,
     isExpanded: Boolean,
     onToggleExpand: () -> Unit,
     onUpdateProgress: (String, Int) -> Unit,
@@ -426,6 +403,13 @@ fun GoalCard(
 ) {
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var sliderPosition by remember { mutableStateOf(goal.progress.toFloat()) }
+    
+    // Determine GoalStatus based on Goal properties
+    val goalStatus = when {
+        goal.isCompleted -> GoalStatus.COMPLETED
+        goal.progress > 0 -> GoalStatus.IN_PROGRESS
+        else -> GoalStatus.NOT_STARTED
+    }
     
     // Update local slider value when external progress changes
     LaunchedEffect(goal.progress) {
@@ -456,7 +440,7 @@ fun GoalCard(
                     Spacer(modifier = Modifier.height(4.dp))
                     
                     Text(
-                        text = goal.description ?: "",
+                        text = goal.description,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = if (isExpanded) Int.MAX_VALUE else 1,
@@ -465,7 +449,7 @@ fun GoalCard(
                 }
                 
                 // Status chip
-                val (statusColor, statusText) = when (goal.status) {
+                val (statusColor, statusText) = when (goalStatus) {
                     GoalStatus.NOT_STARTED -> Pair(MaterialTheme.colorScheme.outline, "Not Started")
                     GoalStatus.IN_PROGRESS -> Pair(MaterialTheme.colorScheme.tertiary, "In Progress")
                     GoalStatus.COMPLETED -> Pair(MaterialTheme.colorScheme.primary, "Completed")
@@ -692,7 +676,7 @@ fun AddGoalDialog(
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun TimelineView(
-    goals: List<GoalItem>,
+    goals: List<Goal>,
     onGoalClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -738,11 +722,18 @@ fun TimelineView(
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun TimelineGoalItem(
-    goal: GoalItem,
+    goal: Goal,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val statusColor = when (goal.status) {
+    // Determine GoalStatus based on Goal properties
+    val goalStatus = when {
+        goal.isCompleted -> GoalStatus.COMPLETED
+        goal.progress > 0 -> GoalStatus.IN_PROGRESS
+        else -> GoalStatus.NOT_STARTED
+    }
+
+    val statusColor = when (goalStatus) {
         GoalStatus.NOT_STARTED -> MaterialTheme.colorScheme.outline
         GoalStatus.IN_PROGRESS -> MaterialTheme.colorScheme.tertiary
         GoalStatus.COMPLETED -> MaterialTheme.colorScheme.primary
@@ -776,7 +767,7 @@ fun TimelineGoalItem(
                     .align(Alignment.TopCenter),
                 contentAlignment = Alignment.Center
             ) {
-                if (goal.status == GoalStatus.COMPLETED) {
+                if (goalStatus == GoalStatus.COMPLETED) {
                     Icon(
                         imageVector = Icons.Default.Check,
                         contentDescription = null,
@@ -811,7 +802,7 @@ fun TimelineGoalItem(
                     )
                     
                     // Status chip
-                    val statusText = when (goal.status) {
+                    val statusText = when (goalStatus) {
                         GoalStatus.NOT_STARTED -> "Not Started"
                         GoalStatus.IN_PROGRESS -> "In Progress"
                         GoalStatus.COMPLETED -> "Completed"
@@ -836,10 +827,10 @@ fun TimelineGoalItem(
                 )
                 
                 // Description if available
-                goal.description?.let { description ->
+                if (goal.description.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = description,
+                        text = goal.description,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -867,18 +858,4 @@ fun TimelineGoalItem(
             }
         }
     }
-}
-
-// Domain models
-data class GoalItem(
-    val id: String,
-    val title: String,
-    val description: String? = null,
-    val targetDate: LocalDate,
-    val progress: Int = 0,
-    val status: GoalStatus = GoalStatus.NOT_STARTED
-)
-
-enum class GoalStatus {
-    NOT_STARTED, IN_PROGRESS, COMPLETED
 }
