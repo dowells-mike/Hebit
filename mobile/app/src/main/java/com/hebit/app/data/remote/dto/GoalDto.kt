@@ -7,13 +7,13 @@ import com.squareup.moshi.JsonClass
 data class GoalDto(
     @Json(name = "_id") val id: String,
     val title: String,
-    val description: String,
-    val progress: Int,
-    @Json(name = "target_date") val targetDate: String,
-    val category: String,
-    @Json(name = "is_completed") val isCompleted: Boolean,
-    @Json(name = "created_at") val createdAt: String,
-    @Json(name = "updated_at") val updatedAt: String
+    val description: String?,
+    val progress: Int?,
+    @Json(name = "target_date") val targetDate: String?,
+    val category: String?,
+    @Json(name = "is_completed") val isCompleted: Boolean?,
+    @Json(name = "created_at") val createdAt: String?,
+    @Json(name = "updated_at") val updatedAt: String?
 )
 
 @JsonClass(generateAdapter = true)

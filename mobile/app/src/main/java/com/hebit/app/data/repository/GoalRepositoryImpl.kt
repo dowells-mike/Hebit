@@ -195,16 +195,29 @@ class GoalRepositoryImpl @Inject constructor(
     }
     
     private fun mapGoalDtoToDomain(dto: GoalDto): Goal {
+        // Provide sensible defaults for potentially missing fields
+        val targetDate = dto.targetDate?.let { 
+            try { LocalDate.parse(it, dateFormatter) } catch (e: Exception) { LocalDate.now() } 
+        } ?: LocalDate.now().plusMonths(1) // Default target: 1 month from now if null
+        
+        val createdAtDate = dto.createdAt?.let {
+             try { LocalDate.parse(it, dateFormatter) } catch (e: Exception) { LocalDate.now() } 
+        } ?: LocalDate.now() // Default createdAt: now if null
+        
+        val updatedAtDate = dto.updatedAt?.let {
+             try { LocalDate.parse(it, dateFormatter) } catch (e: Exception) { LocalDate.now() } 
+        } ?: LocalDate.now() // Default updatedAt: now if null
+        
         return Goal(
             id = dto.id,
-            title = dto.title,
-            description = dto.description,
-            progress = dto.progress,
-            targetDate = LocalDate.parse(dto.targetDate, dateFormatter),
-            category = dto.category,
-            isCompleted = dto.isCompleted,
-            createdAt = LocalDate.parse(dto.createdAt, dateFormatter),
-            updatedAt = LocalDate.parse(dto.updatedAt, dateFormatter)
+            title = dto.title, // Assume title is always present based on API docs
+            description = dto.description ?: "", // Default: empty string if null
+            progress = dto.progress ?: 0, // Default: 0 if null
+            targetDate = targetDate,
+            category = dto.category ?: "General", // Default: "General" if null
+            isCompleted = dto.isCompleted ?: false, // Default: false if null
+            createdAt = createdAtDate,
+            updatedAt = updatedAtDate
         )
     }
 } 

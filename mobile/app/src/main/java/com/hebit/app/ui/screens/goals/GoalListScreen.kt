@@ -29,6 +29,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.hebit.app.domain.model.Goal
 import com.hebit.app.ui.screens.goals.viewmodel.GoalListViewModel
 import com.hebit.app.ui.screens.goals.viewmodel.GoalListState
+import androidx.compose.ui.platform.LocalContext
 
 enum class GoalViewMode {
     LIST_VIEW, TIMELINE
@@ -51,6 +52,18 @@ fun GoalListScreen(
     onProfileClick: () -> Unit = {}
 ) {
     val state = viewModel.state.value
+    val context = LocalContext.current // For potential Toast messages
+
+    // Observe event messages for Snackbar/Toast
+    val eventMessage = viewModel.eventMessage.value
+    LaunchedEffect(eventMessage) {
+        eventMessage?.let {
+            // TODO: Implement Snackbar display
+            println("Event: $it") // Placeholder log
+            // Toast.makeText(context, it, Toast.LENGTH_SHORT).show() // Example Toast
+            viewModel.consumeEventMessage() // Clear the message after showing
+        }
+    }
 
     var showAddGoalDialog by remember { mutableStateOf(false) }
     var expandedGoalId by remember { mutableStateOf<String?>(null) }
@@ -299,12 +312,12 @@ fun GoalListScreen(
                                     expandedGoalId = if (expandedGoalId == goal.id) null else goal.id
                                 },
                                 onUpdateProgress = { goalId, newProgress ->
-                                    // TODO: Implement progress update via ViewModel
-                                    // Example: viewModel.updateGoalProgress(goalId, newProgress)
+                                    // Call ViewModel function
+                                    viewModel.updateGoalProgress(goalId, newProgress)
                                 },
                                 onDeleteGoal = { goalId ->
-                                    // TODO: Implement delete goal via ViewModel
-                                    // Example: viewModel.deleteGoal(goalId)
+                                    // Call ViewModel function
+                                    viewModel.deleteGoal(goalId)
                                 }
                             )
                         }
@@ -320,18 +333,17 @@ fun GoalListScreen(
             }
         }
         
-        // Multi-step goal creation dialog
-        // TODO: Update GoalCreationDialog to interact with ViewModel
-        // if (showAddGoalDialog) {
-        //     GoalCreationDialog(
-        //         onDismiss = { showAddGoalDialog = false },
-        //         onGoalAdd = { title, description, targetDateMonths ->
-        //             // TODO: Call ViewModel to create goal
-        //             // Example: viewModel.createGoal(...)
-        //             showAddGoalDialog = false
-        //         }
-        //     )
-        // }
+        // Goal creation dialog
+        if (showAddGoalDialog) {
+            GoalCreationDialog(
+                onDismiss = { showAddGoalDialog = false },
+                // Updated lambda to pass required fields
+                onGoalAdd = { title, description, targetDate, category ->
+                    viewModel.createGoal(title, description, targetDate, category)
+                    showAddGoalDialog = false
+                }
+            )
+        }
     }
 }
 
@@ -603,15 +615,17 @@ fun GoalCard(
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun AddGoalDialog(
+fun GoalCreationDialog(
     onDismiss: () -> Unit,
-    onGoalAdd: (String, String, Int) -> Unit
+    onGoalAdd: (title: String, description: String, targetDate: LocalDate, category: String) -> Unit
 ) {
     var goalTitle by remember { mutableStateOf("") }
     var goalDescription by remember { mutableStateOf("") }
-    var targetMonths by remember { mutableStateOf("3") }
-    
+    var targetMonths by remember { mutableStateOf(3) } // Default to 3 months
+    var category by remember { mutableStateOf("Personal") } // Default category
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Create New Goal") },
@@ -624,31 +638,45 @@ fun AddGoalDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 OutlinedTextField(
                     value = goalDescription,
                     onValueChange = { goalDescription = it },
-                    label = { Text("Description") },
-                    modifier = Modifier.fillMaxWidth()
+                    label = { Text("Description (Optional)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2
                 )
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
+                // Simplified Category Selection (Example Dropdown/Chips)
+                // TODO: Implement a better category selector (e.g., fetch from API)
+                 Text("Category:", style = MaterialTheme.typography.bodyMedium)
+                 Row {
+                    FilterChip(selected = category == "Personal", onClick = { category = "Personal" }, label = { Text("Personal") })
+                    Spacer(Modifier.width(8.dp))
+                    FilterChip(selected = category == "Career", onClick = { category = "Career" }, label = { Text("Career") })
+                    Spacer(Modifier.width(8.dp))
+                    FilterChip(selected = category == "Health", onClick = { category = "Health" }, label = { Text("Health") })
+                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 Text("Target completion in (months):", style = MaterialTheme.typography.bodyMedium)
-                
+
                 Spacer(modifier = Modifier.height(8.dp))
-                
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    listOf("1", "3", "6", "12").forEach { month ->
+                    listOf(1, 3, 6, 12).forEach { month ->
                         FilterChip(
                             selected = targetMonths == month,
                             onClick = { targetMonths = month },
-                            label = { Text("$month month${if (month != "1") "s" else ""}") }
+                            label = { Text("$month month${if (month != 1) "s" else ""}") }
                         )
                     }
                 }
@@ -656,11 +684,11 @@ fun AddGoalDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { 
-                    val months = targetMonths.toIntOrNull() ?: 3
-                    onGoalAdd(goalTitle, goalDescription, months) 
+                onClick = {
+                    val targetDate = LocalDate.now().plusMonths(targetMonths.toLong())
+                    onGoalAdd(goalTitle, goalDescription, targetDate, category)
                 },
-                enabled = goalTitle.isNotBlank()
+                enabled = goalTitle.isNotBlank() // Only enable if title is present
             ) {
                 Text("Create")
             }
