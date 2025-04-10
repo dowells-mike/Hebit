@@ -31,6 +31,8 @@ import com.hebit.app.domain.model.Task
 import com.hebit.app.ui.components.BottomNavItem
 import com.hebit.app.ui.screens.habits.HabitViewModel
 import com.hebit.app.ui.screens.tasks.TaskViewModel
+import com.hebit.app.ui.screens.goals.viewmodel.GoalListViewModel
+import com.hebit.app.ui.screens.goals.viewmodel.GoalListState
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -50,8 +52,10 @@ fun DashboardScreen(
     onAchievementsClick: () -> Unit = {},
     onTaskDetailClick: (String) -> Unit = {},
     onHabitDetailClick: (String) -> Unit = {},
+    onGoalDetailClick: (String) -> Unit = {},
     taskViewModel: TaskViewModel = hiltViewModel(),
-    habitViewModel: HabitViewModel = hiltViewModel()
+    habitViewModel: HabitViewModel = hiltViewModel(),
+    goalListViewModel: GoalListViewModel = hiltViewModel()
 ) {
     val today = LocalDate.now()
     val formattedDate = today.format(DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.getDefault()))
@@ -60,10 +64,12 @@ fun DashboardScreen(
     LaunchedEffect(key1 = Unit) {
         taskViewModel.loadPriorityTasks(3)
         habitViewModel.loadTodayHabits()
+        // Goals are automatically loaded in the GoalListViewModel init block
     }
     
     val priorityTasksState by taskViewModel.priorityTasksState.collectAsState()
     val todayHabitsState by habitViewModel.todayHabitsState.collectAsState()
+    val goalsState = goalListViewModel.state.value
     
     Scaffold(
         topBar = {
@@ -249,15 +255,28 @@ fun DashboardScreen(
             
             // Active Goals Section
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                Text(
-                    text = "Active Goals",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Active Goals",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    
+                    TextButton(onClick = onGoalsClick) {
+                        Text("See All")
+                    }
+                }
                 
                 // Goal cards
-                ActiveGoalsList(onGoalClick = { /* Open goal details */ })
+                ActiveGoalsList(
+                    goalsState = goalsState,
+                    onGoalClick = onGoalDetailClick
+                )
             }
             
             // Quick Links Section
@@ -571,16 +590,63 @@ fun HabitCard(habit: Habit, onClick: () -> Unit) {
 }
 
 @Composable
-fun ActiveGoalsList(onGoalClick: (String) -> Unit) {
-    val goals = listOf(
-        Goal("Learn Spanish", 75, "Feb 28, 2025", "Education")
-    )
-    
-    Column(
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        goals.forEach { goal ->
-            GoalCard(goal = goal, onClick = { onGoalClick(goal.title) })
+fun ActiveGoalsList(goalsState: GoalListState, onGoalClick: (String) -> Unit) {
+    when {
+        goalsState.isLoading -> {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        }
+        goalsState.error.isNotEmpty() -> {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Error: ${goalsState.error}",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+        goalsState.goals.isEmpty() -> {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No active goals yet",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.outline
+                )
+            }
+        }
+        else -> {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Display up to 3 goals
+                goalsState.goals.filter { !it.isCompleted }.take(3).forEach { goal ->
+                    GoalCard(
+                        goal = Goal(
+                            title = goal.title,
+                            progress = goal.progress,
+                            dueDate = goal.targetDate.format(DateTimeFormatter.ofPattern("MMM d, yyyy")),
+                            category = goal.category
+                        ),
+                        onClick = { onGoalClick(goal.id) }
+                    )
+                }
+            }
         }
     }
 }
