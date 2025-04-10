@@ -121,7 +121,7 @@ interface HebitApiService {
     @GET("goals/active")
     suspend fun getActiveGoals(): Response<GoalListResponse>
     
-    @PUT("goals/{id}/progress")
+    @PATCH("goals/{id}/progress")
     suspend fun updateGoalProgress(
         @Path("id") id: String,
         @Body request: GoalProgressRequest
