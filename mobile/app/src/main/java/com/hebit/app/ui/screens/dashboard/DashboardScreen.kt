@@ -62,8 +62,13 @@ fun DashboardScreen(
     
     // Load data
     LaunchedEffect(key1 = Unit) {
+        android.util.Log.d("DashboardScreen", "Loading data for dashboard...")
         taskViewModel.loadPriorityTasks(3)
+        
+        // Force refresh habits data
+        android.util.Log.d("DashboardScreen", "Explicitly loading today's habits...")
         habitViewModel.loadTodayHabits()
+        
         // Goals are automatically loaded in the GoalListViewModel init block
     }
     
@@ -487,22 +492,39 @@ fun TodayHabitsList(onHabitClick: (String) -> Unit, habitsState: Resource<List<H
                         
                         // Debug information to see what's being returned
                         Text(
-                            text = "Debug: ${habits.size} habits found",
+                            text = "Debug: API returned empty habit list",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error
                         )
                     }
                 }
             } else {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(100.dp)
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    habits.forEach { habit ->
-                        HabitCard(habit = habit, onClick = { onHabitClick(habit.id) })
+                // Display the actual habits from the API
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(100.dp)
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        habits.forEach { habit ->
+                            HabitCard(habit = habit, onClick = { onHabitClick(habit.id) })
+                        }
+                    }
+                    
+                    // Debug info showing number of habits found
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Debug: Found ${habits.size} habits from API",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.tertiary
+                        )
                     }
                 }
             }
@@ -514,11 +536,20 @@ fun TodayHabitsList(onHabitClick: (String) -> Unit, habitsState: Resource<List<H
                     .height(100.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "Error: ${habitsState.message}",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.error
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Error loading habits",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    
+                    Text(
+                        text = "Details: ${habitsState.message}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
     }

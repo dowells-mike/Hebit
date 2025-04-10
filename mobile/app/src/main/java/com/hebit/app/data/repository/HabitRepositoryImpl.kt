@@ -158,26 +158,58 @@ class HabitRepositoryImpl @Inject constructor(
         emit(Resource.Loading())
         
         try {
+            android.util.Log.d("HabitRepo", "Making API call to fetch today's habits...")
             val response = apiService.getTodaysHabits()
+            
+            android.util.Log.d("HabitRepo", "API response received, status code: ${response.code()}")
             
             if (response.isSuccessful && response.body() != null) {
                 val responseBody = response.body()!!
+                android.util.Log.d("HabitRepo", "Today's habits API response body: $responseBody")
                 android.util.Log.d("HabitRepo", "Today's habits API response: ${responseBody.habits.size} habits found")
                 android.util.Log.d("HabitRepo", "Response details: total=${responseBody.total}, page=${responseBody.page}, perPage=${responseBody.perPage}")
+                
+                // If the today endpoint returns no habits, fall back to all habits
+                if (responseBody.habits.isEmpty()) {
+                    android.util.Log.d("HabitRepo", "No habits returned from today endpoint - falling back to all habits")
+                    
+                    // Make a call to get all habits instead
+                    val allHabitsResponse = apiService.getHabits()
+                    
+                    if (allHabitsResponse.isSuccessful && allHabitsResponse.body() != null) {
+                        val allHabitsBody = allHabitsResponse.body()!!
+                        android.util.Log.d("HabitRepo", "Retrieved ${allHabitsBody.habits.size} habits from general endpoint")
+                        
+                        val habits = allHabitsBody.habits.map { mapHabitDtoToDomain(it) }
+                        android.util.Log.d("HabitRepo", "Mapped ${habits.size} habits from general habits endpoint")
+                        emit(Resource.Success(habits))
+                        return@flow
+                    }
+                }
+                
+                if (responseBody.habits.isEmpty()) {
+                    android.util.Log.d("HabitRepo", "No habits returned in the habits list from API")
+                } else {
+                    android.util.Log.d("HabitRepo", "Habit titles: ${responseBody.habits.map { it.title }}")
+                }
                 
                 val habits = responseBody.habits.map { mapHabitDtoToDomain(it) }
                 android.util.Log.d("HabitRepo", "Mapped to ${habits.size} domain habits")
                 emit(Resource.Success(habits))
             } else {
-                val errorMessage = response.errorBody()?.string() ?: "Unknown error occurred"
-                android.util.Log.e("HabitRepo", "Error fetching today's habits: $errorMessage")
-                emit(Resource.Error(errorMessage))
+                val errorBody = response.errorBody()?.string() ?: "Unknown error occurred"
+                android.util.Log.e("HabitRepo", "Error fetching today's habits: $errorBody")
+                android.util.Log.e("HabitRepo", "Error response code: ${response.code()}")
+                emit(Resource.Error(errorBody))
             }
         } catch (e: HttpException) {
+            android.util.Log.e("HabitRepo", "HTTP Exception: ${e.message()}", e)
             emit(Resource.Error("Server error: ${e.message()}"))
         } catch (e: IOException) {
+            android.util.Log.e("HabitRepo", "IO Exception: ${e.localizedMessage}", e)
             emit(Resource.Error("Network error: ${e.localizedMessage ?: "Check your internet connection"}"))
         } catch (e: Exception) {
+            android.util.Log.e("HabitRepo", "Unexpected exception: ${e.localizedMessage}", e)
             emit(Resource.Error("Unexpected error: ${e.localizedMessage ?: "An unexpected error occurred"}"))
         }
     }

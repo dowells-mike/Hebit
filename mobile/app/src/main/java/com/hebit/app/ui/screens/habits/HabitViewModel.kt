@@ -77,7 +77,13 @@ class HabitViewModel @Inject constructor(
                 .onEach { result ->
                     when(result) {
                         is Resource.Success -> {
-                            android.util.Log.d("HabitViewModel", "Today's habits loaded successfully: ${result.data?.size ?: 0} habits")
+                            val habits = result.data ?: emptyList()
+                            android.util.Log.d("HabitViewModel", "Today's habits loaded successfully: ${habits.size} habits")
+                            if (habits.isEmpty()) {
+                                android.util.Log.d("HabitViewModel", "No habits returned from API")
+                            } else {
+                                android.util.Log.d("HabitViewModel", "Habits returned: ${habits.map { it.title }}")
+                            }
                         }
                         is Resource.Error -> {
                             android.util.Log.e("HabitViewModel", "Error loading today's habits: ${result.message}")
