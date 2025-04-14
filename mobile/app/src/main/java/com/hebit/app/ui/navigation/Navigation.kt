@@ -337,7 +337,6 @@ fun HebitNavigation(
         
         composable(Routes.PROGRESS_STATS) {
             ProgressStatsScreen(
-                onNavigateBack = { navController.navigateUp() },
                 onHomeClick = { 
                     navController.navigate(Routes.DASHBOARD) {
                         popUpTo(Routes.DASHBOARD) { inclusive = true }

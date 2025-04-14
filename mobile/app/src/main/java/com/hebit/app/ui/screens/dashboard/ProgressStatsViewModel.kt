@@ -65,26 +65,46 @@ class ProgressStatsViewModel @Inject constructor(
                 .collect { result ->
                     when (result) {
                         is Resource.Success -> {
+                            // Sort metrics by date to ensure chronological order
+                            val sortedMetrics = result.data?.sortedBy { 
+                                try {
+                                    LocalDate.parse(it.date.split("T")[0])
+                                } catch (e: Exception) {
+                                    LocalDate.now()
+                                }
+                            } ?: emptyList()
+                            
                             _uiState.update { it.copy(
-                                metrics = result.data ?: emptyList(),
+                                metrics = sortedMetrics,
                                 isLoading = false
                             )}
                             
                             // Calculate average productivity score
-                            val avgScore = result.data?.let { metrics ->
+                            val avgScore = sortedMetrics.let { metrics ->
                                 if (metrics.isNotEmpty()) {
                                     metrics.map { it.productivityScore }.average().toInt()
                                 } else null
                             }
                             
-                            // Calculate task completion data
-                            val taskData = result.data?.let { metrics ->
-                                metrics.map { it.tasksCompleted }
-                            } ?: emptyList()
+                            // Extract task completion data and corresponding dates
+                            val taskData = sortedMetrics.map { it.tasksCompleted }
+                            
+                            // Generate day labels based on dates
+                            val dayLabels = sortedMetrics.map { metricDto ->
+                                try {
+                                    val date = LocalDate.parse(metricDto.date.split("T")[0])
+                                    // Format as "Mon", "Tue", etc.
+                                    date.dayOfWeek.toString().take(3)
+                                } catch (e: Exception) {
+                                    ""
+                                }
+                            }
                             
                             _uiState.update { it.copy(
                                 productivityScore = avgScore,
-                                taskCompletionData = taskData
+                                taskCompletionData = taskData,
+                                taskCompletionLabels = dayLabels,
+                                error = null
                             )}
                         }
                         is Resource.Error -> {
@@ -215,6 +235,7 @@ data class ProgressStatsUiState(
     val insights: ProductivityInsightsResponse? = null,
     val productivityScore: Int? = null,
     val taskCompletionData: List<Int> = emptyList(),
+    val taskCompletionLabels: List<String> = emptyList(),
     val timeDistribution: Map<String, Float> = emptyMap(),
     val activeStreaks: List<Habit> = emptyList()
 ) 
