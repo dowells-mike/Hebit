@@ -21,7 +21,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,9 +34,10 @@ fun ProgressStatsScreen(
     onTasksClick: () -> Unit,
     onHabitsClick: () -> Unit,
     onGoalsClick: () -> Unit,
-    onProfileClick: () -> Unit
+    onProfileClick: () -> Unit,
+    viewModel: ProgressStatsViewModel = hiltViewModel()
 ) {
-    var selectedPeriod by remember { mutableStateOf(TimePeriod.Week) }
+    val uiState by viewModel.uiState.collectAsState()
     
     Scaffold(
         topBar = {
@@ -94,93 +98,34 @@ fun ProgressStatsScreen(
             }
         }
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
-        ) {
-            // Time period selector
-            TimePeriodSelector(
-                selectedPeriod = selectedPeriod,
-                onPeriodSelected = { selectedPeriod = it }
-            )
-            
-            // Weekly calendar view
-            WeeklyCalendarView()
-            
-            // Task completion chart
-            Card(
+        if (uiState.isLoading) {
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp)
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentAlignment = Alignment.Center
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp)
-                ) {
-                    Text(
-                        text = "Task Completion Chart",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    // Placeholder for the chart
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), shape = RoundedCornerShape(8.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Task Completion Chart",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+                CircularProgressIndicator()
             }
-            
-            // Active streaks section
-            Column {
-                Text(
-                    text = "Active Streaks",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 8.dp)
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                // Time period selector
+                TimePeriodSelector(
+                    selectedPeriod = uiState.selectedPeriod,
+                    onPeriodSelected = { viewModel.loadData(it) }
                 )
                 
-                StreakCard(
-                    title = "Daily Meditation",
-                    streakCount = 15,
-                    icon = Icons.Default.SelfImprovement
-                )
+                // Weekly calendar view
+                WeeklyCalendarView()
                 
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                StreakCard(
-                    title = "Workout",
-                    streakCount = 7,
-                    icon = Icons.Default.FitnessCenter
-                )
-            }
-            
-            // Productivity score card
-            ProductivityScoreCard(score = 85, trend = "+12% above average")
-            
-            // Time distribution chart
-            Column {
-                Text(
-                    text = "Time Distribution",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                
+                // Task completion chart
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -191,38 +136,218 @@ fun ProgressStatsScreen(
                             .fillMaxSize()
                             .padding(16.dp)
                     ) {
-                        // Placeholder for the chart
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f)
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), shape = RoundedCornerShape(8.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "Time Distribution Chart",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                        Text(
+                            text = "Task Completion Chart",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
                         
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         
-                        // Legend
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            ChartLegendItem(color = Color(0xFF4285F4), label = "Tasks (40%)")
-                            ChartLegendItem(color = Color(0xFF34A853), label = "Habits (30%)")
-                            ChartLegendItem(color = Color(0xFFFBBC05), label = "Goals (20%)")
-                            ChartLegendItem(color = Color(0xFFEA4335), label = "Other (10%)")
+                        if (uiState.taskCompletionData.isEmpty()) {
+                            // Placeholder when no data
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), shape = RoundedCornerShape(8.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "No task completion data available",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        } else {
+                            // Simple visualization of task completion data
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.Bottom
+                            ) {
+                                val maxValue = uiState.taskCompletionData.maxOrNull() ?: 1
+                                
+                                uiState.taskCompletionData.forEachIndexed { index, value ->
+                                    val heightPercent = if (maxValue > 0) value.toFloat() / maxValue else 0f
+                                    
+                                    Column(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .fillMaxHeight(),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Bottom
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .fillMaxHeight(heightPercent)
+                                                .background(
+                                                    MaterialTheme.colorScheme.primary,
+                                                    RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)
+                                                )
+                                        )
+                                        
+                                        Text(
+                                            text = value.toString(),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
+                
+                // Active streaks section
+                Column {
+                    Text(
+                        text = "Active Streaks",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    
+                    if (uiState.activeStreaks.isEmpty()) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(80.dp)
+                                    .padding(16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "No active streaks yet",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    } else {
+                        uiState.activeStreaks.forEach { habit ->
+                            val icon = when {
+                                habit.iconName?.contains("meditation") == true -> Icons.Default.SelfImprovement
+                                habit.iconName?.contains("workout") == true || habit.iconName?.contains("exercise") == true -> Icons.Default.FitnessCenter
+                                habit.iconName?.contains("water") == true -> Icons.Default.WaterDrop
+                                habit.iconName?.contains("read") == true || habit.iconName?.contains("book") == true -> Icons.Default.MenuBook
+                                else -> Icons.Default.CheckCircle
+                            }
+                            
+                            StreakCard(
+                                title = habit.title,
+                                streakCount = habit.streak,
+                                icon = icon
+                            )
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+                    }
+                }
+                
+                // Productivity score card
+                ProductivityScoreCard(
+                    score = uiState.productivityScore ?: 0, 
+                    trend = viewModel.getTrendText(uiState.productivityScore)
+                )
+                
+                // Time distribution chart
+                Column {
+                    Text(
+                        text = "Time Distribution",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp)
+                        ) {
+                            if (uiState.timeDistribution.isEmpty()) {
+                                // Placeholder when no data
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f)
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), shape = RoundedCornerShape(8.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "No time distribution data available",
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            } else {
+                                // Simple visualization - in a real app you'd use a chart library
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f)
+                                ) {
+                                    // Here we'd render a proper pie chart
+                                    // For now we'll just show a placeholder with real percentages
+                                    Box(
+                                        modifier = Modifier
+                                            .size(120.dp)
+                                            .align(Alignment.Center)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary)
+                                    )
+                                }
+                                
+                                Spacer(modifier = Modifier.height(16.dp))
+                                
+                                // Legend with real data
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceEvenly
+                                ) {
+                                    val colors = listOf(
+                                        Color(0xFF4285F4), // Blue
+                                        Color(0xFF34A853), // Green
+                                        Color(0xFFFBBC05), // Yellow
+                                        Color(0xFFEA4335)  // Red
+                                    )
+                                    
+                                    uiState.timeDistribution.entries.forEachIndexed { index, entry ->
+                                        val color = colors[index % colors.size]
+                                        val percentage = (entry.value * 100).toInt()
+                                        ChartLegendItem(color = color, label = "${entry.key} (${percentage}%)")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Error handling
+                uiState.error?.let { error ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        )
+                    ) {
+                        Text(
+                            text = error,
+                            modifier = Modifier.padding(16.dp),
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+                
+                // Extra space at the bottom
+                Spacer(modifier = Modifier.height(16.dp))
             }
-            
-            // Extra space at the bottom
-            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
