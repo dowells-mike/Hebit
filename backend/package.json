@@ -26,6 +26,8 @@
     "bcryptjs": "^3.0.2",
     "@types/cors": "^2.8.17",
     "dotenv": "^16.4.7",
+    "cors": "^2.8.5", 
+    "jsonwebtoken": "^9.0.2",
     "express": "^4.21.2",
     "express-async-handler": "^1.2.0",
     "joi": "^17.13.3",
