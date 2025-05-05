@@ -204,7 +204,7 @@ fun TaskCreationScreen(
     var isNumberedList by remember { mutableStateOf(false) }
     
     // Available categories
-    val categories = listOf("Work", "Personal", "Shopping", "Health", "Education")
+    val categories = listOf("Work", "Personal", "Shopping", "Health", "Education", "Home")
     
     // For date picker
     val datePickerState = rememberDatePickerState(
@@ -225,6 +225,10 @@ fun TaskCreationScreen(
             false
         ).show()
     }
+    
+    // Observe category suggestions from ViewModel
+    val categorySuggestions by viewModel.categorySuggestions.collectAsState()
+    var showSuggestions by remember { mutableStateOf(false) }
     
     Scaffold(
         topBar = {
@@ -284,7 +288,15 @@ fun TaskCreationScreen(
             // Task title input - required
             OutlinedTextField(
                 value = taskTitle,
-                onValueChange = { taskTitle = it },
+                onValueChange = { 
+                    taskTitle = it
+                    
+                    // Add this to trigger category suggestions when title changes
+                    viewModel.suggestCategories(taskTitle, taskDescription)
+                    if (taskTitle.length >= 3) {
+                        showSuggestions = true
+                    }
+                },
                 placeholder = { Text("Task title") },
                 modifier = Modifier.fillMaxWidth(),
                 colors = TextFieldDefaults.outlinedTextFieldColors(
@@ -502,6 +514,72 @@ fun TaskCreationScreen(
                     imageVector = Icons.Default.ChevronRight,
                     contentDescription = "Select"
                 )
+            }
+            
+            // Show category suggestions if available and title has enough characters
+            if (showSuggestions && categorySuggestions.isNotEmpty()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    elevation = CardDefaults.cardElevation(
+                        defaultElevation = 4.dp
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(8.dp)
+                    ) {
+                        Text(
+                            text = "Suggested Categories",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                        
+                        categorySuggestions.take(3).forEach { suggestion ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        selectedCategory = suggestion.category
+                                        showSuggestions = false
+                                    }
+                                    .padding(horizontal = 8.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Label,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                
+                                Spacer(modifier = Modifier.width(8.dp))
+                                
+                                Text(
+                                    text = suggestion.category,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                
+                                Spacer(modifier = Modifier.weight(1f))
+                                
+                                // Show confidence as percentage
+                                Text(
+                                    text = "${(suggestion.confidence * 100).toInt()}%",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                            }
+                        }
+                        
+                        TextButton(
+                            onClick = { showSuggestions = false },
+                            modifier = Modifier.align(Alignment.End)
+                        ) {
+                            Text("Dismiss")
+                        }
+                    }
+                }
             }
             
             Divider()

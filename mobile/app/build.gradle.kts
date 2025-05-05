@@ -82,6 +82,12 @@ dependencies {
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     kapt(libs.room.compiler)
+    
+    // ML Dependencies not needed for rule-based approach
+    // implementation("org.tensorflow:tensorflow-lite:2.11.0")
+    // implementation("org.tensorflow:tensorflow-lite-support:0.4.3")
+    // implementation("org.tensorflow:tensorflow-lite-metadata:0.4.3")  
+    // implementation("org.tensorflow:tensorflow-lite-task-text:0.4.3")
 
     // Testing
     testImplementation(libs.junit)

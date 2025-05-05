@@ -7,6 +7,8 @@ import com.hebit.app.domain.model.Resource
 import com.hebit.app.domain.model.Task
 import com.hebit.app.domain.model.TaskCreationData
 import com.hebit.app.domain.repository.TaskRepository
+import com.hebit.app.domain.ml.CategorySuggestion
+import com.hebit.app.domain.ml.CategorySuggestionService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,7 +21,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class TaskViewModel @Inject constructor(
-    private val taskRepository: TaskRepository
+    private val taskRepository: TaskRepository,
+    private val categorySuggestionService: CategorySuggestionService
 ) : ViewModel() {
     
     private val _tasksState = MutableStateFlow<Resource<List<Task>>>(Resource.Loading())
@@ -34,8 +37,32 @@ class TaskViewModel @Inject constructor(
     private val _selectedTaskState = MutableStateFlow<Resource<Task?>>(Resource.Success(null))
     val selectedTaskState: StateFlow<Resource<Task?>> = _selectedTaskState.asStateFlow()
     
+    // ML Category Suggestions
+    private val _categorySuggestions = MutableStateFlow<List<CategorySuggestion>>(emptyList())
+    val categorySuggestions: StateFlow<List<CategorySuggestion>> = _categorySuggestions.asStateFlow()
+    
     init {
         loadTasks()
+    }
+    
+    // New function to get category suggestions based on title and description
+    fun suggestCategories(title: String, description: String = "") {
+        if (title.length < 3) return // Wait until we have enough text
+        
+        viewModelScope.launch {
+            try {
+                val suggestions = categorySuggestionService.getSuggestions(title, description)
+                _categorySuggestions.value = suggestions
+                Log.d("TaskViewModel", "Category suggestions: $suggestions")
+            } catch (e: Exception) {
+                Log.e("TaskViewModel", "Error getting category suggestions: ${e.message}")
+            }
+        }
+    }
+    
+    // Clear suggestions
+    fun clearCategorySuggestions() {
+        _categorySuggestions.value = emptyList()
     }
     
     fun loadTasks() {
