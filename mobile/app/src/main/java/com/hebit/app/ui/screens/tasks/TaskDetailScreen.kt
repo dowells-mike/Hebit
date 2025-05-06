@@ -38,6 +38,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import java.util.Calendar
 import com.hebit.app.ui.screens.tasks.RecurrenceType
+import com.hebit.app.ui.screens.categories.CategoryViewModel
+import com.hebit.app.domain.model.Category
+import java.time.LocalDateTime
+import androidx.compose.material3.ListItem
+import androidx.compose.ui.graphics.Color
+import android.util.Log
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material.icons.outlined.Folder
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,13 +58,16 @@ fun TaskDetailScreen(
     onGoalsClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onEditTask: (String) -> Unit = {},
-    viewModel: TaskViewModel = hiltViewModel()
+    viewModel: TaskViewModel = hiltViewModel(),
+    categoryViewModel: CategoryViewModel = hiltViewModel()
 ) {
     LaunchedEffect(key1 = taskId) {
         viewModel.getTaskById(taskId)
+        categoryViewModel.loadCategories()
     }
     
     val taskState by viewModel.selectedTaskState.collectAsState()
+    val categoriesResource by categoryViewModel.categoriesState.collectAsState()
     
     var showEditMenu by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -65,6 +76,33 @@ fun TaskDetailScreen(
     var showReminderDialog by remember { mutableStateOf(false) }
     var newSubtaskTitle by remember { mutableStateOf("") }
     
+    var showCategoryPicker by remember { mutableStateOf(false) }
+    var availableCategories by remember { mutableStateOf<List<Category>>(emptyList()) }
+    var selectedCategoryObject by remember { mutableStateOf<Category?>(null) }
+
+    LaunchedEffect(categoriesResource) {
+        if (categoriesResource is Resource.Success) {
+            val cats = (categoriesResource as Resource.Success<List<Category>>).data
+            availableCategories = cats ?: emptyList()
+            if (taskState is Resource.Success && (taskState as Resource.Success<Task?>).data != null) {
+                val task = (taskState as Resource.Success<Task?>).data!!
+                selectedCategoryObject = availableCategories.find { it.name == task.category }
+            }
+        } else if (categoriesResource is Resource.Error) {
+            Log.e("TaskDetailScreen", "Error loading categories: ${(categoriesResource as Resource.Error).message}")
+            availableCategories = emptyList()
+        }
+    }
+
+    LaunchedEffect(taskState, availableCategories) {
+        if (taskState is Resource.Success) {
+            val task = (taskState as Resource.Success<Task?>).data
+            if (task != null && availableCategories.isNotEmpty()) {
+                 selectedCategoryObject = availableCategories.find { it.name == task.category }
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -82,7 +120,6 @@ fun TaskDetailScreen(
                         Icon(Icons.Default.MoreVert, contentDescription = "More options")
                     }
                     
-                    // Edit menu dropdown
                     DropdownMenu(
                         expanded = showEditMenu,
                         onDismissRequest = { showEditMenu = false }
@@ -226,19 +263,16 @@ fun TaskDetailScreen(
                         Text("Task not found")
                     }
                 } else {
-                    // Parse subtasks from metadata
                     val subtasks = remember(task.metadata["subtasks"]) {
                         val subtasksStr = task.metadata["subtasks"] ?: ""
                         parseSubtasks(subtasksStr)
                     }
                     
-                    // Parse recurrence pattern from metadata
                     val recurrencePattern = remember(task.metadata["recurrence"]) {
                         val recurrenceStr = task.metadata["recurrence"]
                         if (recurrenceStr != null) parseRecurrencePattern(recurrenceStr) else null
                     }
                     
-                    // Parse reminder settings from metadata
                     val reminderSettings = remember(task.metadata["reminder"]) {
                         val reminderStr = task.metadata["reminder"]
                         if (reminderStr != null) parseReminderSettings(reminderStr) else null
@@ -250,6 +284,8 @@ fun TaskDetailScreen(
                         recurrencePattern = recurrencePattern,
                         reminderSettings = reminderSettings,
                         expandedDescription = expandedDescription,
+                        selectedCategory = selectedCategoryObject,
+                        onCategoryClick = { showCategoryPicker = true },
                         onToggleDescription = { expandedDescription = !expandedDescription },
                         onToggleComplete = { 
                             viewModel.toggleTaskCompletion(task.id)
@@ -262,7 +298,6 @@ fun TaskDetailScreen(
                             val updatedSubtasks = subtasks.toMutableList()
                             updatedSubtasks[index] = updatedSubtasks[index].copy(isCompleted = isCompleted)
                             
-                            // Compute new progress based on subtasks completion
                             val completedCount = updatedSubtasks.count { subtask -> subtask.isCompleted }
                             val newProgress = if (updatedSubtasks.isNotEmpty()) {
                                 (completedCount * 100) / updatedSubtasks.size
@@ -288,7 +323,6 @@ fun TaskDetailScreen(
                             .padding(paddingValues)
                     )
                     
-                    // Add subtask dialog
                     if (showAddSubtaskDialog) {
                         AddSubtaskDialog(
                             onDismiss = { 
@@ -323,7 +357,6 @@ fun TaskDetailScreen(
                         )
                     }
 
-                    // Add Reminder dialog
                     if (showReminderDialog) {
                         ReminderDialog(
                             onDismiss = { showReminderDialog = false },
@@ -351,7 +384,6 @@ fun TaskDetailScreen(
         }
     }
     
-    // Delete confirmation dialog
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
@@ -378,6 +410,86 @@ fun TaskDetailScreen(
             }
         )
     }
+
+    if (showCategoryPicker && taskState is Resource.Success && (taskState as Resource.Success<Task?>).data != null) {
+        val currentTask = (taskState as Resource.Success<Task?>).data!!
+        AlertDialog(
+            onDismissRequest = { showCategoryPicker = false },
+            title = { Text("Select Category") },
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (categoriesResource is Resource.Loading) {
+                        CircularProgressIndicator(modifier = Modifier.padding(16.dp))
+                    } else if (availableCategories.isNotEmpty()) {
+                        LazyColumn {
+                            items(availableCategories) { category ->
+                                ListItem(
+                                    headlineContent = { Text(category.name) },
+                                    modifier = Modifier.clickable {
+                                        selectedCategoryObject = category
+                                        viewModel.updateTask(currentTask.copy(category = category.name, updatedAt = LocalDateTime.now()))
+                                        showCategoryPicker = false
+                                    },
+                                    leadingContent = {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(24.dp)
+                                                .background(
+                                                    color = try {
+                                                        Color(android.graphics.Color.parseColor(category.color))
+                                                    } catch (e: IllegalArgumentException) {
+                                                        MaterialTheme.colorScheme.primary
+                                                    },
+                                                    shape = CircleShape
+                                                )
+                                        )
+                                    },
+                                    trailingContent = {
+                                        if (selectedCategoryObject?.id == category.id) {
+                                            Icon(Icons.Filled.Check, contentDescription = "Selected")
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    } else {
+                        Text(
+                            text = "No categories available.",
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        Text(
+                            text = "You can create categories in the main menu or create one now.",
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+                        Button(
+                            onClick = {
+                                showCategoryPicker = false 
+                                Log.d("TaskDetailScreen", "Create New Category button clicked")
+                            }
+                        ) {
+                            Text("Create New Category")
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                 if (availableCategories.isNotEmpty()) {
+                     TextButton(onClick = { showCategoryPicker = false }) {
+                        Text("Done")
+                    }
+                 }
+            },
+            dismissButton = { 
+                if (availableCategories.isEmpty() && categoriesResource !is Resource.Loading) {
+                    TextButton(onClick = { showCategoryPicker = false }) {
+                        Text("Cancel")
+                    }
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -387,6 +499,8 @@ fun TaskDetailContent(
     recurrencePattern: RecurrenceType? = null,
     reminderSettings: String? = null,
     expandedDescription: Boolean,
+    selectedCategory: Category?,
+    onCategoryClick: () -> Unit,
     onToggleDescription: () -> Unit,
     onToggleComplete: () -> Unit,
     onUpdateProgress: (Int) -> Unit,
@@ -399,13 +513,11 @@ fun TaskDetailContent(
     LazyColumn(
         modifier = modifier.padding(horizontal = 16.dp)
     ) {
-        // Task status
         item {
             Row(
                 modifier = Modifier.padding(vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Task completion toggle
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -424,7 +536,6 @@ fun TaskDetailContent(
                     
                     Spacer(modifier = Modifier.weight(1f))
                     
-                    // Priority indicator
                     Box(
                         modifier = Modifier
                             .size(32.dp)
@@ -454,7 +565,6 @@ fun TaskDetailContent(
             }
         }
         
-        // Task title
         item {
             Text(
                 text = task.title,
@@ -463,7 +573,6 @@ fun TaskDetailContent(
                 textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None
             )
             
-            // Due date
             if (task.dueDateTime != null) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -493,36 +602,52 @@ fun TaskDetailContent(
             }
         }
         
-        // Category
         if (task.category.isNotBlank()) {
             item {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = 16.dp)
+                    modifier = Modifier
+                        .padding(bottom = 16.dp)
+                        .fillMaxWidth()
+                        .clickable(onClick = onCategoryClick)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Category,
+                        imageVector = Icons.Outlined.Folder,
                         contentDescription = "Category",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = selectedCategory?.color?.let { 
+                            try { Color(android.graphics.Color.parseColor(it)) } 
+                            catch (e: Exception) { MaterialTheme.colorScheme.primary }
+                        } ?: MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Surface(
                         shape = MaterialTheme.shapes.small,
-                        color = MaterialTheme.colorScheme.secondaryContainer
+                        color = selectedCategory?.color?.let { 
+                            try { Color(android.graphics.Color.parseColor(it)).copy(alpha = 0.1f) } 
+                            catch (e: Exception) { MaterialTheme.colorScheme.secondaryContainer }
+                        } ?: MaterialTheme.colorScheme.secondaryContainer,
+                        border = BorderStroke(1.dp, selectedCategory?.color?.let { 
+                            try { Color(android.graphics.Color.parseColor(it)) } 
+                            catch (e: Exception) { MaterialTheme.colorScheme.primaryContainer }
+                        } ?: MaterialTheme.colorScheme.primaryContainer)
                     ) {
                         Text(
                             text = task.category,
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                            color = selectedCategory?.color?.let { 
+                                try { Color(android.graphics.Color.parseColor(it)) } 
+                                catch (e: Exception) { MaterialTheme.colorScheme.onSecondaryContainer }
+                            } ?: MaterialTheme.colorScheme.onSecondaryContainer
                         )
                     }
+                    Spacer(Modifier.weight(1f))
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = "Change Category")
                 }
             }
         }
         
-        // Recurrence pattern (if any)
         if (recurrencePattern != null) {
             item {
                 Row(
@@ -557,7 +682,6 @@ fun TaskDetailContent(
             }
         }
         
-        // Reminder (if any)
         if (reminderSettings != null) {
             item {
                 Row(
@@ -586,7 +710,6 @@ fun TaskDetailContent(
             }
         }
         
-        // Progress (automated if has subtasks)
         if (!task.isCompleted) {
             item {
                 Column(
@@ -617,11 +740,9 @@ fun TaskDetailContent(
                         strokeCap = StrokeCap.Round
                     )
                     
-                    // Only show manual progress buttons if no subtasks
                     if (!hasSubtasks) {
                         Spacer(modifier = Modifier.height(8.dp))
                         
-                        // Progress buttons
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceEvenly
@@ -644,7 +765,6 @@ fun TaskDetailContent(
             }
         }
         
-        // Subtasks section (if any)
         if (hasSubtasks) {
             item {
                 Card(
@@ -702,7 +822,6 @@ fun TaskDetailContent(
             }
         }
         
-        // Description
         if (task.description.isNotBlank()) {
             item {
                 Card(
@@ -750,7 +869,6 @@ fun TaskDetailContent(
             }
         }
         
-        // Creation and modification info
         item {
             Card(
                 modifier = Modifier
@@ -901,7 +1019,6 @@ fun ReminderDialog(
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
                 
-                // Option to select minutes before
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -921,7 +1038,6 @@ fun ReminderDialog(
                     )
                 }
                 
-                // Minutes before selection
                 if (!useSpecificTime) {
                     Row(
                         modifier = Modifier
@@ -929,7 +1045,7 @@ fun ReminderDialog(
                             .padding(start = 32.dp, top = 8.dp, bottom = 16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val minutesOptions = listOf(5, 15, 30, 60, 120, 1440) // last one is 1 day
+                        val minutesOptions = listOf(5, 15, 30, 60, 120, 1440)
                         minutesOptions.chunked(3).forEach { rowOptions ->
                             Row(
                                 modifier = Modifier.fillMaxWidth()
@@ -958,7 +1074,6 @@ fun ReminderDialog(
                     }
                 }
                 
-                // Option to select specific time
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -978,7 +1093,6 @@ fun ReminderDialog(
                     )
                 }
                 
-                // Specific time selection
                 if (useSpecificTime) {
                     Row(
                         modifier = Modifier

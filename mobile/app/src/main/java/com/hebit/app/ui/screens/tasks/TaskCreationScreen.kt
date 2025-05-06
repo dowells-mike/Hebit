@@ -55,6 +55,8 @@ import com.hebit.app.domain.model.Resource
 import com.hebit.app.ui.screens.tasks.parseRecurrencePattern
 import com.hebit.app.ui.screens.tasks.parseSubtasks
 import com.hebit.app.ui.screens.tasks.parseReminderSettings
+import com.hebit.app.ui.screens.categories.CategoryViewModel
+import com.hebit.app.domain.model.Category
 
 data class RecurrencePattern(
     val type: RecurrenceType = RecurrenceType.NONE,
@@ -79,7 +81,8 @@ fun TaskCreationScreen(
     onCancel: () -> Unit = {},
     onDismiss: () -> Unit = {},
     onSaveTask: (TaskCreationData) -> Unit = {},
-    viewModel: TaskViewModel = hiltViewModel()
+    viewModel: TaskViewModel = hiltViewModel(),
+    categoryViewModel: CategoryViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
     
@@ -88,7 +91,17 @@ fun TaskCreationScreen(
     var selectedDate by remember { mutableStateOf<LocalDate?>(LocalDate.now()) }
     var selectedTime by remember { mutableStateOf<LocalTime?>(LocalTime.of(14, 0)) }
     var selectedPriority by remember { mutableStateOf(TaskPriority.MEDIUM) }
-    var selectedCategory by remember { mutableStateOf("Work") }
+    
+    // State for categories
+    val categoriesResource by categoryViewModel.categoriesState.collectAsState()
+    var availableCategories by remember { mutableStateOf<List<Category>>(emptyList()) }
+    // Initialize selectedCategoryName from existing task if in edit mode, else a default.
+    // selectedCategoryObject will be derived.
+    var selectedCategoryName by remember { 
+        mutableStateOf(if (isEditMode) "" else "Work") 
+    }
+    var selectedCategoryObject by remember { mutableStateOf<Category?>(null) }
+
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     var showCategoryPicker by remember { mutableStateOf(false) }
@@ -145,7 +158,11 @@ fun TaskCreationScreen(
                     3 -> TaskPriority.HIGH
                     else -> TaskPriority.MEDIUM
                 }
-                selectedCategory = task.category
+                selectedCategoryName = task.category // Set selectedCategoryName from task
+                
+                // Attempt to set selectedCategoryObject based on the name and available categories
+                // This will be further refined when categoriesResource itself updates
+                selectedCategoryObject = availableCategories.find { it.name == task.category }
                 
                 // Load recurrence pattern if available
                 task.metadata["recurrence"]?.let {
@@ -203,8 +220,35 @@ fun TaskCreationScreen(
     var isBulletList by remember { mutableStateOf(false) }
     var isNumberedList by remember { mutableStateOf(false) }
     
-    // Available categories
-    val categories = listOf("Work", "Personal", "Shopping", "Health", "Education", "Home")
+    // Update availableCategories and selectedCategoryObject when categoriesResource changes
+    LaunchedEffect(categoriesResource, selectedCategoryName) {
+        if (categoriesResource is Resource.Success) {
+            val cats = (categoriesResource as Resource.Success<List<Category>>).data
+            if (!cats.isNullOrEmpty()) {
+                availableCategories = cats
+                val currentSelection = cats.find { it.name == selectedCategoryName }
+                if (currentSelection != null) {
+                    selectedCategoryObject = currentSelection
+                    // Ensure selectedCategoryName is also consistent if it was a default
+                    selectedCategoryName = currentSelection.name 
+                } else if (selectedCategoryObject == null && !isEditMode) {
+                    // If no specific name was set (e.g., not edit mode and default didn't match)
+                    // or if the edit mode category name isn't in the list, pick the first as default.
+                    selectedCategoryObject = cats.first()
+                    selectedCategoryName = cats.first().name
+                } // If in edit mode and name doesn't match, selectedCategoryObject remains null until picker used
+            } else {
+                availableCategories = emptyList()
+                if (!isEditMode) selectedCategoryName = "General" // Fallback if categories are empty & not edit mode
+                selectedCategoryObject = null
+            }
+        } else if (categoriesResource is Resource.Error) {
+            Log.e("TaskCreationScreen", "Error loading categories: ${(categoriesResource as Resource.Error).message}")
+            availableCategories = emptyList()
+            if (!isEditMode) selectedCategoryName = "General"
+            selectedCategoryObject = null
+        }
+    }
     
     // For date picker
     val datePickerState = rememberDatePickerState(
@@ -254,7 +298,7 @@ fun TaskCreationScreen(
                                 dueDate = selectedDate,
                                 dueTime = selectedTime,
                                 priority = selectedPriority,
-                                category = selectedCategory,
+                                category = selectedCategoryName,
                                 labels = emptyList(),
                                 subtasks = subtasks.toList(),
                                 recurrencePattern = recurrencePattern,
@@ -489,9 +533,12 @@ fun TaskCreationScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.Folder,
+                    imageVector = Icons.Outlined.Folder, 
                     contentDescription = "Category",
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = selectedCategoryObject?.color?.let { 
+                        try { Color(android.graphics.Color.parseColor(it)) } 
+                        catch (e: Exception) { MaterialTheme.colorScheme.primary }
+                    } ?: MaterialTheme.colorScheme.primary
                 )
                 
                 Spacer(modifier = Modifier.width(8.dp))
@@ -504,7 +551,7 @@ fun TaskCreationScreen(
                 Spacer(modifier = Modifier.weight(1f))
                 
                 Text(
-                    text = selectedCategory,
+                    text = selectedCategoryName, // Display selected category name
                     style = MaterialTheme.typography.bodyMedium
                 )
                 
@@ -541,7 +588,8 @@ fun TaskCreationScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable {
-                                        selectedCategory = suggestion.category
+                                        selectedCategoryName = suggestion.category 
+                                        selectedCategoryObject = availableCategories.find { it.name == suggestion.category }
                                         showSuggestions = false
                                     }
                                     .padding(horizontal = 8.dp, vertical = 12.dp),
@@ -788,7 +836,7 @@ fun TaskCreationScreen(
                             dueDate = selectedDate,
                             dueTime = selectedTime,
                             priority = selectedPriority,
-                            category = selectedCategory,
+                            category = selectedCategoryName,
                             labels = emptyList(),
                             subtasks = subtasks.toList(),
                             recurrencePattern = recurrencePattern,
@@ -896,45 +944,82 @@ fun TaskCreationScreen(
         }
     }
     
-    // Category Picker Dialog
+    // Category Picker Dialog/Dropdown
     if (showCategoryPicker) {
         AlertDialog(
             onDismissRequest = { showCategoryPicker = false },
             title = { Text("Select Category") },
             text = {
-                Column {
-                    categories.forEach { category ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    selectedCategory = category
-                                    showCategoryPicker = false
-                                }
-                                .padding(vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                Column(horizontalAlignment = Alignment.CenterHorizontally) { 
+                    if (categoriesResource is Resource.Loading) {
+                        CircularProgressIndicator(modifier = Modifier.padding(16.dp))
+                    } else if (availableCategories.isNotEmpty()) {
+                        LazyColumn {
+                            items(availableCategories) { category ->
+                                ListItem(
+                                    headlineContent = { Text(category.name) },
+                                    modifier = Modifier.clickable {
+                                        selectedCategoryName = category.name
+                                        selectedCategoryObject = category
+                                        showCategoryPicker = false
+                                    },
+                                    leadingContent = {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(24.dp)
+                                                .background(
+                                                    color = try {
+                                                        Color(android.graphics.Color.parseColor(category.color))
+                                                    } catch (e: IllegalArgumentException) {
+                                                        MaterialTheme.colorScheme.primary // Fallback color
+                                                    },
+                                                    shape = CircleShape
+                                                )
+                                        )
+                                    },
+                                    trailingContent = {
+                                        if (selectedCategoryObject?.id == category.id) {
+                                            Icon(Icons.Filled.Check, contentDescription = "Selected")
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    } else {
+                        Text(
+                            text = "No categories available.",
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        Text(
+                            text = "You can create categories in the main menu or create one now.",
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+                        Button(
+                            onClick = {
+                                showCategoryPicker = false 
+                                Log.d("TaskCreationScreen", "Create New Category button clicked")
+                                // TODO: Navigate to CategoryEditScreen
+                            }
                         ) {
-                            RadioButton(
-                                selected = selectedCategory == category,
-                                onClick = {
-                                    selectedCategory = category
-                                    showCategoryPicker = false
-                                }
-                            )
-                            
-                            Spacer(modifier = Modifier.width(8.dp))
-                            
-                            Text(
-                                text = category,
-                                style = MaterialTheme.typography.bodyLarge
-                            )
+                            Text("Create New Category")
                         }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showCategoryPicker = false }) {
-                    Text("Cancel")
+                if (availableCategories.isNotEmpty()) { 
+                    TextButton(onClick = { showCategoryPicker = false }) {
+                        Text("Done")
+                    }
+                }
+            },
+            dismissButton = { 
+                if (availableCategories.isEmpty() && categoriesResource !is Resource.Loading) {
+                    TextButton(onClick = { showCategoryPicker = false }) {
+                        Text("Cancel")
+                    }
                 }
             }
         )

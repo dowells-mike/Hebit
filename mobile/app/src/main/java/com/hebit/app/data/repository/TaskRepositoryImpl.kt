@@ -17,6 +17,11 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import com.squareup.moshi.JsonDataException
 import android.util.Log
+import com.hebit.app.domain.model.Category
+import com.hebit.app.data.remote.dto.CategoryDto
+import com.hebit.app.data.remote.dto.CreateCategoryRequest
+import com.hebit.app.data.remote.dto.UpdateCategoryRequest
+import com.hebit.app.domain.model.TaskStatus
 
 @Singleton
 class TaskRepositoryImpl @Inject constructor(
@@ -247,7 +252,110 @@ class TaskRepositoryImpl @Inject constructor(
             emit(Resource.Error("Unexpected error: ${e.localizedMessage ?: "An unexpected error occurred"}"))
         }
     }
-    
+
+    override suspend fun updateTaskStatus(taskId: String, status: TaskStatus): Flow<Resource<Task>> = flow {
+        emit(Resource.Loading())
+        try {
+            val statusUpdate = mapOf("status" to status.value)
+            Log.d("TaskRepository", "Sending status update for task ID: $taskId, status: ${status.value}")
+            val response = apiService.updateTaskStatus(taskId, statusUpdate)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(mapTaskDtoToDomain(response.body()!!)))
+            } else {
+                val errorBody = response.errorBody()?.string()
+                val errorMessage = errorBody ?: "Unknown error updating status"
+                Log.e("TaskRepository", "Error updating task status: $errorMessage (code: ${response.code()})")
+                emit(Resource.Error(errorMessage))
+            }
+        } catch (e: HttpException) {
+            Log.e("TaskRepository", "HTTP error updating status: ${e.message()}", e)
+            emit(Resource.Error("Server error updating status: ${e.message()}"))
+        } catch (e: IOException) {
+             Log.e("TaskRepository", "IO error updating status: ${e.localizedMessage}", e)
+            emit(Resource.Error("Network error updating status: ${e.localizedMessage ?: "Check connection"}"))
+        } catch (e: Exception) {
+             Log.e("TaskRepository", "Unexpected error updating status: ${e.localizedMessage}", e)
+            emit(Resource.Error("Unexpected error updating status: ${e.localizedMessage ?: "Unknown error"}"))
+        }
+    }
+
+    override suspend fun getCategories(): Flow<Resource<List<Category>>> = flow {
+        emit(Resource.Loading())
+        try {
+            val response = apiService.getCategories()
+            if (response.isSuccessful) {
+                val categoryDtos = response.body() ?: emptyList()
+                val categories = categoryDtos.map { mapCategoryDtoToDomain(it) }
+                emit(Resource.Success(categories))
+            } else {
+                emit(Resource.Error(response.errorBody()?.string() ?: "Failed to fetch categories"))
+            }
+        } catch (e: HttpException) {
+            emit(Resource.Error("Server error fetching categories: ${e.message()}"))
+        } catch (e: IOException) {
+            emit(Resource.Error("Network error fetching categories: ${e.localizedMessage}"))
+        } catch (e: Exception) {
+            emit(Resource.Error("Unexpected error fetching categories: ${e.localizedMessage}"))
+        }
+    }
+
+    override suspend fun createCategory(name: String, color: String, icon: String?): Flow<Resource<Category>> = flow {
+        emit(Resource.Loading())
+        try {
+            val request = CreateCategoryRequest(name = name, color = color, icon = icon)
+            val response = apiService.createCategory(request)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(mapCategoryDtoToDomain(response.body()!!)))
+            } else {
+                emit(Resource.Error(response.errorBody()?.string() ?: "Failed to create category"))
+            }
+        } catch (e: HttpException) {
+            emit(Resource.Error("Server error creating category: ${e.message()}"))
+        } catch (e: IOException) {
+            emit(Resource.Error("Network error creating category: ${e.localizedMessage}"))
+        } catch (e: Exception) {
+            emit(Resource.Error("Unexpected error creating category: ${e.localizedMessage}"))
+        }
+    }
+
+    override suspend fun updateCategory(id: String, name: String?, color: String?, icon: String?): Flow<Resource<Category>> = flow {
+        emit(Resource.Loading())
+        try {
+            val request = UpdateCategoryRequest(name = name, color = color, icon = icon)
+            val response = apiService.updateCategory(id, request)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(mapCategoryDtoToDomain(response.body()!!)))
+            } else {
+                emit(Resource.Error(response.errorBody()?.string() ?: "Failed to update category"))
+            }
+        } catch (e: HttpException) {
+            emit(Resource.Error("Server error updating category: ${e.message()}"))
+        } catch (e: IOException) {
+            emit(Resource.Error("Network error updating category: ${e.localizedMessage}"))
+        } catch (e: Exception) {
+            emit(Resource.Error("Unexpected error updating category: ${e.localizedMessage}"))
+        }
+    }
+
+    override suspend fun deleteCategory(id: String): Flow<Resource<Boolean>> = flow {
+        emit(Resource.Loading())
+        try {
+            val response = apiService.deleteCategory(id)
+            // Assuming 200/204 indicates success for DELETE
+            if (response.isSuccessful) {
+                emit(Resource.Success(true))
+            } else {
+                emit(Resource.Error(response.errorBody()?.string() ?: "Failed to delete category"))
+            }
+        } catch (e: HttpException) {
+            emit(Resource.Error("Server error deleting category: ${e.message()}"))
+        } catch (e: IOException) {
+            emit(Resource.Error("Network error deleting category: ${e.localizedMessage}"))
+        } catch (e: Exception) {
+            emit(Resource.Error("Unexpected error deleting category: ${e.localizedMessage}"))
+        }
+    }
+
     private fun mapTaskDtoToDomain(dto: TaskDto): Task {
         // Convert backend string priority to integer priority
         val priorityInt = when(dto.priority.lowercase()) {
@@ -268,6 +376,15 @@ class TaskRepositoryImpl @Inject constructor(
             isCompleted = dto.completed,
             createdAt = LocalDateTime.parse(dto.createdAt, dateFormatter),
             updatedAt = LocalDateTime.parse(dto.updatedAt, dateFormatter)
+        )
+    }
+
+    private fun mapCategoryDtoToDomain(dto: CategoryDto): Category {
+        return Category(
+            id = dto.id,
+            name = dto.name,
+            color = dto.color,
+            icon = dto.icon
         )
     }
 } 

@@ -50,6 +50,9 @@ interface HebitApiService {
     @PATCH("tasks/{id}/complete")
     suspend fun toggleTaskCompletion(@Path("id") id: String): Response<TaskDto>
     
+    @PUT("tasks/{id}")
+    suspend fun updateTaskStatus(@Path("id") id: String, @Body statusUpdate: Map<String, String>): Response<TaskDto>
+    
     @GET("tasks/priority")
     suspend fun getPriorityTasks(@Query("limit") limit: Int = 5): Response<TaskListResponse>
     
@@ -161,4 +164,21 @@ interface HebitApiService {
     
     @GET("achievements/user")
     suspend fun getUserAchievements(): Response<UserAchievementResponse>
+
+    // Category (List) Endpoints (Add New)
+    @GET("categories")
+    suspend fun getCategories(): Response<List<CategoryDto>>
+
+    @POST("categories")
+    suspend fun createCategory(@Body request: CreateCategoryRequest): Response<CategoryDto>
+
+    @PUT("categories/{id}")
+    suspend fun updateCategory(@Path("id") id: String, @Body request: UpdateCategoryRequest): Response<CategoryDto>
+
+    @DELETE("categories/{id}")
+    suspend fun deleteCategory(@Path("id") id: String): Response<Void>
+
+    // Define internal data classes for specific responses if not already defined
+    // Ensure TaskListResponse is defined if used by getPriorityTasks/getTasksDueToday
+    data class TaskListResponse(val tasks: List<TaskDto>) // Example if not defined in dto package
 }

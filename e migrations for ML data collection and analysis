@@ -1,0 +1,5 @@
+[33mfc1fd8c[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mdevelop[m[33m, [m[1;31morigin/develop[m[33m)[m Clean up documentation: Archive outdated wireframe files and move API documentation
+[33m34ada0a[m Implement backend API controllers and models for tasks, habits, goals, achievements, categories, and productivity metrics
+[33m92a5021[m refactor(mobile): restructure app for backend integration
+[33mb9ad30d[m feat(mobile): implement refresh token functionality and authentication improvements
+[33md592898[m feat(backend): add mock controllers for development mode
