@@ -46,6 +46,7 @@ import androidx.compose.ui.graphics.Color
 import android.util.Log
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.ui.text.style.TextAlign
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

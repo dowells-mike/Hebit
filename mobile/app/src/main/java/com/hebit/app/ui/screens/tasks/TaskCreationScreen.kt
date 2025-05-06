@@ -46,9 +46,11 @@ import android.app.TimePickerDialog
 import android.content.Context
 import android.Manifest
 import android.content.pm.PackageManager
+import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.hebit.app.domain.model.Resource
@@ -252,7 +254,7 @@ fun TaskCreationScreen(
     
     // For date picker
     val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = selectedDate?.toEpochDay()?.let { it * 24 * 60 * 60 * 1000 } 
+        initialSelectedDateMillis = selectedDate?.toEpochDay()?.let { it * 24 * 60 * 60 * 1000 }
             ?: LocalDate.now().toEpochDay() * 24 * 60 * 60 * 1000
     )
     
