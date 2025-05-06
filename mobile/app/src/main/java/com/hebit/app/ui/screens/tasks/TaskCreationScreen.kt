@@ -84,7 +84,8 @@ fun TaskCreationScreen(
     onDismiss: () -> Unit = {},
     onSaveTask: (TaskCreationData) -> Unit = {},
     viewModel: TaskViewModel = hiltViewModel(),
-    categoryViewModel: CategoryViewModel = hiltViewModel()
+    categoryViewModel: CategoryViewModel = hiltViewModel(),
+    onNavigateToCreateCategory: () -> Unit
 ) {
     val context = LocalContext.current
     
@@ -1001,8 +1002,9 @@ fun TaskCreationScreen(
                         Button(
                             onClick = {
                                 showCategoryPicker = false 
-                                Log.d("TaskCreationScreen", "Create New Category button clicked")
-                                // TODO: Navigate to CategoryEditScreen
+                                // Call the navigation lambda
+                                onNavigateToCreateCategory()
+                                Log.d("TaskCreationScreen", "Create New Category button clicked - navigating")
                             }
                         ) {
                             Text("Create New Category")

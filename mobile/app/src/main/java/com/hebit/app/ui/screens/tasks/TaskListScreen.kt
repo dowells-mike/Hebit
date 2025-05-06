@@ -33,7 +33,8 @@ fun TaskListScreen(
     onTaskCategoriesClick: () -> Unit = {},
     onTaskBoardClick: () -> Unit = {},
     onTaskClick: (String) -> Unit = {},
-    viewModel: TaskViewModel = hiltViewModel()
+    viewModel: TaskViewModel = hiltViewModel(),
+    onNavigateToCreateCategory: () -> Unit
 ) {
     var showAddTaskScreen by remember { mutableStateOf(false) }
     var viewMode by remember { mutableStateOf(TaskViewMode.LIST) }
@@ -53,7 +54,8 @@ fun TaskListScreen(
             onSaveTask = { taskData ->
                 viewModel.createTask(taskData)
                 showAddTaskScreen = false
-            }
+            },
+            onNavigateToCreateCategory = onNavigateToCreateCategory
         )
     } else {
         Scaffold(

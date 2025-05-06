@@ -33,6 +33,7 @@ import com.hebit.app.ui.screens.settings.SettingsScreen
 import com.hebit.app.ui.screens.profile.ProfileScreen
 import com.hebit.app.ui.screens.profile.StatisticsScreen
 import com.hebit.app.ui.screens.tasks.TaskCreationScreen
+import com.hebit.app.ui.screens.categories.CategoryEditScreen
 
 /**
  * Main navigation routes for the app
@@ -68,6 +69,7 @@ object Routes {
     // New features
     const val PRODUCTIVITY = "productivity"
     const val ACHIEVEMENTS = "achievements"
+    const val CATEGORY_EDIT = "category_edit"
 }
 
 /**
@@ -160,7 +162,8 @@ fun HebitNavigation(
                 onTaskBoardClick = { navController.navigate(Routes.TASK_BOARD) },
                 onTaskClick = { taskId -> 
                     navController.navigate("${Routes.TASK_DETAIL}/$taskId")
-                }
+                },
+                onNavigateToCreateCategory = { navController.navigate(Routes.CATEGORY_EDIT) }
             )
         }
         
@@ -196,7 +199,8 @@ fun HebitNavigation(
                 onSaveComplete = { navController.navigateUp() },
                 onCancel = { navController.navigateUp() },
                 onDismiss = { navController.navigateUp() },
-                onSaveTask = { /* This won't be used in edit mode */ }
+                onSaveTask = { /* This won't be used in edit mode */ },
+                onNavigateToCreateCategory = { navController.navigate(Routes.CATEGORY_EDIT) }
             )
         }
         
@@ -407,6 +411,13 @@ fun HebitNavigation(
         
         composable(Routes.ACHIEVEMENTS) {
             AchievementScreen()
+        }
+
+        // Add Composable for CategoryEditScreen
+        composable(Routes.CATEGORY_EDIT) {
+            CategoryEditScreen(
+                onNavigateBack = { navController.navigateUp() }
+            )
         }
     }
 }
