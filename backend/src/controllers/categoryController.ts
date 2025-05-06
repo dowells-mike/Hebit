@@ -59,9 +59,11 @@ export const createCategory = catchAsync(async (req: AuthRequest, res: Response)
     throw new AppError('Name is required', 400);
   }
 
+  /* // Temporarily commented out to allow default 'all'
   if (!req.body.type) {
     throw new AppError('Type is required', 400);
   }
+  */
   
   // Find the highest order value for the user's categories
   const highestOrder = await Category.findOne({ user: userId })
