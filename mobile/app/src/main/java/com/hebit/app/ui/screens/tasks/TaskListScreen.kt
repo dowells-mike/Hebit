@@ -23,6 +23,7 @@ import com.hebit.app.domain.model.TaskViewMode
 import java.time.format.DateTimeFormatter
 import android.util.Log
 import androidx.navigation.NavController
+import com.hebit.app.ui.navigation.Routes
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,21 +52,47 @@ fun TaskListScreen(
         navController?.currentBackStackEntry?.savedStateHandle?.get<TaskCreationData>("new_task_data")?.let { taskData ->
             Log.d("TaskListScreen", "Received task data from creation screen")
             viewModel.createTask(taskData)
+            // Important: Remove the data from SavedStateHandle after processing to prevent re-processing
+            navController.currentBackStackEntry?.savedStateHandle?.remove<TaskCreationData>("new_task_data")
         }
     }
     
     var searchQuery by remember { mutableStateOf("") }
+    var showMoreMenu by remember { mutableStateOf(false) } // State for the dropdown menu
     
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Tasks") },
                 actions = {
-                    IconButton(onClick = {}) {
+                    IconButton(onClick = { /* TODO: Implement search functionality */ }) {
                         Icon(Icons.Default.Search, contentDescription = "Search")
                     }
-                    IconButton(onClick = {}) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "More")
+                    Box { // Box to anchor the DropdownMenu
+                        IconButton(onClick = { showMoreMenu = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "More options")
+                        }
+                        DropdownMenu(
+                            expanded = showMoreMenu,
+                            onDismissRequest = { showMoreMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Manage Categories") },
+                                onClick = {
+                                    showMoreMenu = false
+                                    navController?.navigate(Routes.CATEGORY_LIST)
+                                    Log.d("TaskListScreen", "Manage Categories clicked - navigating to CATEGORY_LIST")
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("View Task Board") },
+                                onClick = {
+                                    showMoreMenu = false
+                                    onTaskBoardClick()
+                                }
+                            )
+                            // Add other menu items here if needed
+                        }
                     }
                 }
             )

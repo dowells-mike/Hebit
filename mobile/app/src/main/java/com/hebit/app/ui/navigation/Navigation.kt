@@ -36,6 +36,7 @@ import com.hebit.app.ui.screens.profile.StatisticsScreen
 import com.hebit.app.ui.screens.tasks.TaskCreationScreen
 import com.hebit.app.ui.screens.categories.CategoryEditScreen
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.hebit.app.ui.screens.categories.CategoryListScreen
 
 /**
  * Main navigation routes for the app
@@ -73,6 +74,7 @@ object Routes {
     const val PRODUCTIVITY = "productivity"
     const val ACHIEVEMENTS = "achievements"
     const val CATEGORY_EDIT = "category_edit"
+    const val CATEGORY_LIST = "category_list"
 }
 
 /**
@@ -465,6 +467,10 @@ fun HebitNavigation(
                 categoryId = categoryId,
                 returnToRoute = returnToRoute
             )
+        }
+
+        composable(Routes.CATEGORY_LIST) {
+            CategoryListScreen(navController = navController)
         }
     }
 }
