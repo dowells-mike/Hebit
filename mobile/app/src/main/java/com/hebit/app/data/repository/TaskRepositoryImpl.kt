@@ -96,7 +96,9 @@ class TaskRepositoryImpl @Inject constructor(
                 description = task.description,
                 category = task.category,
                 dueDate = task.dueDateTime?.format(dateFormatter),
-                priority = priorityString
+                priority = priorityString,
+                recurrence = task.recurrenceRule,
+                metadata = task.metadata
             )
             
             val response = apiService.createTask(createTaskRequest)
@@ -136,7 +138,9 @@ class TaskRepositoryImpl @Inject constructor(
                 dueDate = task.dueDateTime?.format(dateFormatter),
                 priority = priorityString,
                 progress = task.progress,
-                isCompleted = task.isCompleted
+                isCompleted = task.isCompleted,
+                recurrence = task.recurrenceRule,
+                metadata = task.metadata
             )
             
             val response = apiService.updateTask(task.id, updateTaskRequest)
@@ -375,7 +379,9 @@ class TaskRepositoryImpl @Inject constructor(
             progress = dto.progress ?: 0,
             isCompleted = dto.completed,
             createdAt = LocalDateTime.parse(dto.createdAt, dateFormatter),
-            updatedAt = LocalDateTime.parse(dto.updatedAt, dateFormatter)
+            updatedAt = LocalDateTime.parse(dto.updatedAt, dateFormatter),
+            recurrenceRule = dto.recurrence,
+            metadata = dto.metadata ?: emptyMap()
         )
     }
 

@@ -9,12 +9,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import android.util.Log
+import androidx.navigation.NavController
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoryEditScreen(
     // categoryId: String? = null, // For editing existing category, null for new
     onNavigateBack: () -> Unit,
+    returnToTaskCreate: Boolean = false,  // New parameter to determine proper back navigation
+    onNavigateToTaskCreate: () -> Unit = {}, // New parameter for navigating back to task creation
     categoryViewModel: CategoryViewModel = hiltViewModel()
 ) {
     var categoryName by remember { mutableStateOf("") }
@@ -37,9 +41,18 @@ fun CategoryEditScreen(
                     TextButton(
                         onClick = {
                             if (categoryName.isNotBlank()) {
+                                Log.d("CategoryEditScreen", "Creating new category: $categoryName")
                                 // TODO: Add validation for hex color if needed
                                 categoryViewModel.createCategory(categoryName, categoryColorHex, null)
-                                onNavigateBack() // Navigate back after attempting to save
+                                
+                                // Navigate based on where we came from
+                                if (returnToTaskCreate) {
+                                    Log.d("CategoryEditScreen", "Returning to task creation")
+                                    onNavigateToTaskCreate()
+                                } else {
+                                    Log.d("CategoryEditScreen", "Returning to previous screen")
+                                    onNavigateBack()
+                                }
                             }
                         },
                         enabled = categoryName.isNotBlank()
@@ -78,4 +91,32 @@ fun CategoryEditScreen(
             // TODO: Add icon picker
         }
     }
+}
+
+// Wrapper function for use with NavController
+@Composable
+fun CategoryEditScreen(
+    navController: NavController,
+    categoryViewModel: CategoryViewModel = hiltViewModel()
+) {
+    // Check if we should return to task creation
+    val returnToTaskCreate = navController.previousBackStackEntry
+        ?.savedStateHandle
+        ?.get<Boolean>("return_to_task_create") ?: false
+    
+    Log.d("CategoryEditScreen", "Should return to task creation: $returnToTaskCreate")
+    
+    // Clear the flag from saved state
+    if (returnToTaskCreate) {
+        navController.previousBackStackEntry?.savedStateHandle?.remove<Boolean>("return_to_task_create")
+    }
+    
+    CategoryEditScreen(
+        onNavigateBack = { navController.navigateUp() },
+        returnToTaskCreate = returnToTaskCreate,
+        onNavigateToTaskCreate = {
+            // Pop back to task creation
+            navController.navigateUp()
+        }
+    )
 } 

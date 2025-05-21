@@ -21,6 +21,8 @@ import com.hebit.app.domain.model.TaskCreationData
 import com.hebit.app.domain.model.TaskPriority
 import com.hebit.app.domain.model.TaskViewMode
 import java.time.format.DateTimeFormatter
+import android.util.Log
+import androidx.navigation.NavController
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,123 +35,152 @@ fun TaskListScreen(
     onTaskCategoriesClick: () -> Unit = {},
     onTaskBoardClick: () -> Unit = {},
     onTaskClick: (String) -> Unit = {},
+    onCreateTaskClick: () -> Unit = {},
     viewModel: TaskViewModel = hiltViewModel(),
-    onNavigateToCreateCategory: () -> Unit
+    onNavigateToCreateCategory: () -> Unit,
+    navController: NavController? = null // Optional NavController parameter
 ) {
-    var showAddTaskScreen by remember { mutableStateOf(false) }
-    var viewMode by remember { mutableStateOf(TaskViewMode.LIST) }
-    var searchQuery by remember { mutableStateOf("") }
-    
     // Collect tasks from ViewModel
     val tasksState by viewModel.tasksState.collectAsState()
     
     // Load tasks on first composition
     LaunchedEffect(key1 = true) {
         viewModel.loadTasks()
+        
+        // Check if we have a new task from TaskCreationScreen - simpler approach
+        navController?.currentBackStackEntry?.savedStateHandle?.get<TaskCreationData>("new_task_data")?.let { taskData ->
+            Log.d("TaskListScreen", "Received task data from creation screen")
+            viewModel.createTask(taskData)
+        }
     }
     
-    if (showAddTaskScreen) {
-        TaskCreationScreen(
-            onDismiss = { showAddTaskScreen = false },
-            onSaveTask = { taskData ->
-                viewModel.createTask(taskData)
-                showAddTaskScreen = false
-            },
-            onNavigateToCreateCategory = onNavigateToCreateCategory
-        )
-    } else {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text("Tasks") },
-                    actions = {
-                        IconButton(onClick = {}) {
-                            Icon(Icons.Default.Search, contentDescription = "Search")
-                        }
-                        IconButton(onClick = {}) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "More")
-                        }
+    var searchQuery by remember { mutableStateOf("") }
+    
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Tasks") },
+                actions = {
+                    IconButton(onClick = {}) {
+                        Icon(Icons.Default.Search, contentDescription = "Search")
                     }
-                )
-            },
-            floatingActionButton = {
-                FloatingActionButton(onClick = { showAddTaskScreen = true }) {
-                    Icon(Icons.Default.Add, contentDescription = "Add Task")
+                    IconButton(onClick = {}) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "More")
+                    }
                 }
-            },
-            bottomBar = {
-                BottomAppBar {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        BottomNavItem(
-                            icon = Icons.Default.Home,
-                            label = "Home",
-                            selected = false,
-                            onClick = onHomeClick
-                        )
-                        
-                        BottomNavItem(
-                            icon = Icons.Default.CheckCircle,
-                            label = "Tasks",
-                            selected = true,
-                            onClick = { /* Already on tasks */ }
-                        )
-                        
-                        BottomNavItem(
-                            icon = Icons.Default.Loop,
-                            label = "Habits",
-                            selected = false,
-                            onClick = onHabitsClick
-                        )
-                        
-                        BottomNavItem(
-                            icon = Icons.Default.Flag,
-                            label = "Goals",
-                            selected = false,
-                            onClick = onGoalsClick
-                        )
-                        
-                        BottomNavItem(
-                            icon = Icons.Default.Person,
-                            label = "Profile",
-                            selected = false,
-                            onClick = onProfileClick
-                        )
-                    }
+            )
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = { onCreateTaskClick() }) {
+                Icon(Icons.Default.Add, contentDescription = "Add Task")
+            }
+        },
+        bottomBar = {
+            BottomAppBar {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    BottomNavItem(
+                        icon = Icons.Default.Home,
+                        label = "Home",
+                        selected = false,
+                        onClick = onHomeClick
+                    )
+                    
+                    BottomNavItem(
+                        icon = Icons.Default.CheckCircle,
+                        label = "Tasks",
+                        selected = true,
+                        onClick = { /* Already on tasks */ }
+                    )
+                    
+                    BottomNavItem(
+                        icon = Icons.Default.Loop,
+                        label = "Habits",
+                        selected = false,
+                        onClick = onHabitsClick
+                    )
+                    
+                    BottomNavItem(
+                        icon = Icons.Default.Flag,
+                        label = "Goals",
+                        selected = false,
+                        onClick = onGoalsClick
+                    )
+                    
+                    BottomNavItem(
+                        icon = Icons.Default.Person,
+                        label = "Profile",
+                        selected = false,
+                        onClick = onProfileClick
+                    )
                 }
             }
-        ) { paddingValues ->
-            Column(
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            // Search bar
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text("Search tasks...") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-            ) {
-                // Search bar
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = { Text("Search tasks...") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    singleLine = true
-                )
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                singleLine = true
+            )
+            
+            // Task list
+            when (tasksState) {
+                is Resource.Loading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
                 
-                // Task list
-                when (tasksState) {
-                    is Resource.Loading -> {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
+                is Resource.Error -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            CircularProgressIndicator()
+                            Text(
+                                text = "Error loading tasks",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Text(
+                                text = (tasksState as Resource.Error).message ?: "Unknown error",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Button(onClick = { viewModel.loadTasks() }) {
+                                Text("Retry")
+                            }
                         }
                     }
+                }
+                
+                is Resource.Success -> {
+                    val tasks = (tasksState as Resource.Success<List<Task>>).data ?: emptyList()
+                    val filteredTasks = tasks.filter {
+                        searchQuery.isEmpty() || 
+                        it.title.contains(searchQuery, ignoreCase = true) ||
+                        it.description.contains(searchQuery, ignoreCase = true)
+                    }
                     
-                    is Resource.Error -> {
+                    if (filteredTasks.isEmpty()) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
@@ -157,71 +188,37 @@ fun TaskListScreen(
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Text(
-                                    text = "Error loading tasks",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.error
-                                )
-                                Text(
-                                    text = (tasksState as Resource.Error).message ?: "Unknown error",
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Button(onClick = { viewModel.loadTasks() }) {
-                                    Text("Retry")
-                                }
-                            }
-                        }
-                    }
-                    
-                    is Resource.Success -> {
-                        val tasks = (tasksState as Resource.Success<List<Task>>).data ?: emptyList()
-                        val filteredTasks = tasks.filter {
-                            searchQuery.isEmpty() || 
-                            it.title.contains(searchQuery, ignoreCase = true) ||
-                            it.description.contains(searchQuery, ignoreCase = true)
-                        }
-                        
-                        if (filteredTasks.isEmpty()) {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    if (searchQuery.isNotEmpty()) {
-                                        Text(
-                                            text = "No tasks match your search",
-                                            style = MaterialTheme.typography.titleMedium
-                                        )
-                                    } else {
-                                        Text(
-                                            text = "No tasks yet",
-                                            style = MaterialTheme.typography.titleMedium
-                                        )
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Text(
-                                            text = "Tap + to create your first task",
-                                            style = MaterialTheme.typography.bodyMedium
-                                        )
-                                    }
-                                }
-                            }
-                        } else {
-                            LazyColumn(
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                items(filteredTasks, key = { task -> task.id }) { task ->
-                                    TaskItem(
-                                        task = task,
-                                        onTaskClick = { onTaskClick(task.id) },
-                                        onTaskToggle = { viewModel.toggleTaskCompletion(task.id) },
-                                        onTaskDelete = { viewModel.deleteTask(task.id) }
+                                if (searchQuery.isNotEmpty()) {
+                                    Text(
+                                        text = "No tasks match your search",
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                } else {
+                                    Text(
+                                        text = "No tasks yet",
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "Tap + to create your first task",
+                                        style = MaterialTheme.typography.bodyMedium
                                     )
                                 }
+                            }
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(filteredTasks, key = { task -> task.id }) { task ->
+                                TaskItem(
+                                    task = task,
+                                    onTaskClick = { onTaskClick(task.id) },
+                                    onTaskToggle = { viewModel.toggleTaskCompletion(task.id) },
+                                    onTaskDelete = { viewModel.deleteTask(task.id) }
+                                )
                             }
                         }
                     }

@@ -12,7 +12,7 @@ data class CategoryDto(
     val name: String,
     val color: String, // Assuming backend sends hex color string
     val icon: String? = null, // Assuming backend sends icon name/identifier
-    val userId: String // Assuming categories are user-specific
+    val user: String // Assuming categories are user-specific
 )
 
 /**

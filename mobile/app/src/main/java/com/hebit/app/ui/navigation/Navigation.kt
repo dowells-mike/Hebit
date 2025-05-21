@@ -27,6 +27,7 @@ import com.hebit.app.ui.screens.tasks.TaskListScreen
 import com.hebit.app.ui.screens.tasks.TaskDetailScreen
 import com.hebit.app.ui.screens.tasks.TaskCategoriesScreen
 import com.hebit.app.ui.screens.tasks.TaskBoardScreen
+import com.hebit.app.ui.screens.tasks.TaskViewModel
 import com.hebit.app.ui.screens.goals.GoalListScreen
 import com.hebit.app.ui.screens.goals.GoalDetailScreen
 import com.hebit.app.ui.screens.settings.SettingsScreen
@@ -34,6 +35,7 @@ import com.hebit.app.ui.screens.profile.ProfileScreen
 import com.hebit.app.ui.screens.profile.StatisticsScreen
 import com.hebit.app.ui.screens.tasks.TaskCreationScreen
 import com.hebit.app.ui.screens.categories.CategoryEditScreen
+import androidx.hilt.navigation.compose.hiltViewModel
 
 /**
  * Main navigation routes for the app
@@ -54,6 +56,7 @@ object Routes {
     const val TASK_CATEGORIES = "task_categories"
     const val TASK_BOARD = "task_board"
     const val TASK_EDIT = "task_edit"
+    const val TASK_CREATE = "task_create"
     const val HABITS = "habits"
     const val HABIT_DETAIL = "habit_detail"
     const val HABIT_STREAK = "habit_streak"
@@ -163,7 +166,9 @@ fun HebitNavigation(
                 onTaskClick = { taskId -> 
                     navController.navigate("${Routes.TASK_DETAIL}/$taskId")
                 },
-                onNavigateToCreateCategory = { navController.navigate(Routes.CATEGORY_EDIT) }
+                onCreateTaskClick = { navController.navigate(Routes.TASK_CREATE) },
+                onNavigateToCreateCategory = { navController.navigate(Routes.CATEGORY_EDIT) },
+                navController = navController
             )
         }
         
@@ -201,6 +206,27 @@ fun HebitNavigation(
                 onDismiss = { navController.navigateUp() },
                 onSaveTask = { /* This won't be used in edit mode */ },
                 onNavigateToCreateCategory = { navController.navigate(Routes.CATEGORY_EDIT) }
+            )
+        }
+        
+        // New route for creating a task (without edit mode)
+        composable(Routes.TASK_CREATE) {
+            val taskViewModel = hiltViewModel<TaskViewModel>()
+            TaskCreationScreen(
+                isEditMode = false,
+                onSaveComplete = { navController.navigateUp() },
+                onCancel = { navController.navigateUp() },
+                onDismiss = { navController.navigateUp() },
+                onSaveTask = { taskData ->
+                    // Create the task using the ViewModel we obtained from the composable context
+                    taskViewModel.createTask(taskData)
+                    navController.navigateUp()
+                },
+                onNavigateToCreateCategory = { 
+                    // Save the current backstack entry ID to return to task creation after category creation
+                    navController.currentBackStackEntry?.savedStateHandle?.set("return_to_task_create", true)
+                    navController.navigate(Routes.CATEGORY_EDIT)
+                }
             )
         }
         
@@ -416,7 +442,7 @@ fun HebitNavigation(
         // Add Composable for CategoryEditScreen
         composable(Routes.CATEGORY_EDIT) {
             CategoryEditScreen(
-                onNavigateBack = { navController.navigateUp() }
+                navController = navController
             )
         }
     }

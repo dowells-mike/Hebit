@@ -101,7 +101,7 @@ fun TaskCreationScreen(
     // Initialize selectedCategoryName from existing task if in edit mode, else a default.
     // selectedCategoryObject will be derived.
     var selectedCategoryName by remember { 
-        mutableStateOf(if (isEditMode) "" else "Work") 
+        mutableStateOf(if (isEditMode) "" else "Uncategorized") // Default to Uncategorized for new tasks
     }
     var selectedCategoryObject by remember { mutableStateOf<Category?>(null) }
 
@@ -152,7 +152,7 @@ fun TaskCreationScreen(
             val task = (taskState as? Resource.Success)?.data
             if (task != null) {
                 taskTitle = task.title
-                taskDescription = task.description ?: ""
+                taskDescription = task.description
                 selectedDate = task.dueDateTime?.toLocalDate()
                 selectedTime = task.dueDateTime?.toLocalTime()
                 selectedPriority = when (task.priority) {
@@ -161,49 +161,57 @@ fun TaskCreationScreen(
                     3 -> TaskPriority.HIGH
                     else -> TaskPriority.MEDIUM
                 }
-                selectedCategoryName = task.category // Set selectedCategoryName from task
-                
-                // Attempt to set selectedCategoryObject based on the name and available categories
-                // This will be further refined when categoriesResource itself updates
+                selectedCategoryName = task.category ?: "Uncategorized"
                 selectedCategoryObject = availableCategories.find { it.name == task.category }
-                
-                // Load recurrence pattern if available
-                task.metadata["recurrence"]?.let {
+
+                // Load recurrence pattern from structured recurrenceRule
+                task.recurrenceRule?.let {
                     recurrencePattern = RecurrencePattern(
-                        type = parseRecurrencePattern(it) ?: RecurrenceType.NONE
+                        type = RecurrenceType.valueOf(it.frequency ?: RecurrenceType.NONE.name),
+                        interval = it.interval ?: 1,
+                        endDate = it.endDate?.let { endDateStr ->
+                            try { LocalDate.parse(endDateStr) } catch (e: Exception) { null }
+                        }
                     )
+                } ?: run {
+                    recurrencePattern = RecurrencePattern() // Default if no rule
                 }
                 
-                // Load reminder settings if available
-                task.metadata["reminder"]?.let { reminderStr ->
-                    val parts = reminderStr.split(",")
-                    if (parts.isNotEmpty()) {
-                        val minutes = parts[0].toIntOrNull() ?: 15
-                        val timeString = parts.getOrNull(1) ?: ""
-                        
-                        if (timeString.isNotBlank()) {
-                            reminderSettings = ReminderSettings(
-                                isEnabled = true,
-                                minutes = 0,
-                                time = try {
-                                    LocalTime.parse(timeString, DateTimeFormatter.ofPattern("h:mm a"))
-                                } catch (e: Exception) {
-                                    null
-                                }
-                            )
-                        } else {
-                            reminderSettings = ReminderSettings(
-                                isEnabled = true,
-                                minutes = minutes
-                            )
+                // Load reminder settings from metadata (remains as string in metadata for now)
+                task.metadata["reminder"]?.let { reminderValue ->
+                    if (reminderValue is String) {
+                        val reminderStr = reminderValue
+                        val parts = reminderStr.split(",")
+                        if (parts.isNotEmpty()) {
+                            val minutes = parts[0].toIntOrNull() ?: 15
+                            val timeString = parts.getOrNull(1) ?: ""
+                            
+                            if (timeString.isNotBlank()) {
+                                reminderSettings = ReminderSettings(
+                                    isEnabled = true,
+                                    minutes = 0,
+                                    time = try {
+                                        LocalTime.parse(timeString, DateTimeFormatter.ofPattern("h:mm a"))
+                                    } catch (e: Exception) {
+                                        null
+                                    }
+                                )
+                            } else {
+                                reminderSettings = ReminderSettings(
+                                    isEnabled = true,
+                                    minutes = minutes
+                                )
+                            }
                         }
                     }
                 }
                 
                 // Load subtasks if available
-                task.metadata["subtasks"]?.let {
-                    subtasks.clear()
-                    subtasks.addAll(parseSubtasks(it))
+                task.metadata["subtasks"]?.let { subtasksValue ->
+                    if (subtasksValue is String) {
+                        subtasks.clear()
+                        subtasks.addAll(parseSubtasks(subtasksValue))
+                    }
                 }
             }
         }
@@ -224,33 +232,61 @@ fun TaskCreationScreen(
     var isNumberedList by remember { mutableStateOf(false) }
     
     // Update availableCategories and selectedCategoryObject when categoriesResource changes
-    LaunchedEffect(categoriesResource, selectedCategoryName) {
+    LaunchedEffect(categoriesResource, selectedCategoryName, isEditMode) { // Added isEditMode to dependencies
+        Log.d("TaskCreationScreen", "Categories LaunchedEffect triggered. categoriesResource: $categoriesResource")
         if (categoriesResource is Resource.Success) {
             val cats = (categoriesResource as Resource.Success<List<Category>>).data
-            if (!cats.isNullOrEmpty()) {
-                availableCategories = cats
-                val currentSelection = cats.find { it.name == selectedCategoryName }
-                if (currentSelection != null) {
-                    selectedCategoryObject = currentSelection
-                    // Ensure selectedCategoryName is also consistent if it was a default
-                    selectedCategoryName = currentSelection.name 
-                } else if (selectedCategoryObject == null && !isEditMode) {
-                    // If no specific name was set (e.g., not edit mode and default didn't match)
-                    // or if the edit mode category name isn't in the list, pick the first as default.
-                    selectedCategoryObject = cats.first()
-                    selectedCategoryName = cats.first().name
-                } // If in edit mode and name doesn't match, selectedCategoryObject remains null until picker used
-            } else {
-                availableCategories = emptyList()
-                if (!isEditMode) selectedCategoryName = "General" // Fallback if categories are empty & not edit mode
-                selectedCategoryObject = null
+            Log.d("TaskCreationScreen", "Categories Resource.Success. Data: ${cats?.size ?: "null"} categories")
+            availableCategories = cats ?: emptyList()
+
+            if (isEditMode) {
+                if (selectedCategoryName.isNotEmpty()) { // Task data has a category name
+                    val foundCat = availableCategories.find { it.name == selectedCategoryName }
+                    if (foundCat != null) {
+                        selectedCategoryObject = foundCat
+                    } else {
+                        // Category name from task not found in available list (e.g., deleted)
+                        selectedCategoryObject = null
+                        selectedCategoryName = "Uncategorized" // Or keep the old name and show an error/warning
+                    }
+                } else {
+                    // Task data has no category name, treat as Uncategorized
+                    selectedCategoryObject = null
+                    selectedCategoryName = "Uncategorized"
+                }
+            } else { // Not in edit mode (new task)
+                if (selectedCategoryName != "Uncategorized" && selectedCategoryObject == null) {
+                    // User might have picked a category, then it got deleted before save - try to re-find
+                    val foundCat = availableCategories.find { it.name == selectedCategoryName }
+                    if (foundCat != null) {
+                        selectedCategoryObject = foundCat
+                    } else {
+                        selectedCategoryObject = null
+                        selectedCategoryName = "Uncategorized"
+                    }
+                } else if (selectedCategoryObject != null) {
+                    // User has picked a category, ensure name is consistent
+                    selectedCategoryName = selectedCategoryObject!!.name
+                } else {
+                    // New task, no interaction yet, remains Uncategorized
+                    selectedCategoryName = "Uncategorized"
+                    selectedCategoryObject = null
+                }
             }
         } else if (categoriesResource is Resource.Error) {
-            Log.e("TaskCreationScreen", "Error loading categories: ${(categoriesResource as Resource.Error).message}")
+            Log.e("TaskCreationScreen", "Categories Resource.Error: ${(categoriesResource as Resource.Error).message}")
             availableCategories = emptyList()
-            if (!isEditMode) selectedCategoryName = "General"
             selectedCategoryObject = null
+            // selectedCategoryName will retain its current value (e.g., from edit mode, or "Uncategorized")
+            // Or, force to "Uncategorized" if an error occurs during new task creation:
+            if (!isEditMode) {
+                 selectedCategoryName = "Uncategorized"
+            }
+        } else if (categoriesResource is Resource.Loading) {
+            Log.d("TaskCreationScreen", "Categories Resource.Loading")
+            // Potentially do nothing or set a loading state for availableCategories if needed elsewhere
         }
+        Log.d("TaskCreationScreen", "End of Categories LaunchedEffect. availableCategories: ${availableCategories.size}")
     }
     
     // For date picker
@@ -276,6 +312,14 @@ fun TaskCreationScreen(
     // Observe category suggestions from ViewModel
     val categorySuggestions by viewModel.categorySuggestions.collectAsState()
     var showSuggestions by remember { mutableStateOf(false) }
+    
+    // Add this effect to reload categories when the category picker is opened
+    LaunchedEffect(showCategoryPicker) {
+        if (showCategoryPicker) {
+            Log.d("TaskCreationScreen", "Category picker opened - explicitly reloading categories")
+            categoryViewModel.loadCategories()
+        }
+    }
     
     Scaffold(
         topBar = {
@@ -335,8 +379,10 @@ fun TaskCreationScreen(
             // Task title input - required
             OutlinedTextField(
                 value = taskTitle,
-                onValueChange = { 
-                    taskTitle = it
+                onValueChange = {
+                    if (it.length <= 255) { // Add character limit
+                        taskTitle = it
+                    }
                     
                     // Add this to trigger category suggestions when title changes
                     viewModel.suggestCategories(taskTitle, taskDescription)
@@ -458,8 +504,17 @@ fun TaskCreationScreen(
                 
                 Text(
                     text = selectedTime?.format(DateTimeFormatter.ofPattern("h:mm a")) ?: "Set time",
-                    modifier = Modifier.clickable { showTimePicker = true }
+                    modifier = Modifier.clickable(enabled = selectedDate != null) { 
+                        if (selectedDate != null) showTimePicker = true 
+                    }
                 )
+
+                if (selectedDate != null && selectedTime != null) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    IconButton(onClick = { selectedTime = null }, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.Clear, contentDescription = "Clear time")
+                    }
+                }
             }
             
             Divider()
@@ -928,12 +983,24 @@ fun TaskCreationScreen(
                 }
             },
             dismissButton = {
-                TextButton(
-                    onClick = { 
-                        showDatePicker = false 
+                Row {
+                    TextButton(
+                        onClick = { 
+                            selectedDate = null // Clear the date
+                            selectedTime = null // Also clear the time
+                            showDatePicker = false 
+                        }
+                    ) {
+                        Text("Clear")
                     }
-                ) {
-                    Text("Cancel")
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TextButton(
+                        onClick = { 
+                            showDatePicker = false 
+                        }
+                    ) {
+                        Text("Cancel")
+                    }
                 }
             },
             properties = DialogProperties(dismissOnClickOutside = true)

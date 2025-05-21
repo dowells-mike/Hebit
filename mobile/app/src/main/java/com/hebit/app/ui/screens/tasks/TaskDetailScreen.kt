@@ -264,26 +264,24 @@ fun TaskDetailScreen(
                         Text("Task not found")
                     }
                 } else {
-                    val subtasks = remember(task.metadata["subtasks"]) {
-                        val subtasksStr = task.metadata["subtasks"] ?: ""
-                        parseSubtasks(subtasksStr)
-                    }
+                    // Subtasks
+                    val subtasksString = task.metadata["subtasks"]
+                    val subtasks = if (subtasksString is String) parseSubtasks(subtasksString) else emptyList()
                     
-                    val recurrencePattern = remember(task.metadata["recurrence"]) {
-                        val recurrenceStr = task.metadata["recurrence"]
-                        if (recurrenceStr != null) parseRecurrencePattern(recurrenceStr) else null
-                    }
+                    // Reminder
+                    val reminderString = task.metadata["reminder"]
+                    val reminder = if (reminderString is String) parseReminderSettings(reminderString) else null
                     
-                    val reminderSettings = remember(task.metadata["reminder"]) {
-                        val reminderStr = task.metadata["reminder"]
-                        if (reminderStr != null) parseReminderSettings(reminderStr) else null
-                    }
+                    // Recurrence (assuming it might still be in metadata for older tasks)
+                    // Or, it might be in the dedicated recurrenceRule field
+                    val recurrencePatternString = task.metadata["recurrencePattern"]
+                    val recurrenceFromMetadata = if (recurrencePatternString is String) parseRecurrencePattern(recurrencePatternString) else null
                     
                     TaskDetailContent(
                         task = task,
                         subtasks = subtasks,
-                        recurrencePattern = recurrencePattern,
-                        reminderSettings = reminderSettings,
+                        recurrencePattern = recurrenceFromMetadata,
+                        reminderSettings = reminder,
                         expandedDescription = expandedDescription,
                         selectedCategory = selectedCategoryObject,
                         onCategoryClick = { showCategoryPicker = true },
@@ -376,8 +374,8 @@ fun TaskDetailScreen(
                                 
                                 showReminderDialog = false
                             },
-                            initialMinutes = task.metadata["reminder"]?.split(",")?.get(0)?.toIntOrNull() ?: 15,
-                            initialTimeString = task.metadata["reminder"]?.split(",")?.getOrNull(1) ?: ""
+                            initialMinutes = (task.metadata["reminder"] as? String)?.split(",")?.get(0)?.toIntOrNull() ?: 15,
+                            initialTimeString = (task.metadata["reminder"] as? String)?.split(",")?.getOrNull(1) ?: ""
                         )
                     }
                 }
@@ -603,7 +601,7 @@ fun TaskDetailContent(
             }
         }
         
-        if (task.category.isNotBlank()) {
+        if (task.category?.isNotBlank() == true) {
             item {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -634,7 +632,7 @@ fun TaskDetailContent(
                         } ?: MaterialTheme.colorScheme.primaryContainer)
                     ) {
                         Text(
-                            text = task.category,
+                            text = task.category ?: "N/A",
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             color = selectedCategory?.color?.let { 

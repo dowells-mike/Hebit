@@ -403,7 +403,7 @@ fun TaskCard(task: Task, onClick: () -> Unit) {
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = task.category,
+                        text = task.category ?: "Uncategorized",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary
                     )
