@@ -18,6 +18,7 @@ interface TaskRepository {
     suspend fun getTasksDueToday(): Flow<Resource<List<Task>>>
 
     suspend fun getCategories(): Flow<Resource<List<Category>>>
+    suspend fun getCategoryById(categoryId: String): Flow<Resource<Category>>
     suspend fun createCategory(name: String, color: String, icon: String?): Flow<Resource<Category>>
     suspend fun updateCategory(id: String, name: String?, color: String?, icon: String?): Flow<Resource<Category>>
     suspend fun deleteCategory(id: String): Flow<Resource<Boolean>>

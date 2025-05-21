@@ -1023,7 +1023,7 @@ fun TaskCreationScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) { 
                     if (categoriesResource is Resource.Loading) {
                         CircularProgressIndicator(modifier = Modifier.padding(16.dp))
-                    } else if (availableCategories.isNotEmpty()) {
+                    } else { // Handles both empty and non-empty states for categories
                         LazyColumn {
                             items(availableCategories) { category ->
                                 ListItem(
@@ -1054,44 +1054,42 @@ fun TaskCreationScreen(
                                     }
                                 )
                             }
-                        }
-                    } else {
-                        Text(
-                            text = "No categories available.",
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                        Text(
-                            text = "You can create categories in the main menu or create one now.",
-                            style = MaterialTheme.typography.bodySmall,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(bottom = 16.dp)
-                        )
-                        Button(
-                            onClick = {
-                                showCategoryPicker = false 
-                                // Call the navigation lambda
-                                onNavigateToCreateCategory()
-                                Log.d("TaskCreationScreen", "Create New Category button clicked - navigating")
+                            // Always show "Create New Category" at the end of the list
+                            item {
+                                Divider(modifier = Modifier.padding(vertical = 8.dp))
+                                ListItem(
+                                    headlineContent = { Text("Create New Category...") },
+                                    leadingContent = { Icon(Icons.Filled.Add, contentDescription = "Create New Category") },
+                                    modifier = Modifier.clickable {
+                                        showCategoryPicker = false
+                                        onNavigateToCreateCategory()
+                                        Log.d("TaskCreationScreen", "Create New Category list item clicked - navigating")
+                                    }
+                                )
                             }
-                        ) {
-                            Text("Create New Category")
+                        }
+                        if (availableCategories.isEmpty()) {
+                             Text(
+                                 text = "No categories yet. Click above to create one.",
+                                 style = MaterialTheme.typography.bodySmall,
+                                 textAlign = TextAlign.Center,
+                                 modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+                             )
                         }
                     }
                 }
             },
             confirmButton = {
-                if (availableCategories.isNotEmpty()) { 
-                    TextButton(onClick = { showCategoryPicker = false }) {
-                        Text("Done")
-                    }
+                TextButton(onClick = { showCategoryPicker = false }) {
+                    Text("Done")
                 }
             },
             dismissButton = { 
-                if (availableCategories.isEmpty() && categoriesResource !is Resource.Loading) {
-                    TextButton(onClick = { showCategoryPicker = false }) {
-                        Text("Cancel")
-                    }
-                }
+                // Optional: Only show cancel if you want a different action from "Done" when no selection is made.
+                // Otherwise, "Done" can also act as dismiss.
+                 TextButton(onClick = { showCategoryPicker = false }) {
+                     Text("Cancel")
+                 }
             }
         )
     }

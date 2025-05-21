@@ -345,18 +345,47 @@ class TaskRepositoryImpl @Inject constructor(
         emit(Resource.Loading())
         try {
             val response = apiService.deleteCategory(id)
-            // Assuming 200/204 indicates success for DELETE
             if (response.isSuccessful) {
                 emit(Resource.Success(true))
             } else {
-                emit(Resource.Error(response.errorBody()?.string() ?: "Failed to delete category"))
+                val errorMessage = response.errorBody()?.string() ?: "Unknown error deleting category"
+                Log.e("TaskRepositoryImpl", "Error deleting category: $errorMessage (code: ${response.code()})")
+                emit(Resource.Error(errorMessage))
             }
         } catch (e: HttpException) {
-            emit(Resource.Error("Server error deleting category: ${e.message()}"))
+            Log.e("TaskRepositoryImpl", "HTTP error deleting category: ${e.message()}", e)
+            emit(Resource.Error("Server error: ${e.message()}"))
         } catch (e: IOException) {
-            emit(Resource.Error("Network error deleting category: ${e.localizedMessage}"))
+            Log.e("TaskRepositoryImpl", "IO error deleting category: ${e.localizedMessage}", e)
+            emit(Resource.Error("Network error: ${e.localizedMessage ?: "Check connection"}"))
         } catch (e: Exception) {
-            emit(Resource.Error("Unexpected error deleting category: ${e.localizedMessage}"))
+            Log.e("TaskRepositoryImpl", "Unexpected error deleting category: ${e.localizedMessage}", e)
+            emit(Resource.Error("Unexpected error: ${e.localizedMessage ?: "Unknown error"}"))
+        }
+    }
+
+    override suspend fun getCategoryById(categoryId: String): Flow<Resource<Category>> = flow {
+        emit(Resource.Loading())
+        try {
+            val response = apiService.getCategoryById(categoryId)
+            if (response.isSuccessful && response.body() != null) {
+                val categoryDto = response.body()!!
+                val category = mapCategoryDtoToDomain(categoryDto)
+                emit(Resource.Success(category))
+            } else {
+                val errorMessage = response.errorBody()?.string() ?: "Category not found"
+                Log.e("TaskRepositoryImpl", "Error fetching category by ID $categoryId: $errorMessage (code: ${response.code()})")
+                emit(Resource.Error(errorMessage))
+            }
+        } catch (e: HttpException) {
+            Log.e("TaskRepositoryImpl", "HTTP error fetching category by ID $categoryId: ${e.message()}", e)
+            emit(Resource.Error("Server error: ${e.message()}"))
+        } catch (e: IOException) {
+            Log.e("TaskRepositoryImpl", "IO error fetching category by ID $categoryId: ${e.localizedMessage}", e)
+            emit(Resource.Error("Network error: ${e.localizedMessage ?: "Check connection"}"))
+        } catch (e: Exception) {
+            Log.e("TaskRepositoryImpl", "Unexpected error fetching category by ID $categoryId: ${e.localizedMessage}", e)
+            emit(Resource.Error("Unexpected error: ${e.localizedMessage ?: "Unknown error"}"))
         }
     }
 

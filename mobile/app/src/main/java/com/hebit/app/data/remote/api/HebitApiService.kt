@@ -169,6 +169,9 @@ interface HebitApiService {
     @GET("categories")
     suspend fun getCategories(): Response<List<CategoryDto>>
 
+    @GET("categories/{id}")
+    suspend fun getCategoryById(@Path("id") categoryId: String): Response<CategoryDto>
+
     @POST("categories")
     suspend fun createCategory(@Body request: CreateCategoryRequest): Response<CategoryDto>
 
