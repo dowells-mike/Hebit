@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { catchAsync, AppError } from '../middleware/errorHandler';
 import { Category } from '../models';
 import { AuthRequest } from '../types';
+import mongoose from 'mongoose';
 
 /**
  * @desc    Get all categories for a user
@@ -129,6 +130,12 @@ export const deleteCategory = catchAsync(async (req: AuthRequest, res: Response)
     throw new AppError('Cannot delete default categories', 400);
   }
   
+  // Find and update tasks associated with this category
+  // Assuming you have a Task model imported and it has a 'category' field that stores the category ID
+  // And assuming your Task model is named 'Task'
+  // import Task from '../models/Task'; // Make sure Task model is imported
+  await mongoose.model('Task').updateMany({ category: categoryId, user: userId }, { $set: { category: null } });
+
   await Category.findByIdAndDelete(categoryId);
   
   res.status(200).json({ success: true });
