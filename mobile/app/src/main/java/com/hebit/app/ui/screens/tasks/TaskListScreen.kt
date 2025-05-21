@@ -22,8 +22,12 @@ import com.hebit.app.domain.model.TaskPriority
 import com.hebit.app.domain.model.TaskViewMode
 import java.time.format.DateTimeFormatter
 import android.util.Log
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.graphics.Color
 import androidx.navigation.NavController
 import com.hebit.app.ui.navigation.Routes
+import androidx.compose.foundation.border
+import androidx.compose.material3.CardDefaults
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -243,8 +247,7 @@ fun TaskListScreen(
                                 TaskItem(
                                     task = task,
                                     onTaskClick = { onTaskClick(task.id) },
-                                    onTaskToggle = { viewModel.toggleTaskCompletion(task.id) },
-                                    onTaskDelete = { viewModel.deleteTask(task.id) }
+                                    onTaskToggle = { viewModel.toggleTaskCompletion(task.id) }
                                 )
                             }
                         }
@@ -259,108 +262,109 @@ fun TaskListScreen(
 fun TaskItem(
     task: Task,
     onTaskClick: () -> Unit,
-    onTaskToggle: () -> Unit,
-    onTaskDelete: () -> Unit
+    onTaskToggle: () -> Unit
 ) {
-    var showDeleteConfirm by remember { mutableStateOf(false) }
-    val dateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy")
-    
+    val today = java.time.LocalDate.now()
+    val tomorrow = today.plusDays(1)
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onTaskClick)
+            .clickable(onClick = onTaskClick),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(horizontal = 8.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Priority indicator
-            Box(
-                modifier = Modifier
-                    .size(12.dp)
-                    .padding(end = 8.dp)
-            ) {
-                val color = when (task.priority) {
-                    3 -> MaterialTheme.colorScheme.error
-                    2 -> MaterialTheme.colorScheme.tertiary
-                    1 -> MaterialTheme.colorScheme.secondary
-                    else -> MaterialTheme.colorScheme.tertiary
-                }
-                Surface(
-                    modifier = Modifier.size(12.dp),
-                    color = color,
-                    shape = MaterialTheme.shapes.small
-                ) {}
-            }
-            
-            // Checkbox
             Checkbox(
                 checked = task.isCompleted,
-                onCheckedChange = { onTaskToggle() }
+                onCheckedChange = { onTaskToggle() },
+                modifier = Modifier.padding(end = 10.dp)
             )
-            
-            // Task details
+
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(start = 8.dp)
+                    .padding(end = 8.dp)
             ) {
                 Text(
                     text = task.title,
                     style = MaterialTheme.typography.titleMedium,
-                    textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None
+                    textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
+                    color = if (task.isCompleted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface
                 )
-                
+
+                var showSpacer = false
+
                 if (task.description.isNotBlank()) {
                     Text(
                         text = task.description,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        color = (if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant).copy(alpha = 0.8f),
+                        modifier = Modifier.padding(top = 2.dp)
                     )
+                    showSpacer = true
                 }
-                
-                if (task.dueDateTime != null) {
-                    Text(
-                        text = "Due: ${task.dueDateTime.toLocalDate().format(dateFormatter)}",
-                        style = MaterialTheme.typography.bodySmall
-                    )
+
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = if (task.description.isNotBlank()) 4.dp else 2.dp)) {
+                    task.dueDateTime?.let {
+                        val dateText = when (it.toLocalDate()) {
+                            today -> "Today"
+                            tomorrow -> "Tomorrow"
+                            else -> it.format(DateTimeFormatter.ofPattern("MMM d"))
+                        }
+                        val timeText = it.format(DateTimeFormatter.ofPattern("h:mm a"))
+                        Text(
+                            text = "$dateText, $timeText",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        showSpacer = true
+                    }
+
+                    task.category?.let { categoryName ->
+                        if (categoryName.isNotBlank() && categoryName.lowercase() != "uncategorized") {
+                            if (task.dueDateTime != null) {
+                                Spacer(Modifier.width(8.dp))
+                            }
+                            Surface(
+                                shape = MaterialTheme.shapes.small,
+                                color = if (task.isCompleted) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                border = BorderStroke(1.dp, if (task.isCompleted) MaterialTheme.colorScheme.outline.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline),
+                                modifier = Modifier
+                            ) {
+                                Text(
+                                    text = categoryName,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
+                        }
+                    }
                 }
             }
-            
-            // Actions
-            IconButton(onClick = { showDeleteConfirm = true }) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "Delete",
-                    tint = MaterialTheme.colorScheme.error
+
+            val priorityColor = when (task.priority) {
+                3 -> MaterialTheme.colorScheme.error
+                2 -> MaterialTheme.colorScheme.tertiary
+                1 -> MaterialTheme.colorScheme.secondary
+                else -> Color.Transparent
+            }
+            if (task.priority > 0) {
+                 Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .background(if (task.isCompleted) priorityColor.copy(alpha = 0.5f) else priorityColor, shape = androidx.compose.foundation.shape.CircleShape)
                 )
+            } else {
+                Spacer(modifier = Modifier.size(10.dp))
             }
         }
-    }
-    
-    if (showDeleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete Task") },
-            text = { Text("Are you sure you want to delete this task?") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onTaskDelete()
-                        showDeleteConfirm = false
-                    }
-                ) {
-                    Text("Delete")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
     }
 }
 

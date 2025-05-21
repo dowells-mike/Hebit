@@ -145,7 +145,7 @@ class TaskViewModel @Inject constructor(
             val recurrenceRuleDto = taskData.recurrencePattern?.let {
                 if (it.type == RecurrenceType.NONE) null
                 else RecurrenceRuleDto(
-                    frequency = it.type.name,
+                    frequency = it.type.name.lowercase(),
                     interval = it.interval,
                     endDate = it.endDate?.format(DateTimeFormatter.ISO_LOCAL_DATE)
                 )
@@ -388,7 +388,7 @@ class TaskViewModel @Inject constructor(
             val recurrenceRuleDto = taskData.recurrencePattern?.let {
                 if (it.type == RecurrenceType.NONE) null
                 else RecurrenceRuleDto(
-                    frequency = it.type.name,
+                    frequency = it.type.name.lowercase(),
                     interval = it.interval,
                     endDate = it.endDate?.format(DateTimeFormatter.ISO_LOCAL_DATE)
                 )
