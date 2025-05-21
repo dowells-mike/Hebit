@@ -13,14 +13,14 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import android.util.Log
 import androidx.navigation.NavController
 import com.hebit.app.domain.model.Resource
+import androidx.navigation.NavGraph.Companion.findStartDestination
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoryEditScreen(
     categoryId: String? = null, // For editing existing category, null for new
+    returnToRoute: String? = null, // Added to accept the return route string
     onNavigateBack: () -> Unit,
-    returnToTaskCreate: Boolean = false,
-    onNavigateToTaskCreate: () -> Unit = {},
     categoryViewModel: CategoryViewModel = hiltViewModel()
 ) {
     var categoryName by remember { mutableStateOf("") }
@@ -43,15 +43,26 @@ fun CategoryEditScreen(
 
     val selectedCategoryState by categoryViewModel.selectedCategoryState.collectAsState()
 
-    LaunchedEffect(selectedCategoryState) {
-        if (isEditMode && selectedCategoryState is Resource.Success) {
-            val category = (selectedCategoryState as Resource.Success).data
-            if (category != null) {
-                categoryName = category.name
-                categoryColorHex = category.color
-            } else if (selectedCategoryState is Resource.Error) {
-                Log.e("CategoryEditScreen", "Error loading category for edit: ${(selectedCategoryState as Resource.Error).message}")
-                // Potentially show a toast or navigate back
+    LaunchedEffect(selectedCategoryState, isEditMode) {
+        if (isEditMode) {
+            when (val state = selectedCategoryState) {
+                is Resource.Success -> {
+                    val category = state.data
+                    if (category != null) {
+                        categoryName = category.name
+                        categoryColorHex = category.color
+                    } else {
+                        Log.w("CategoryEditScreen", "Category loaded successfully but data is null for ID: $categoryId. Navigating back.")
+                        onNavigateBack()
+                    }
+                }
+                is Resource.Error -> {
+                    Log.e("CategoryEditScreen", "Error loading category for edit: ${state.message} for ID: $categoryId. Navigating back.")
+                    onNavigateBack()
+                }
+                is Resource.Loading -> {
+                    Log.d("CategoryEditScreen", "Loading category details for ID: $categoryId")
+                }
             }
         }
     }
@@ -81,10 +92,10 @@ fun CategoryEditScreen(
                                     Log.d("CategoryEditScreen", "Creating new category: $categoryName")
                                     categoryViewModel.createCategory(categoryName, categoryColorHex, null)
                                 }
-                                if (returnToTaskCreate) {
-                                    onNavigateToTaskCreate()
+                                if (!returnToRoute.isNullOrEmpty()) {
+                                    // This navigation will be handled by the wrapper now
                                 } else {
-                                    onNavigateBack()
+                                    onNavigateBack() // Default back navigation
                                 }
                             }
                         },
@@ -158,21 +169,25 @@ fun CategoryEditScreen(
 @Composable
 fun CategoryEditScreen(
     navController: NavController,
-    categoryId: String? = null, // Pass categoryId for editing
+    categoryId: String? = null, 
+    returnToRoute: String? = null, 
     categoryViewModel: CategoryViewModel = hiltViewModel()
 ) {
-    val returnToTaskCreate = navController.previousBackStackEntry
-        ?.savedStateHandle
-        ?.get<Boolean>("return_to_task_create") ?: false
-    
-    if (returnToTaskCreate) {
-        navController.previousBackStackEntry?.savedStateHandle?.remove<Boolean>("return_to_task_create")
-    }
     
     CategoryEditScreen(
         categoryId = categoryId,
-        onNavigateBack = { navController.popBackStack() }, // Use popBackStack for robust navigation
-        returnToTaskCreate = returnToTaskCreate,
-        onNavigateToTaskCreate = { navController.popBackStack() } // Also popBackStack to return
+        returnToRoute = returnToRoute, 
+        onNavigateBack = { 
+            if (!returnToRoute.isNullOrEmpty()) {
+                navController.navigate(returnToRoute) {
+                    popUpTo(navController.graph.findStartDestination().id) { 
+                        this.inclusive = true 
+                    }
+                }
+            } else {
+                navController.popBackStack()
+            }
+        },
+        categoryViewModel = categoryViewModel
     )
 } 

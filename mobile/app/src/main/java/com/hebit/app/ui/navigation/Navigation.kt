@@ -187,8 +187,11 @@ fun HebitNavigation(
                 onHabitsClick = { navController.navigate(Routes.HABITS) },
                 onGoalsClick = { navController.navigate(Routes.GOALS) },
                 onProfileClick = { navController.navigate(Routes.PROFILE) },
-                onEditTask = { taskId -> 
-                    navController.navigate("${Routes.TASK_EDIT}/$taskId")
+                onEditTask = { id ->
+                    navController.navigate("${Routes.TASK_EDIT}/$id")
+                },
+                onNavigateToCreateCategory = { 
+                    navController.navigate(Routes.CATEGORY_EDIT + "?returnTo=${Routes.TASK_DETAIL}/$taskId")
                 }
             )
         }
@@ -440,9 +443,27 @@ fun HebitNavigation(
         }
 
         // Add Composable for CategoryEditScreen
-        composable(Routes.CATEGORY_EDIT) {
+        composable(
+            route = Routes.CATEGORY_EDIT + "?categoryId={categoryId}&returnTo={returnTo}",
+            arguments = listOf(
+                navArgument("categoryId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+                navArgument("returnTo") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val categoryId = backStackEntry.arguments?.getString("categoryId")
+            val returnToRoute = backStackEntry.arguments?.getString("returnTo")
             CategoryEditScreen(
-                navController = navController
+                navController = navController,
+                categoryId = categoryId,
+                returnToRoute = returnToRoute
             )
         }
     }
