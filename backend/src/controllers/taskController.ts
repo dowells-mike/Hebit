@@ -149,47 +149,40 @@ export const updateTask = catchAsync(async (req: AuthRequest, res: Response) => 
     throw new AppError('Task not found', 404);
   }
   
-  // Track which field is being modified for ML purposes
-  const updates = { ...req.body };
+  const { metadata: requestMetadata, ...otherUpdates } = req.body;
+  const updates: any = { ...otherUpdates }; // Use 'any' for updates object for flexibility
+
+  // Initialize taskMetadata safely, using existing task.metadata or an empty object
+  let taskMetadata: any = task.metadata ? { ...task.metadata } : {};
+
+  // Merge requestMetadata if it exists
+  if (requestMetadata) {
+    taskMetadata = { ...taskMetadata, ...requestMetadata };
+  }
   
   // Don't allow changing user
   delete updates.user;
   
-  // Update the metadata with last modified field
   const changedFields = Object.keys(updates);
-  if (changedFields.length > 0) {
-    updates.metadata = {
-      ...(task.metadata || {}),
-      lastModifiedField: changedFields[0]
-    };
+  if (changedFields.length > 0 && changedFields[0] !== 'metadata' && changedFields[0] !== 'recurrence') {
+    taskMetadata.lastModifiedField = changedFields[0];
   }
   
-  // If completing the task, set completedAt
   if (updates.completed && !task.completed) {
     updates.completedAt = new Date();
     updates.status = 'completed';
     
-    // Use ML service to collect task completion context
     try {
-      // Ensure userId is a string
       if (userId) {
         const mlContext = await mlService.collectTaskCompletionContext(taskId, userId.toString());
-        
-        // Add the ML context to the updates
-        updates.metadata = {
-          ...(updates.metadata || {}),
-          completionContext: mlContext
-        };
+        taskMetadata.completionContext = mlContext;
       }
     } catch (error) {
       console.error('ML data collection error:', error);
-      // Continue with update even if ML processing fails
     }
     
-    // Update productivity metrics
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
     await ProductivityMetrics.findOneAndUpdate(
       { user: userId, date: today },
       { $inc: { tasksCompleted: 1 } },
@@ -197,10 +190,17 @@ export const updateTask = catchAsync(async (req: AuthRequest, res: Response) => 
     );
   }
   
-  // Update the task
+  // Assign the consolidated metadata to updates
+  // only if it's not empty or if original metadata existed, to avoid sending empty object if not needed
+  if (Object.keys(taskMetadata).length > 0 || task.metadata) {
+    updates.metadata = taskMetadata;
+  }
+
+  // Recurrence is handled directly if present in req.body as updates.recurrence
+
   const updatedTask = await Task.findByIdAndUpdate(
     taskId,
-    updates,
+    updates, // updates contains otherUpdates, and potentially updates.metadata
     { new: true, runValidators: true }
   );
   
