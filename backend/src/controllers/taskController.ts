@@ -211,7 +211,35 @@ export const updateTask = catchAsync(async (req: AuthRequest, res: Response) => 
     { new: true, runValidators: true }
   );
   
-  res.status(200).json(updatedTask);
+  // Send specific fields to ensure progress is included if available on updatedTask
+  if (updatedTask) {
+    res.status(200).json({
+      _id: updatedTask._id,
+      title: updatedTask.title,
+      description: updatedTask.description,
+      completed: updatedTask.completed,
+      completedAt: updatedTask.completedAt,
+      priority: updatedTask.priority,
+      progress: updatedTask.progress, // Explicitly include progress
+      dueDate: updatedTask.dueDate,
+      status: updatedTask.status,
+      category: updatedTask.category,
+      parentTaskId: updatedTask.parentTaskId,
+      tags: updatedTask.tags,
+      recurrence: updatedTask.recurrence,
+      reminderTime: updatedTask.reminderTime,
+      effort: updatedTask.effort,
+      complexity: updatedTask.complexity,
+      attachments: updatedTask.attachments,
+      metadata: updatedTask.metadata,
+      createdAt: updatedTask.createdAt,
+      updatedAt: updatedTask.updatedAt,
+      user: updatedTask.user // Ensure user is also sent if needed by client DTO mapping
+    });
+  } else {
+    // Should not happen if findByIdAndUpdate was successful with an existing task
+    throw new AppError('Failed to retrieve updated task details', 500);
+  }
 });
 
 /**
