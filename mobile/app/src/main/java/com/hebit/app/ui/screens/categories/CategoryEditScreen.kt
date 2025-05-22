@@ -15,6 +15,30 @@ import androidx.navigation.NavController
 import com.hebit.app.domain.model.Resource
 import androidx.navigation.NavGraph.Companion.findStartDestination
 
+// Added imports for color palette
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material.icons.filled.Check // For selected color indicator
+
+// Predefined color palette
+val colorPalette = listOf(
+    "#FFADAD", // Light Red
+    "#FFD6A5", // Light Orange
+    "#FDFFB6", // Light Yellow
+    "#CAFFBF", // Light Green
+    "#9BF6FF", // Light Cyan
+    "#A0C4FF", // Light Blue
+    "#BDB2FF", // Light Indigo
+    "#FFC6FF", // Light Pink
+    "#E0E0E0", // Light Gray
+    "#AAAAAA"  // Medium Gray
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoryEditScreen(
@@ -126,13 +150,52 @@ fun CategoryEditScreen(
                     singleLine = true
                 )
 
-                OutlinedTextField(
-                    value = categoryColorHex,
-                    onValueChange = { categoryColorHex = it },
-                    label = { Text("Category Color (e.g., #RRGGBB)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                // Spacer(modifier = Modifier.height(8.dp)) // Add some space
+
+                Text(
+                    text = "Category Color",
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp)
                 )
+
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    items(colorPalette) { colorHex ->
+                        val isSelected = categoryColorHex.equals(colorHex, ignoreCase = true)
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(Color(android.graphics.Color.parseColor(colorHex)), CircleShape)
+                                .border(
+                                    width = if (isSelected) 3.dp else 1.dp,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray,
+                                    shape = CircleShape
+                                )
+                                .clickable { categoryColorHex = colorHex }
+                                .padding(4.dp), // Padding inside the border
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Filled.Check,
+                                    contentDescription = "Selected",
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer // A color that contrasts well with the selection border/bg
+                                )
+                            }
+                        }
+                    }
+                }
+                // Remove old text field for color
+                // OutlinedTextField(
+                //     value = categoryColorHex,
+                //     onValueChange = { categoryColorHex = it },
+                //     label = { Text("Category Color (e.g., #RRGGBB)") },
+                //     modifier = Modifier.fillMaxWidth(),
+                //     singleLine = true
+                // )
             }
         }
     }
