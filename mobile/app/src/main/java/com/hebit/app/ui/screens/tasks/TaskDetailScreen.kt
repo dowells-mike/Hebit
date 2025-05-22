@@ -151,11 +151,12 @@ fun TaskDetailScreen(
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Delete") },
-                            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                            text = { Text("Archive") },
+                            leadingIcon = { Icon(Icons.Default.Archive, contentDescription = "Archive Task") },
                             onClick = { 
                                 showEditMenu = false
-                                showDeleteDialog = true
+                                viewModel.archiveTask(taskId)
+                                onNavigateBack()
                             }
                         )
                     }

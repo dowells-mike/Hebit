@@ -27,7 +27,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.navigation.NavController
 import com.hebit.app.ui.navigation.Routes
 import androidx.compose.foundation.border
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Archive
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,7 +70,12 @@ fun TaskListScreen(
     
     var searchQuery by remember { mutableStateOf("") }
     var showMoreMenu by remember { mutableStateOf(false) } // State for the dropdown menu
+    var taskForDeletionDialog by remember { mutableStateOf<Task?>(null) }
     
+    // To store swipe states of items, keyed by task ID
+    val swipeStates = remember { mutableMapOf<String, SwipeToDismissBoxState>() }
+    val coroutineScope = rememberCoroutineScope()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -244,17 +256,104 @@ fun TaskListScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             items(filteredTasks, key = { task -> task.id }) { task ->
-                                TaskItem(
-                                    task = task,
-                                    onTaskClick = { onTaskClick(task.id) },
-                                    onTaskToggle = { viewModel.toggleTaskCompletion(task.id) }
+                                val dismissState = rememberSwipeToDismissBoxState(
+                                    confirmValueChange = { newValue ->
+                                        if (newValue == SwipeToDismissBoxValue.EndToStart) { // Swiped left (for delete)
+                                            taskForDeletionDialog = task // Set the task for the dialog
+                                            true // Return true to allow the swipe to settle and show background
+                                        } else {
+                                            false // Snap back for any other case
+                                        }
+                                    },
+                                    positionalThreshold = { it * 0.25f }
                                 )
+
+                                // Store the state in the map and clean up on dispose
+                                DisposableEffect(task.id) {
+                                    swipeStates[task.id] = dismissState
+                                    onDispose {
+                                        swipeStates.remove(task.id)
+                                    }
+                                }
+
+                                SwipeToDismissBox(
+                                    state = dismissState,
+                                    enableDismissFromStartToEnd = false, // Disable swipe right
+                                    enableDismissFromEndToStart = true,  // Enable swipe left
+                                    backgroundContent = {
+                                        val color = when(dismissState.targetValue) {
+                                            SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.errorContainer
+                                            else -> Color.Transparent
+                                        }
+                                        val icon = when(dismissState.targetValue) {
+                                            SwipeToDismissBoxValue.EndToStart -> Icons.Outlined.Delete
+                                            else -> null // No icon for other states or if not swiped enough
+                                        }
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .background(color)
+                                                .padding(horizontal = 20.dp),
+                                            contentAlignment = Alignment.CenterEnd // Align icon to the end (left swipe)
+                                        ) {
+                                            if (icon != null) {
+                                                Icon(
+                                                    icon,
+                                                    contentDescription = "Delete Task",
+                                                    tint = MaterialTheme.colorScheme.onErrorContainer
+                                                )
+                                            }
+                                        }
+                                    }
+                                ) {
+                                    TaskItem(
+                                        task = task,
+                                        onTaskClick = { onTaskClick(task.id) },
+                                        onTaskToggle = { viewModel.toggleTaskCompletion(task.id) }
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    // Dialog logic using the new variable name
+    val currentTaskToDelete = taskForDeletionDialog
+    if (currentTaskToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { // Dialog dismissed (e.g., back press or click outside)
+                coroutineScope.launch {
+                    swipeStates[currentTaskToDelete.id]?.reset()
+                }
+                taskForDeletionDialog = null
+            },
+            title = { Text("Delete Task?") },
+            text = { Text("Are you sure you want to permanently delete \"${currentTaskToDelete.title}\"? This action cannot be undone.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteTask(currentTaskToDelete.id)
+                        taskForDeletionDialog = null
+                        // No need to reset swipe state, item will be removed
+                    }
+                ) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    coroutineScope.launch {
+                        swipeStates[currentTaskToDelete.id]?.reset()
+                    }
+                    taskForDeletionDialog = null
+                }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 

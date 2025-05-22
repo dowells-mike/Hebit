@@ -304,21 +304,24 @@ class TaskViewModel @Inject constructor(
                             val updatedTask = result.data
                             Log.d("TaskViewModel", "Task toggled successfully in VM: ${updatedTask?.id}, completed: ${updatedTask?.isCompleted}")
                             if (updatedTask != null) {
-                                // Ensure the selected task state is definitely updated with the server's response
                                 _selectedTaskState.value = Resource.Success(updatedTask)
                                 
-                                // Update the task in the main list
                                 val currentTasks = (_tasksState.value as? Resource.Success)?.data?.toMutableList()
                                 if (currentTasks != null) {
                                     val index = currentTasks.indexOfFirst { it.id == updatedTask.id }
                                     if (index != -1) {
                                         currentTasks[index] = updatedTask
-                                        _tasksState.value = Resource.Success(currentTasks.toList()) // Ensure new list instance
+                                        _tasksState.value = Resource.Success(currentTasks.toList())
                                     } else {
-                                        loadTasks() // If not found, refresh the whole list
+                                        loadTasks() 
                                     }
                                 } else {
-                                    loadTasks() // If task list isn't success, refresh
+                                    loadTasks() 
+                                }
+
+                                // If task is now completed, archive it immediately
+                                if (updatedTask.isCompleted) {
+                                    archiveTask(updatedTask.id) // This will further update the state and remove it from the list
                                 }
                             }
                         }
@@ -440,6 +443,40 @@ class TaskViewModel @Inject constructor(
                         }
                         is Resource.Loading -> {
                             Log.d("TaskViewModel", "Updating task $taskId in progress...")
+                        }
+                    }
+                }
+        }
+    }
+
+    fun archiveTask(taskId: String) {
+        viewModelScope.launch {
+            Log.d("TaskViewModel", "Archiving task: $taskId")
+            taskRepository.updateTaskStatus(taskId, com.hebit.app.domain.model.TaskStatus.ARCHIVED)
+                .catch { e ->
+                    Log.e("TaskViewModel", "Error archiving task $taskId: ${e.message}", e)
+                    // Optionally, update UI to show error, and revert optimistic updates if any
+                }
+                .collect { result ->
+                    when (result) {
+                        is Resource.Success -> {
+                            Log.d("TaskViewModel", "Task $taskId archived successfully")
+                            // Remove from current list and refresh, or filter out archived
+                            val currentTasks = (_tasksState.value as? Resource.Success)?.data?.toMutableList()
+                            currentTasks?.removeAll { it.id == taskId }
+                            if (currentTasks != null) {
+                                _tasksState.value = Resource.Success(currentTasks.toList())
+                            }
+                            // If it was the selected task, clear it or navigate back
+                            if (_selectedTaskState.value.data?.id == taskId) {
+                                _selectedTaskState.value = Resource.Success(null) // Clear selected task
+                            }
+                        }
+                        is Resource.Error -> {
+                            Log.e("TaskViewModel", "API Error archiving task $taskId: ${result.message}")
+                        }
+                        is Resource.Loading -> {
+                            Log.d("TaskViewModel", "Archiving task $taskId in progress...")
                         }
                     }
                 }
