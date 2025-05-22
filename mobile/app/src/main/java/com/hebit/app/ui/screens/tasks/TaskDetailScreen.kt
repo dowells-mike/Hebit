@@ -268,7 +268,16 @@ fun TaskDetailScreen(
                 } else {
                     // Subtasks
                     val subtasksString = task.metadata["subtasks"]
-                    val subtasks = if (subtasksString is String) parseSubtasks(subtasksString) else emptyList()
+                    Log.d("TaskDetailScreen", "Received subtasksString from metadata: '$subtasksString'")
+
+                    val subtasks = if (subtasksString is String) {
+                        val parsed = parseSubtasks(subtasksString) // Assuming parseSubtasks is accessible
+                        Log.d("TaskDetailScreen", "Parsed subtasks list size: ${parsed.size}, Content: $parsed")
+                        parsed
+                    } else {
+                        Log.d("TaskDetailScreen", "subtasksString is not a String or is null. Defaulting to empty list.")
+                        emptyList()
+                    }
                     
                     // Reminder
                     val reminderString = task.metadata["reminder"]

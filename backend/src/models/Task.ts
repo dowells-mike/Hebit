@@ -121,6 +121,9 @@ const taskSchema = new Schema<TaskDocument>(
           min: 0,
           max: 6
         }
+      },
+      subtasks: {
+        type: String
       }
     }
   },
