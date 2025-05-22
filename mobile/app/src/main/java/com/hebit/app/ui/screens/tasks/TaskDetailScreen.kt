@@ -708,7 +708,7 @@ fun TaskDetailContent(
             }
         }
         
-        if (!task.isCompleted) {
+        if (!task.isCompleted && !hasSubtasks) {
             item {
                 Column(
                     modifier = Modifier.padding(bottom = 16.dp)
