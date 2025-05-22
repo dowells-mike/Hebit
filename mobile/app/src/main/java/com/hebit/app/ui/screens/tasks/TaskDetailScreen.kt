@@ -314,7 +314,7 @@ fun TaskDetailScreen(
                             val newProgress = if (updatedSubtasks.isNotEmpty()) {
                                 (completedCount * 100) / updatedSubtasks.size
                             } else {
-                                task.progress
+                                task.progress // Should be 0 if no subtasks, or retain current if subtasks were just deleted
                             }
                             
                             val subtasksStr = updatedSubtasks.joinToString(",") { subtask -> 
@@ -324,11 +324,16 @@ fun TaskDetailScreen(
                             val updatedMetadata = task.metadata.toMutableMap()
                             updatedMetadata["subtasks"] = subtasksStr
                             
+                            // Check if all subtasks are completed and the parent task isn't already completed
+                            val parentTaskShouldBeCompleted = newProgress == 100 && !task.isCompleted && updatedSubtasks.isNotEmpty()
+
                             val updatedTask = task.copy(
                                 progress = newProgress,
-                                metadata = updatedMetadata
+                                metadata = updatedMetadata,
+                                // Update isCompleted status if all subtasks are now complete
+                                isCompleted = if (parentTaskShouldBeCompleted) true else task.isCompleted
                             )
-                            Log.d("TaskDetailScreen", "onSubtaskToggle - Calculated newProgress: $newProgress, Sending to ViewModel: ${updatedTask.progress}")
+                            Log.d("TaskDetailScreen", "onSubtaskToggle - Calculated newProgress: $newProgress, Parent to complete: $parentTaskShouldBeCompleted. Sending to ViewModel: Progress=${updatedTask.progress}, IsCompleted=${updatedTask.isCompleted}")
                             viewModel.updateTask(updatedTask)
                         },
                         modifier = Modifier
