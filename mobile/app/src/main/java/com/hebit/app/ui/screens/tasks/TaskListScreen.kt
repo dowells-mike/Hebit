@@ -257,12 +257,17 @@ fun TaskListScreen(
                         ) {
                             items(filteredTasks, key = { task -> task.id }) { task ->
                                 val dismissState = rememberSwipeToDismissBoxState(
-                                    confirmValueChange = { newValue ->
-                                        if (newValue == SwipeToDismissBoxValue.EndToStart) { // Swiped left (for delete)
+                                    confirmValueChange = { proposedTargetValue ->
+                                        if (proposedTargetValue == SwipeToDismissBoxValue.EndToStart) {
+                                            // Trying to swipe to "delete" position
                                             taskForDeletionDialog = task // Set the task for the dialog
-                                            true // Return true to allow the swipe to settle and show background
+                                            true // Allow settling at EndToStart to show dialog & background
+                                        } else if (proposedTargetValue == SwipeToDismissBoxValue.Settled) {
+                                            // Trying to swipe back to "settled" position
+                                            true // Allow settling back to normal (e.g., user swipes it back)
                                         } else {
-                                            false // Snap back for any other case
+                                            // Reject other transitions (e.g., StartToEnd, which we don't enable anyway)
+                                            false
                                         }
                                     },
                                     positionalThreshold = { it * 0.25f }
