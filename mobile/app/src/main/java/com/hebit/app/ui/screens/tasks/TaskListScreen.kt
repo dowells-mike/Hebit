@@ -35,6 +35,7 @@ import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
+import com.hebit.app.ui.screens.tasks.getSubtaskProgressCounts
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -371,6 +372,9 @@ fun TaskItem(
     val today = java.time.LocalDate.now()
     val tomorrow = today.plusDays(1)
 
+    // Get subtask progress
+    val subtaskProgress = getSubtaskProgressCounts(task.metadata["subtasks"])
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -394,12 +398,22 @@ fun TaskItem(
                     .weight(1f)
                     .padding(end = 8.dp)
             ) {
-                Text(
-                    text = task.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
-                    color = if (task.isCompleted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) { // Row for title and subtask count
+                    Text(
+                        text = task.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
+                        color = if (task.isCompleted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface
+                    )
+                    if (subtaskProgress.total > 0) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "(${subtaskProgress.completed}/${subtaskProgress.total})",
+                            style = MaterialTheme.typography.bodySmall, // Or titleSmall if preferred
+                            color = if (task.isCompleted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
+                    }
+                }
 
                 var showSpacer = false
 

@@ -22,19 +22,26 @@ fun parseRecurrencePattern(recurrenceStr: String): RecurrenceType? {
 
 /**
  * Parse subtasks from metadata string
+ * Handles both nullable and non-nullable strings
+ * Format: "id:title:isCompleted,id:title:isCompleted,..."
  */
-fun parseSubtasks(subtasksStr: String): List<SubTask> {
-    if (subtasksStr.isBlank()) return emptyList()
-    
-    return subtasksStr.split(",").mapNotNull { subTaskStr ->
-        val parts = subTaskStr.split(":")
-        if (parts.size >= 3) {
+fun parseSubtasks(subtasksString: String?): List<SubTask> {
+    if (subtasksString.isNullOrBlank()) {
+        return emptyList()
+    }
+    return subtasksString.split(',').mapNotNull { subtaskPart ->
+        val parts = subtaskPart.split(':', limit = 3)
+        if (parts.size == 3) {
             SubTask(
                 id = parts[0],
                 title = parts[1],
-                isCompleted = parts[2].toBoolean()
+                isCompleted = parts[2].toBooleanStrictOrNull() ?: false
             )
-        } else null
+        } else {
+            // Optionally log a warning for malformed subtask parts
+            // Log.w("TaskUtils", "Malformed subtask part: $subtaskPart")
+            null
+        }
     }
 }
 
@@ -52,4 +59,26 @@ fun parseReminderSettings(reminderStr: String): String {
         }
     }
     return "Reminder set"
-} 
+}
+
+data class SubtaskProgress(val completed: Int, val total: Int)
+
+/**
+ * Calculates the number of completed and total subtasks from metadata.
+ *
+ * @param subtasksMetadata The subtasks data, expected to be a String (e.g., from task.metadata["subtasks"]).
+ * @return SubtaskProgress containing the counts. Returns (0, 0) if no subtasks or invalid format.
+ */
+fun getSubtaskProgressCounts(subtasksMetadata: Any?): SubtaskProgress {
+    if (subtasksMetadata !is String || subtasksMetadata.isBlank()) {
+        return SubtaskProgress(0, 0)
+    }
+    val subtasksList = parseSubtasks(subtasksMetadata)
+    val total = subtasksList.size
+    val completed = subtasksList.count { it.isCompleted }
+    return SubtaskProgress(completed, total)
+}
+
+// TODO: Add other utility functions like parseRecurrencePattern, parseReminderSettings if they are generic enough
+// For now, parseSubtasks is included here for completeness of getSubtaskProgressCounts.
+// If parseSubtasks is already defined elsewhere (e.g. TaskDetailScreen), it could be moved or referenced. 

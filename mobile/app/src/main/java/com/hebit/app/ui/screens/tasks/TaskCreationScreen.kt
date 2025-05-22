@@ -116,8 +116,6 @@ fun TaskCreationScreen(
     // Subtasks - using the existing mutableStateListOf
     val currentSubtasks = remember { mutableStateListOf<SubTask>() }
     var newSubtaskTitle by remember { mutableStateOf("") }
-    // We'll remove showAddSubtask Dialog later if fully replaced by inline UI
-    var showAddSubtaskDialog by remember { mutableStateOf(false) } // Keep for now, maybe useful
     
     // Reminder settings
     var showReminderOptions by remember { mutableStateOf(false) }
@@ -164,7 +162,7 @@ fun TaskCreationScreen(
                 }
                 selectedCategoryName = task.category ?: "Uncategorized"
                 selectedCategoryObject = availableCategories.find { it.name == task.category }
-
+                
                 // Load recurrence pattern from structured recurrenceRule
                 task.recurrenceRule?.let {
                     recurrencePattern = RecurrencePattern(
@@ -182,26 +180,26 @@ fun TaskCreationScreen(
                 task.metadata["reminder"]?.let { reminderValue ->
                     if (reminderValue is String) {
                         val reminderStr = reminderValue
-                        val parts = reminderStr.split(",")
-                        if (parts.isNotEmpty()) {
-                            val minutes = parts[0].toIntOrNull() ?: 15
-                            val timeString = parts.getOrNull(1) ?: ""
-                            
-                            if (timeString.isNotBlank()) {
-                                reminderSettings = ReminderSettings(
-                                    isEnabled = true,
-                                    minutes = 0,
-                                    time = try {
-                                        LocalTime.parse(timeString, DateTimeFormatter.ofPattern("h:mm a"))
-                                    } catch (e: Exception) {
-                                        null
-                                    }
-                                )
-                            } else {
-                                reminderSettings = ReminderSettings(
-                                    isEnabled = true,
-                                    minutes = minutes
-                                )
+                    val parts = reminderStr.split(",")
+                    if (parts.isNotEmpty()) {
+                        val minutes = parts[0].toIntOrNull() ?: 15
+                        val timeString = parts.getOrNull(1) ?: ""
+                        
+                        if (timeString.isNotBlank()) {
+                            reminderSettings = ReminderSettings(
+                                isEnabled = true,
+                                minutes = 0,
+                                time = try {
+                                    LocalTime.parse(timeString, DateTimeFormatter.ofPattern("h:mm a"))
+                                } catch (e: Exception) {
+                                    null
+                                }
+                            )
+                        } else {
+                            reminderSettings = ReminderSettings(
+                                isEnabled = true,
+                                minutes = minutes
+                            )
                             }
                         }
                     }
@@ -293,8 +291,8 @@ fun TaskCreationScreen(
     
     // For date picker
     val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = selectedDate?.toEpochDay()?.let { it * 24 * 60 * 60 * 1000 }
-            ?: LocalDate.now().toEpochDay() * 24 * 60 * 60 * 1000
+        initialSelectedDateMillis = selectedDate?.toEpochDay()?.let { it * 24 * 60 * 60 * 1000 } 
+            ?: (LocalDate.now().toEpochDay() * 24 * 60 * 60 * 1000)
     )
     
     // Time picker handler
@@ -381,9 +379,9 @@ fun TaskCreationScreen(
             // Task title input - required
             OutlinedTextField(
                 value = taskTitle,
-                onValueChange = {
+                onValueChange = { 
                     if (it.length <= 255) { // Add character limit
-                        taskTitle = it
+                    taskTitle = it
                     }
                     
                     // Add this to trigger category suggestions when title changes
@@ -593,7 +591,7 @@ fun TaskCreationScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.Folder, 
+                    imageVector = Icons.Outlined.Folder,
                     contentDescription = "Category",
                     tint = selectedCategoryObject?.color?.let { 
                         try { Color(android.graphics.Color.parseColor(it)) } 
@@ -737,12 +735,12 @@ fun TaskCreationScreen(
             Divider()
             
             // Subtasks section
-            Text(
+                Text(
                 "Subtasks",
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
             )
-
+            
             // Display existing subtasks
             if (currentSubtasks.isNotEmpty()) {
                 Column(modifier = Modifier.fillMaxWidth()) {
@@ -769,7 +767,7 @@ fun TaskCreationScreen(
                                 onClick = { currentSubtasks.removeAt(index) },
                                 modifier = Modifier.size(24.dp)
                             ) {
-                                Icon(
+                        Icon(
                                     imageVector = Icons.Default.RemoveCircleOutline, // Changed icon
                                     contentDescription = "Remove Subtask",
                                     modifier = Modifier.size(20.dp) // Adjusted size
@@ -804,7 +802,7 @@ fun TaskCreationScreen(
                         if (newSubtaskTitle.isNotBlank()) {
                             currentSubtasks.add(SubTask(title = newSubtaskTitle))
                             newSubtaskTitle = "" // Clear input field
-                        }
+                }
                     },
                     enabled = newSubtaskTitle.isNotBlank(),
                     modifier = Modifier.height(56.dp) // Match OutlinedTextField height
@@ -815,7 +813,7 @@ fun TaskCreationScreen(
             // End of Subtasks Section ---
             
             HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-
+            
             // Reminder settings
             Row(
                 modifier = Modifier
@@ -955,12 +953,12 @@ fun TaskCreationScreen(
                         Text("Clear")
                     }
                     Spacer(modifier = Modifier.width(8.dp))
-                    TextButton(
-                        onClick = { 
-                            showDatePicker = false 
-                        }
-                    ) {
-                        Text("Cancel")
+                TextButton(
+                    onClick = { 
+                        showDatePicker = false 
+                    }
+                ) {
+                    Text("Cancel")
                     }
                 }
             },
@@ -992,7 +990,7 @@ fun TaskCreationScreen(
                                     modifier = Modifier.clickable {
                                         selectedCategoryName = category.name
                                         selectedCategoryObject = category
-                                        showCategoryPicker = false
+                                    showCategoryPicker = false
                                     },
                                     leadingContent = {
                                         Box(
@@ -1022,20 +1020,20 @@ fun TaskCreationScreen(
                                     headlineContent = { Text("Create New Category...") },
                                     leadingContent = { Icon(Icons.Filled.Add, contentDescription = "Create New Category") },
                                     modifier = Modifier.clickable {
-                                        showCategoryPicker = false
+                                    showCategoryPicker = false
                                         onNavigateToCreateCategory()
                                         Log.d("TaskCreationScreen", "Create New Category list item clicked - navigating")
-                                    }
-                                )
+                                }
+                            )
                             }
                         }
                         if (availableCategories.isEmpty()) {
-                             Text(
+                            Text(
                                  text = "No categories yet. Click above to create one.",
                                  style = MaterialTheme.typography.bodySmall,
                                  textAlign = TextAlign.Center,
                                  modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
-                             )
+                            )
                         }
                     }
                 }
@@ -1048,9 +1046,9 @@ fun TaskCreationScreen(
             dismissButton = { 
                 // Optional: Only show cancel if you want a different action from "Done" when no selection is made.
                 // Otherwise, "Done" can also act as dismiss.
-                 TextButton(onClick = { showCategoryPicker = false }) {
-                     Text("Cancel")
-                 }
+                TextButton(onClick = { showCategoryPicker = false }) {
+                    Text("Cancel")
+                }
             }
         )
     }
@@ -1382,35 +1380,4 @@ fun FlowRow(
     }
 }
 
-// Move all these duplicate function definitions to a common utility file
-// For now, import them from TaskDetailScreen
-// Helper function to parse recurrence pattern from metadata string
-/*
-fun parseRecurrencePattern(recurrenceStr: String): RecurrenceType? {
-    val parts = recurrenceStr.split(",")
-    if (parts.isNotEmpty()) {
-        return try {
-            RecurrenceType.valueOf(parts[0])
-        } catch (e: Exception) {
-            null
-        }
-    }
-    return null
-}
-
-// Helper function to parse subtasks from metadata string
-fun parseSubtasks(subtasksStr: String): List<SubTask> {
-    if (subtasksStr.isBlank()) return emptyList()
-    
-    return subtasksStr.split(",").mapNotNull { subTaskStr ->
-        val parts = subTaskStr.split(":")
-        if (parts.size >= 3) {
-            SubTask(
-                id = parts[0],
-                title = parts[1],
-                isCompleted = parts[2].toBoolean()
-            )
-        } else null
-    }
-}
-*/
+// Utility functions have been moved to TaskUtils.kt to avoid duplicates
