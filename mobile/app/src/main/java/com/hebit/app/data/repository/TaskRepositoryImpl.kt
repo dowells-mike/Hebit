@@ -390,6 +390,8 @@ class TaskRepositoryImpl @Inject constructor(
     }
 
     private fun mapTaskDtoToDomain(dto: TaskDto): Task {
+        Log.d("TaskRepository", "Mapping TaskDto: ID=${dto._id}, Title='${dto.title}', DueDateString='${dto.dueDate}'")
+
         // Convert backend string priority to integer priority
         val priorityInt = when(dto.priority.lowercase()) {
             "low" -> 1
@@ -398,12 +400,23 @@ class TaskRepositoryImpl @Inject constructor(
             else -> 2 // Default to medium
         }
         
+        val parsedDueDateTime = dto.dueDate?.let {
+            try {
+                LocalDateTime.parse(it, dateFormatter).also { parsed ->
+                    Log.d("TaskRepository", "Successfully parsed dueDateString '${dto.dueDate}' to: $parsed")
+                }
+            } catch (e: Exception) {
+                Log.e("TaskRepository", "Failed to parse dueDateString '${dto.dueDate}': ${e.message}")
+                null
+            }
+        }
+
         return Task(
             id = dto._id,
             title = dto.title,
             description = dto.description,
             category = dto.category,
-            dueDateTime = dto.dueDate?.let { LocalDateTime.parse(it, dateFormatter) },
+            dueDateTime = parsedDueDateTime,
             priority = priorityInt,
             progress = dto.progress ?: 0,
             isCompleted = dto.completed,

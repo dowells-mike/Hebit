@@ -369,7 +369,7 @@ class TaskViewModel @Inject constructor(
     
     fun updateTaskWithData(taskId: String, taskData: TaskCreationData) {
         viewModelScope.launch {
-            Log.d("TaskViewModel", "Updating task $taskId from TaskCreationData: ${taskData.title}")
+            Log.d("TaskViewModel", "Updating task $taskId from TaskCreationData: $taskData")
 
             val dueDateTime = if (taskData.dueDate != null) {
                 taskData.dueDate.atTime(taskData.dueTime ?: java.time.LocalTime.now())

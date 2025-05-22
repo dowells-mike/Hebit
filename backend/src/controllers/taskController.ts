@@ -140,6 +140,7 @@ export const createTask = catchAsync(async (req: AuthRequest, res: Response) => 
  * @access  Private
  */
 export const updateTask = catchAsync(async (req: AuthRequest, res: Response) => {
+  console.log("updateTask controller - Received req.body:", req.body); // Log the entire request body
   const userId = req.user?._id;
   const taskId = req.params.id;
   
@@ -150,7 +151,13 @@ export const updateTask = catchAsync(async (req: AuthRequest, res: Response) => 
   }
   
   const { metadata: requestMetadata, ...otherUpdates } = req.body;
-  const updates: any = { ...otherUpdates }; // Use 'any' for updates object for flexibility
+  const updates: any = { ...otherUpdates }; 
+
+  // Explicitly map due_date from request to dueDate for the update
+  if (req.body.due_date) {
+    updates.dueDate = req.body.due_date;
+    delete updates.due_date; // Remove the snake_case version if it was spread
+  }
 
   // Initialize taskMetadata safely, using existing task.metadata or an empty object
   let taskMetadata: any = task.metadata ? { ...task.metadata } : {};
