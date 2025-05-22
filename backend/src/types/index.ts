@@ -57,6 +57,7 @@ export interface TaskDocument {
   completed: boolean;
   completedAt?: Date;              // When was it completed
   priority: 'low' | 'medium' | 'high';
+  progress?: number;
   dueDate?: Date;
   status?: 'todo' | 'in_progress' | 'completed' | 'archived';  // More granular status
   category?: string;
