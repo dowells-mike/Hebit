@@ -113,10 +113,11 @@ fun TaskCreationScreen(
     var showRecurrenceOptions by remember { mutableStateOf(false) }
     var recurrencePattern by remember { mutableStateOf(RecurrencePattern()) }
     
-    // Subtasks
-    val subtasks = remember { mutableStateListOf<SubTask>() }
-    var showAddSubtask by remember { mutableStateOf(false) }
+    // Subtasks - using the existing mutableStateListOf
+    val currentSubtasks = remember { mutableStateListOf<SubTask>() }
     var newSubtaskTitle by remember { mutableStateOf("") }
+    // We'll remove showAddSubtask Dialog later if fully replaced by inline UI
+    var showAddSubtaskDialog by remember { mutableStateOf(false) } // Keep for now, maybe useful
     
     // Reminder settings
     var showReminderOptions by remember { mutableStateOf(false) }
@@ -209,8 +210,9 @@ fun TaskCreationScreen(
                 // Load subtasks if available
                 task.metadata["subtasks"]?.let { subtasksValue ->
                     if (subtasksValue is String) {
-                        subtasks.clear()
-                        subtasks.addAll(parseSubtasks(subtasksValue))
+                        // Ensure we're updating the correct state list
+                        currentSubtasks.clear()
+                        currentSubtasks.addAll(parseSubtasks(subtasksValue))
                     }
                 }
             }
@@ -347,7 +349,7 @@ fun TaskCreationScreen(
                                 priority = selectedPriority,
                                 category = selectedCategoryName,
                                 labels = emptyList(),
-                                subtasks = subtasks.toList(),
+                                subtasks = currentSubtasks.toList(),
                                 recurrencePattern = recurrencePattern,
                                 reminderSettings = reminderSettings
                             )
@@ -735,43 +737,16 @@ fun TaskCreationScreen(
             Divider()
             
             // Subtasks section
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                            Icon(
-                    imageVector = Icons.Outlined.CheckBox,
-                    contentDescription = "Subtasks",
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                
-                Spacer(modifier = Modifier.width(8.dp))
-                
-                Text(
-                    text = "Subtasks",
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                
-                Spacer(modifier = Modifier.weight(1f))
-                
-                IconButton(onClick = { showAddSubtask = true }) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Add Subtask"
-                    )
-                }
-            }
-            
+            Text(
+                "Subtasks",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+            )
+
             // Display existing subtasks
-            if (subtasks.isNotEmpty()) {
-            Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 32.dp, end = 16.dp, bottom = 16.dp)
-                ) {
-                    subtasks.forEachIndexed { index, subtask ->
+            if (currentSubtasks.isNotEmpty()) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    currentSubtasks.forEachIndexed { index, subtask ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -781,36 +756,66 @@ fun TaskCreationScreen(
                             Checkbox(
                                 checked = subtask.isCompleted,
                                 onCheckedChange = { isChecked ->
-                                    subtasks[index] = subtask.copy(isCompleted = isChecked)
+                                    currentSubtasks[index] = subtask.copy(isCompleted = isChecked)
                                 }
                             )
-                            
                             Text(
                                 text = subtask.title,
                                 modifier = Modifier
                                     .weight(1f)
                                     .padding(start = 8.dp)
                             )
-                            
                             IconButton(
-                                onClick = {
-                                    subtasks.removeAt(index)
-                                },
+                                onClick = { currentSubtasks.removeAt(index) },
                                 modifier = Modifier.size(24.dp)
                             ) {
-                        Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Remove",
-                                    modifier = Modifier.size(16.dp)
+                                Icon(
+                                    imageVector = Icons.Default.RemoveCircleOutline, // Changed icon
+                                    contentDescription = "Remove Subtask",
+                                    modifier = Modifier.size(20.dp) // Adjusted size
                                 )
                             }
+                        }
+                        if (index < currentSubtasks.size - 1) {
+                            HorizontalDivider(modifier = Modifier.padding(start = 40.dp))
                         }
                     }
                 }
             }
+
+            // Input field to add new subtask
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = newSubtaskTitle,
+                    onValueChange = { newSubtaskTitle = it },
+                    label = { Text("New subtask...") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    // leadingIcon = { Icon(Icons.Default.PlaylistAddCheck, contentDescription = null) }
+                )
+                Button(
+                    onClick = {
+                        if (newSubtaskTitle.isNotBlank()) {
+                            currentSubtasks.add(SubTask(title = newSubtaskTitle))
+                            newSubtaskTitle = "" // Clear input field
+                        }
+                    },
+                    enabled = newSubtaskTitle.isNotBlank(),
+                    modifier = Modifier.height(56.dp) // Match OutlinedTextField height
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Add Subtask")
+                }
+            }
+            // End of Subtasks Section ---
             
-            Divider()
-            
+            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+
             // Reminder settings
             Row(
                 modifier = Modifier
@@ -896,7 +901,7 @@ fun TaskCreationScreen(
                             priority = selectedPriority,
                             category = selectedCategoryName,
                             labels = emptyList(),
-                            subtasks = subtasks.toList(),
+                            subtasks = currentSubtasks.toList(),
                             recurrencePattern = recurrencePattern,
                             reminderSettings = reminderSettings
                         )
@@ -919,50 +924,6 @@ fun TaskCreationScreen(
             showTimePickerDialog()
             showTimePicker = false
         }
-    }
-    
-    // Add Subtask Dialog
-    if (showAddSubtask) {
-        AlertDialog(
-            onDismissRequest = { 
-                showAddSubtask = false
-                newSubtaskTitle = ""
-            },
-            title = { Text("Add Subtask") },
-            text = {
-                OutlinedTextField(
-                    value = newSubtaskTitle,
-                    onValueChange = { newSubtaskTitle = it },
-                    placeholder = { Text("Subtask title") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (newSubtaskTitle.isNotBlank()) {
-                            subtasks.add(SubTask(title = newSubtaskTitle))
-                            newSubtaskTitle = ""
-                        }
-                        showAddSubtask = false
-                    },
-                    enabled = newSubtaskTitle.isNotBlank()
-                ) {
-                    Text("Add")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { 
-                        showAddSubtask = false
-                        newSubtaskTitle = ""
-                    }
-                ) {
-                    Text("Cancel")
-                }
-            }
-        )
     }
     
     // Date Picker Dialog
