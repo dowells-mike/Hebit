@@ -266,6 +266,8 @@ fun TaskDetailScreen(
                         Text("Task not found")
                     }
                 } else {
+                    Log.d("TaskDetailScreen", "taskState is Success. Task ID: ${task.id}, Progress: ${task.progress}")
+
                     // Subtasks
                     val subtasksString = task.metadata["subtasks"]
                     Log.d("TaskDetailScreen", "Received subtasksString from metadata: '$subtasksString'")
@@ -326,6 +328,7 @@ fun TaskDetailScreen(
                                 progress = newProgress,
                                 metadata = updatedMetadata
                             )
+                            Log.d("TaskDetailScreen", "onSubtaskToggle - Calculated newProgress: $newProgress, Sending to ViewModel: ${updatedTask.progress}")
                             viewModel.updateTask(updatedTask)
                         },
                         modifier = Modifier
@@ -514,6 +517,7 @@ fun TaskDetailContent(
     onSubtaskToggle: (Int, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    Log.d("TaskDetailContent", "Recomposing. Task ID: ${task.id}, Progress: ${task.progress}")
     val dateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy")
     val hasSubtasks = subtasks.isNotEmpty()
     
@@ -717,11 +721,10 @@ fun TaskDetailContent(
             }
         }
         
-        if (!task.isCompleted && !hasSubtasks) {
+        // Show Progress Text and LinearProgressIndicator if task is not completed
+        if (!task.isCompleted) {
             item {
-                Column(
-                    modifier = Modifier.padding(bottom = 16.dp)
-                ) {
+                Column(modifier = Modifier.padding(bottom = if (hasSubtasks) 8.dp else 16.dp)) { // Adjusted bottom padding
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -731,43 +734,18 @@ fun TaskDetailContent(
                             text = "Progress: ${task.progress}%",
                             style = MaterialTheme.typography.bodyMedium
                         )
-                        
                         Text(
                             text = "${task.progress}/100",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    
                     Spacer(modifier = Modifier.height(8.dp))
-                    
                     LinearProgressIndicator(
                         progress = { task.progress / 100f },
                         modifier = Modifier.fillMaxWidth(),
                         strokeCap = StrokeCap.Round
                     )
-                    
-                    if (!hasSubtasks) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            val progressOptions = listOf(0, 25, 50, 75, 100)
-                            progressOptions.forEach { progress ->
-                                OutlinedButton(
-                                    onClick = { onUpdateProgress(progress) },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .padding(horizontal = 4.dp),
-                                    enabled = progress != task.progress
-                                ) {
-                                    Text(text = "$progress%")
-                                }
-                            }
-                        }
-                    }
                 }
             }
         }
