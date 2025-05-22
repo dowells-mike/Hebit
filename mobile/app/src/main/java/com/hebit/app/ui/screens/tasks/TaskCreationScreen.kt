@@ -167,7 +167,7 @@ fun TaskCreationScreen(
                 // Load recurrence pattern from structured recurrenceRule
                 task.recurrenceRule?.let {
                     recurrencePattern = RecurrencePattern(
-                        type = RecurrenceType.valueOf(it.frequency ?: RecurrenceType.NONE.name),
+                        type = RecurrenceType.valueOf(it.frequency?.uppercase() ?: RecurrenceType.NONE.name),
                         interval = it.interval ?: 1,
                         endDate = it.endDate?.let { endDateStr ->
                             try { LocalDate.parse(endDateStr) } catch (e: Exception) { null }
