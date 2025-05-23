@@ -63,8 +63,14 @@ export interface TaskDocument {
   category?: string;
   parentTaskId?: string;           // For hierarchical tasks
   tags?: string[];
-  rrule?: string;                  // iCalendar RRULE string for recurrence
-  reminderTime?: Date;             // When to remind
+  recurrenceRule?: string;          // iCalendar RRULE string
+  recurrenceStartDate?: Date;       // DTSTART for the recurrence
+  recurrenceExceptions?: Date[];    // Array of EXDATEs (exception dates)
+  reminders?: Array<{
+    type: 'relative' | 'absolute';
+    offsetMinutes?: number;      // For relative reminders
+    absoluteTime?: Date;         // For absolute reminders
+  }>;
   effort?: number;                 // Estimated effort (1-5)
   complexity?: number;             // Task complexity (1-5) for ML
   attachments?: [{                 // File attachments

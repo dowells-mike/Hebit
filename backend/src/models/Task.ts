@@ -56,13 +56,34 @@ const taskSchema = new Schema<TaskDocument>(
         type: String
       }
     ],
-    rrule: {
+    recurrenceRule: {
       type: String,
       trim: true
     },
-    reminderTime: {
+    recurrenceStartDate: {
       type: Date
     },
+    recurrenceExceptions: [
+      {
+        type: Date
+      }
+    ],
+    reminders: [
+      {
+        type: {
+          type: String,
+          required: true,
+          enum: ['relative', 'absolute']
+        },
+        offsetMinutes: {
+          type: Number
+        },
+        absoluteTime: {
+          type: Date
+        },
+        _id: false
+      }
+    ],
     effort: {
       type: Number,
       min: 1,
