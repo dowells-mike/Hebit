@@ -22,6 +22,9 @@ import com.hebit.app.data.remote.dto.CategoryDto
 import com.hebit.app.data.remote.dto.CreateCategoryRequest
 import com.hebit.app.data.remote.dto.UpdateCategoryRequest
 import com.hebit.app.domain.model.TaskStatus
+import com.hebit.app.domain.model.Reminder
+import com.hebit.app.domain.model.ReminderType
+import com.hebit.app.data.remote.dto.ReminderDto
 
 @Singleton
 class TaskRepositoryImpl @Inject constructor(
@@ -97,8 +100,11 @@ class TaskRepositoryImpl @Inject constructor(
                 category = task.category,
                 dueDate = task.dueDateTime?.format(dateFormatter),
                 priority = priorityString,
-                recurrence = task.recurrenceRule,
-                metadata = task.metadata
+                metadata = task.metadata,
+                recurrenceRuleRequest = task.recurrenceRuleString,
+                recurrenceStartDateRequest = task.recurrenceStartDate?.format(dateFormatter),
+                recurrenceExceptionsRequest = task.recurrenceExceptions?.map { it.format(dateFormatter) },
+                remindersRequest = task.reminders.map { reminderDomainToDto(it) }
             )
             
             val response = apiService.createTask(createTaskRequest)
@@ -139,8 +145,11 @@ class TaskRepositoryImpl @Inject constructor(
                 priority = priorityString,
                 progress = task.progress,
                 isCompleted = task.isCompleted,
-                recurrence = task.recurrenceRule,
-                metadata = task.metadata
+                metadata = task.metadata,
+                recurrenceRuleRequest = task.recurrenceRuleString,
+                recurrenceStartDateRequest = task.recurrenceStartDate?.format(dateFormatter),
+                recurrenceExceptionsRequest = task.recurrenceExceptions?.map { it.format(dateFormatter) },
+                remindersRequest = task.reminders.map { reminderDomainToDto(it) }
             )
             
             val response = apiService.updateTask(task.id, updateTaskRequest)
@@ -414,7 +423,7 @@ class TaskRepositoryImpl @Inject constructor(
         return Task(
             id = dto._id,
             title = dto.title,
-            description = dto.description,
+            description = dto.description ?: "",
             category = dto.category,
             dueDateTime = parsedDueDateTime,
             priority = priorityInt,
@@ -422,8 +431,18 @@ class TaskRepositoryImpl @Inject constructor(
             isCompleted = dto.completed,
             createdAt = LocalDateTime.parse(dto.createdAt, dateFormatter),
             updatedAt = LocalDateTime.parse(dto.updatedAt, dateFormatter),
-            recurrenceRule = dto.recurrence,
-            metadata = dto.metadata ?: emptyMap()
+            metadata = dto.metadata ?: emptyMap(),
+            recurrenceRuleString = dto.recurrenceRule,
+            recurrenceStartDate = dto.recurrenceStartDate?.let { LocalDateTime.parse(it, dateFormatter) },
+            recurrenceExceptions = dto.recurrenceExceptions?.mapNotNull { exDateString ->
+                try {
+                    LocalDateTime.parse(exDateString, dateFormatter)
+                } catch (e: Exception) {
+                    Log.e("TaskRepositoryImpl", "Failed to parse recurrence exception date: $exDateString", e)
+                    null
+                }
+            } ?: emptyList(),
+            reminders = dto.reminders?.map { reminderDtoToDomain(it) } ?: emptyList()
         )
     }
 
@@ -433,6 +452,22 @@ class TaskRepositoryImpl @Inject constructor(
             name = dto.name,
             color = dto.color,
             icon = dto.icon
+        )
+    }
+
+    private fun reminderDtoToDomain(dto: ReminderDto): Reminder {
+        return Reminder(
+            type = ReminderType.valueOf(dto.type.uppercase()), // Assuming DTO type matches enum name (case insensitive)
+            offsetMinutes = dto.offsetMinutes,
+            absoluteDateTime = dto.absoluteTime?.let { LocalDateTime.parse(it, dateFormatter) }
+        )
+    }
+
+    private fun reminderDomainToDto(domain: Reminder): ReminderDto {
+        return ReminderDto(
+            type = domain.type.name.lowercase(),
+            offsetMinutes = domain.offsetMinutes,
+            absoluteTime = domain.absoluteDateTime?.format(dateFormatter)
         )
     }
 } 

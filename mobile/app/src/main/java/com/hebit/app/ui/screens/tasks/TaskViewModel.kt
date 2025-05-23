@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.hebit.app.domain.model.Reminder
+import com.hebit.app.domain.model.ReminderType
 
 @HiltViewModel
 class TaskViewModel @Inject constructor(
@@ -142,13 +144,30 @@ class TaskViewModel @Inject constructor(
                 taskData.subtasks.joinToString(",") { "${it.id}:${it.title}:${it.isCompleted}" }
             } else null
             
-            val recurrenceRuleDto = taskData.recurrencePattern?.let {
-                if (it.type == RecurrenceType.NONE) null
-                else RecurrenceRuleDto(
-                    frequency = it.type.name.lowercase(),
-                    interval = it.interval,
-                    endDate = it.endDate?.format(DateTimeFormatter.ISO_LOCAL_DATE)
-                )
+            // RECURRENCE: This part needs to align with the new Task domain model fields
+            // The Task domain model now expects: 
+            // recurrenceRuleString: String? 
+            // recurrenceStartDate: LocalDateTime?
+            // recurrenceExceptions: List<LocalDateTime>?
+
+            var taskRecurrenceRuleString: String? = null
+            var taskRecurrenceStartDate: LocalDateTime? = null
+            // var taskRecurrenceExceptions: List<LocalDateTime>? = null // TODO: Add if TaskCreationData supports exceptions
+
+            taskData.recurrencePattern?.let {
+                if (it.type != RecurrenceType.NONE) {
+                    // This is a simplified mapping. A full RRULE might be constructed here or passed through.
+                    // For now, let's assume TaskCreationData holds enough info for a basic RRULE string
+                    // or that we will primarily use recurrenceRuleString directly if provided by UI.
+                    // This part might need significant enhancement for full RRULE generation.
+                    taskRecurrenceRuleString = "FREQ=${it.type.name};INTERVAL=${it.interval}" 
+                    if (it.endDate != null) {
+                        taskRecurrenceRuleString += ";UNTIL=${it.endDate.format(DateTimeFormatter.BASIC_ISO_DATE).replace("-", "")}T235959Z"
+                    }
+                    // DTSTART would typically be the initial due date of the task if it's recurring from that point.
+                    // For now, setting it based on dueDateTime, but this needs careful handling.
+                    taskRecurrenceStartDate = dueDateTime 
+                }
             }
             
             val reminderData = taskData.reminderSettings?.let {
@@ -166,11 +185,16 @@ class TaskViewModel @Inject constructor(
                 isCompleted = false,
                 createdAt = LocalDateTime.now(),
                 updatedAt = LocalDateTime.now(),
-                recurrenceRule = recurrenceRuleDto,
                 metadata = mapOf(
                     "subtasks" to subtasksData,
                     "reminder" to reminderData
-                ).filterValues { it != null } as Map<String, String>
+                ).filterValues { it != null } as Map<String, String>,
+                
+                // NEW RECURRENCE FIELDS
+                recurrenceRuleString = taskRecurrenceRuleString,
+                recurrenceStartDate = taskRecurrenceStartDate,
+                recurrenceExceptions = emptyList(), // Placeholder, needs to be populated if UI supports it
+                reminders = emptyList() // Placeholder, map reminderData to List<Reminder> here later
             )
             
             taskRepository.createTask(task)
@@ -288,7 +312,7 @@ class TaskViewModel @Inject constructor(
             if (currentSelectedTask?.id == taskId) {
                 _selectedTaskState.value = Resource.Success(currentSelectedTask.copy(isCompleted = !currentSelectedTask.isCompleted, updatedAt = LocalDateTime.now()))
             }
-
+            
             taskRepository.toggleTaskCompletion(taskId)
                 .catch { e ->
                     Log.e("TaskViewModel", "Error toggling task completion in VM: ${e.message}", e)
@@ -313,9 +337,9 @@ class TaskViewModel @Inject constructor(
                                         currentTasks[index] = updatedTask
                                         _tasksState.value = Resource.Success(currentTasks.toList())
                                     } else {
-                                        loadTasks() 
+                                loadTasks()
                                     }
-                                } else {
+                            } else {
                                     loadTasks() 
                                 }
 
@@ -373,21 +397,21 @@ class TaskViewModel @Inject constructor(
     fun updateTaskWithData(taskId: String, taskData: TaskCreationData) {
         viewModelScope.launch {
             Log.d("TaskViewModel", "Updating task $taskId from TaskCreationData: $taskData")
-
-            val dueDateTime = if (taskData.dueDate != null) {
-                taskData.dueDate.atTime(taskData.dueTime ?: java.time.LocalTime.now())
-            } else null
-
-            val priority = when (taskData.priority) {
-                com.hebit.app.domain.model.TaskPriority.HIGH -> 3
-                com.hebit.app.domain.model.TaskPriority.MEDIUM -> 2
-                com.hebit.app.domain.model.TaskPriority.LOW -> 1
-            }
-
-            val subtasksData = if (taskData.subtasks.isNotEmpty()) {
-                taskData.subtasks.joinToString(",") { "${it.id}:${it.title}:${it.isCompleted}" }
-            } else null
-
+                    
+                    val dueDateTime = if (taskData.dueDate != null) {
+                        taskData.dueDate.atTime(taskData.dueTime ?: java.time.LocalTime.now())
+                    } else null
+                    
+                    val priority = when (taskData.priority) {
+                        com.hebit.app.domain.model.TaskPriority.HIGH -> 3
+                        com.hebit.app.domain.model.TaskPriority.MEDIUM -> 2
+                        com.hebit.app.domain.model.TaskPriority.LOW -> 1
+                    }
+                    
+                    val subtasksData = if (taskData.subtasks.isNotEmpty()) {
+                        taskData.subtasks.joinToString(",") { "${it.id}:${it.title}:${it.isCompleted}" }
+                    } else null
+                    
             val recurrenceRuleDto = taskData.recurrencePattern?.let {
                 if (it.type == RecurrenceType.NONE) null
                 else RecurrenceRuleDto(
@@ -397,10 +421,10 @@ class TaskViewModel @Inject constructor(
                 )
             }
 
-            val reminderData = taskData.reminderSettings?.let {
+                    val reminderData = taskData.reminderSettings?.let {
                 if (it.isEnabled) "${it.minutes},${it.time?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: ""}" else null
-            }
-
+                    }
+                    
             // Fetch existing task to ensure we don't overwrite fields not in TaskCreationData
             // Or, construct a Task object with only the updatable fields, if your TaskRepository.updateTask handles partial updates.
             // For now, assuming we need to pass a full Task object, which means we might need to fetch it first if not all fields are in TaskCreationData.
@@ -410,20 +434,32 @@ class TaskViewModel @Inject constructor(
 
             val updatedTaskDomainObject = Task(
                 id = taskId, // Crucial for update
-                title = taskData.title,
-                description = taskData.description ?: "",
+                        title = taskData.title,
+                        description = taskData.description ?: "",
                 category = if (taskData.category == "Uncategorized") null else taskData.category,
-                dueDateTime = dueDateTime,
-                priority = priority,
+                        dueDateTime = dueDateTime,
+                        priority = priority,
                 progress = selectedTaskState.value.data?.progress ?: 0, // Preserve existing progress or default
                 isCompleted = selectedTaskState.value.data?.isCompleted ?: false, // Preserve existing completion or default
                 createdAt = selectedTaskState.value.data?.createdAt ?: LocalDateTime.now(), // Preserve or use placeholder
                 updatedAt = LocalDateTime.now(), // This will be set by backend
-                recurrenceRule = recurrenceRuleDto,
+                // recurrenceRule = recurrenceRuleDto, // OLD FIELD - THIS WAS THE ERROR
                 metadata = mapOf(
                     "subtasks" to subtasksData,
                     "reminder" to reminderData
-                ).filterValues { it != null } as Map<String, String>
+                ).filterValues { it != null } as Map<String, String>,
+
+                // NEW RECURRENCE FIELDS - Similar to how it was done in createTask
+                // This assumes recurrenceRuleDto is an instance of the old RecurrenceRuleDto 
+                // and needs to be mapped to the new fields. This logic should mirror createTask or be refined.
+                recurrenceRuleString = recurrenceRuleDto?.let { 
+                    if (it.frequency == null) null 
+                    else "FREQ=${it.frequency.uppercase()};INTERVAL=${it.interval ?: 1}" + 
+                         (it.endDate?.let { ed -> ";UNTIL=${ed.replace("-", "")}T235959Z" } ?: "")
+                },
+                recurrenceStartDate = if (recurrenceRuleDto != null && recurrenceRuleDto.frequency != null) dueDateTime else null, // Or derive from existing task if not changing
+                recurrenceExceptions = selectedTaskState.value.data?.recurrenceExceptions ?: emptyList(), // Preserve existing or default
+                reminders = selectedTaskState.value.data?.reminders ?: emptyList() // Preserve existing or default. TODO: Map from taskData if provided
             )
 
             taskRepository.updateTask(updatedTaskDomainObject)
@@ -478,8 +514,8 @@ class TaskViewModel @Inject constructor(
                         is Resource.Loading -> {
                             Log.d("TaskViewModel", "Archiving task $taskId in progress...")
                         }
-                    }
                 }
+            }
         }
     }
 } 

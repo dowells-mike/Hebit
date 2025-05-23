@@ -163,17 +163,50 @@ fun TaskCreationScreen(
                 selectedCategoryName = task.category ?: "Uncategorized"
                 selectedCategoryObject = availableCategories.find { it.name == task.category }
                 
-                // Load recurrence pattern from structured recurrenceRule
-                task.recurrenceRule?.let {
-                    recurrencePattern = RecurrencePattern(
-                        type = RecurrenceType.valueOf(it.frequency?.uppercase() ?: RecurrenceType.NONE.name),
-                        interval = it.interval ?: 1,
-                        endDate = it.endDate?.let { endDateStr ->
-                            try { LocalDate.parse(endDateStr) } catch (e: Exception) { null }
+                // Load recurrence pattern from new recurrence fields
+                if (task.recurrenceRuleString != null) {
+                    // Basic parsing of RRULE string - THIS IS A SIMPLIFIED PLACEHOLDER
+                    // A proper RRULE parsing library or more detailed logic is needed here.
+                    var parsedType = RecurrenceType.NONE
+                    var parsedInterval = 1
+                    var parsedEndDate: LocalDate? = null
+
+                    val parts = task.recurrenceRuleString.split(";")
+                    parts.forEach { part ->
+                        val keyValue = part.split("=")
+                        if (keyValue.size == 2) {
+                            when (keyValue[0]) {
+                                "FREQ" -> {
+                                    try {
+                                        parsedType = RecurrenceType.valueOf(keyValue[1])
+                                    } catch (e: IllegalArgumentException) { /* Keep default */ }
+                                }
+                                "INTERVAL" -> {
+                                    parsedInterval = keyValue[1].toIntOrNull() ?: 1
+                                }
+                                "UNTIL" -> {
+                                    try {
+                                        //UNTIL=20240715T235959Z - Basic parsing, needs to be robust
+                                        if (keyValue[1].length >= 8) {
+                                            val dateStr = keyValue[1].substring(0, 8)
+                                            parsedEndDate = LocalDate.parse(dateStr, DateTimeFormatter.BASIC_ISO_DATE)
+                                        }
+                                    } catch (e: Exception) { /* Keep default */ }
+                                }
+                            }
                         }
+                    }
+                    recurrencePattern = RecurrencePattern(
+                        type = parsedType,
+                        interval = parsedInterval,
+                        endDate = parsedEndDate
+                        // daysOfWeek would also need parsing from BYDAY if present in RRULE
                     )
-                } ?: run {
-                    recurrencePattern = RecurrencePattern() // Default if no rule
+                    // task.recurrenceStartDate could be used to set the initial selectedDate if relevant
+                    // and if the recurrence starts from a specific point different from the first due date.
+                    // For now, selectedDate is taken from task.dueDateTime
+                } else {
+                    recurrencePattern = RecurrencePattern() // Default if no rule string
                 }
                 
                 // Load reminder settings from metadata (remains as string in metadata for now)

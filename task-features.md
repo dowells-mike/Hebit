@@ -78,10 +78,10 @@
 5. **Individual Task Item in List:**
     a. Completion Checkbox  
     b. Title  
-    c. Due Date & Time (e.g., “Tomorrow, 2:00 PM”)  
+    c. Due Date & Time (e.g., "Tomorrow, 2:00 PM")  
     d. Priority Indicator  
     e. Category Tag (Optional)  
-    f. Subtask Progress (e.g., “2/5 subtasks”)  
+    f. Subtask Progress (e.g., "2/5 subtasks")  
     g. Recurrence Icon  
     h. Tap: Navigates to task details or edit screen  
     i. Optional Swipe Actions:
@@ -149,34 +149,107 @@
 
 ### B. Recurrence Engine
 
-1. **Recurrence Rules:**
-    a. Daily (e.g., every X days)  
-    b. Weekly (specific weekdays, every X weeks)  
-    c. Monthly (e.g., 2nd Tuesday)  
-    d. Yearly  
+1. **Recurrence Rules Definition & Storage:**
+    a. Support standard recurrence patterns:
+        - i. Daily (every X days, specific days of the week if X > 1)
+        - ii. Weekly (every X weeks, on specific days of the week - e.g., Mon, Wed, Fri)
+        - iii. Monthly (every X months, on a specific day of the month - e.g., the 15th, or a relative day like "the second Tuesday")
+        - iv. Yearly (every X years, on a specific month and day - e.g., July 26th, or "the last Friday of October")
+    b. **Data Storage**:
+        - i. Store recurrence rules using a standard format (e.g., iCalendar `RRULE` string - RFC 5545). This is robust and widely supported.
+        - ii. Include `DTSTART` (the first occurrence's date/time) as part of the rule definition.
+    c. **Rule Parameters**:
+        - i. `FREQ`: (DAILY, WEEKLY, MONTHLY, YEARLY)
+        - ii. `INTERVAL`: (every X days/weeks/months/years)
+        - iii. `BYDAY`: (e.g., MO, TU, WE, TH, FR, SA, SU)
+        - iv. `BYMONTHDAY`: (e.g., 1, 15, -1 for last day)
+        - v. `BYSETPOS`: (e.g., 1 for first, -1 for last, used with `BYDAY` for "nth weekday of month")
+        - vi. `BYMONTH`: (1-12)
 2. **Recurrence End Conditions:**
-    a. Never  
-    b. After X times  
-    c. End on specific date  
-3. **Instance Management:**
-    a. Generated dynamically or stored in backend  
-4. **Edit/Delete Recurring Tasks:**
-    a. Modify/delete:
-        - i. This instance  
-        - ii. This + future  
-        - iii. All  
+    a. `COUNT`: End after X occurrences.
+    b. `UNTIL`: End on a specific date (inclusive).
+    c. Never (no end date/count specified).
+3. **Instance Management & Generation:**
+    a. **Dynamic Generation**: Future instances are typically generated on-the-fly for display rather than pre-storing a large number of them.
+        - i. Define a reasonable horizon for generating instances (e.g., next 1-2 years).
+    b. **Original Task as Template**: The original task serves as the template for all instances.
+    c. **Exception Handling**:
+        - i. Store exceptions separately. If an instance is modified (e.g., time changed, description updated) or deleted, it becomes an exception.
+        - ii. An exception record should link to the original recurring task ID and store the original date of the instance it's replacing/modifying, along with the new data.
+        - iii. Deleting an instance can create an `EXDATE` (exception date) in iCalendar terms.
+    d. **Time Zone Handling**:
+        - i. All dates and times should be stored in UTC in the backend.
+        - ii. Recurrence rules should be applied based on the user's current timezone or a specified timezone for the task.
+        - iii. Floating tasks (no specific time, just date) should adapt to the user's current timezone for their "due day".
+4. **Editing & Deleting Recurring Tasks:**
+    a. When editing properties (title, description, etc.):
+        - i. Apply to "This instance only" (creates an exception).
+        - ii. Apply to "This and all future instances" (ends the current series at the previous instance and starts a new recurring series with the changes).
+        - iii. Apply to "All instances" (modifies the original template task and all its occurrences, potentially invalidating past exceptions if the core rule changes).
+    b. When deleting:
+        - i. "This instance only" (creates an `EXDATE`).
+        - ii. "This and all future instances" (modifies the `UNTIL` or `COUNT` of the original rule to end before this instance).
+        - iii. "All instances" (deletes the main recurring task and all its associated instances/exceptions).
+    c. Changing the recurrence rule itself:
+        - i. Typically applies to "This and all future instances" or "All instances". Careful consideration for existing exceptions.
+5. **Completion of Recurring Tasks:**
+    a. Completing an instance marks only that specific instance as done.
+    b. The next instance in the series will still appear as due.
 
 ---
 
 ### C. Reminders & Notifications
 
-1. Multiple reminders per task  
-2. System-level notifications  
-3. **Snooze** functionality  
-4. Notification actions:
-    a. Mark as done  
-    b. Snooze  
-    c. View task  
+1. **Reminder Configuration:**
+    a. **Multiple Reminders per Task**: Allow users to set several reminders for a single task.
+    b. **Reminder Types**:
+        - i. At time of due date/time.
+        - ii. Minutes before (e.g., 5, 10, 15, 30, 60 minutes).
+        - iii. Hours before (e.g., 1, 2, 3 hours).
+        - iv. Days before (e.g., 1, 2 days).
+        - v. Custom date and time for a specific reminder.
+    c. **Storage**:
+        - i. Relative reminders (e.g., "15 minutes before") stored as an offset from the due time.
+        - ii. Absolute reminders (custom date/time) stored as a specific timestamp (UTC).
+        - iii. Link reminders to the specific task ID. For recurring tasks, reminders apply to each instance unless overridden for a specific instance.
+2. **Notification System:**
+    a. **Delivery Mechanism**:
+        - i. **Local Notifications**: Scheduled by the mobile app using platform-specific APIs (e.g., `AlarmManager` or `WorkManager` on Android, `UserNotifications` framework on iOS). Suitable for offline reminders.
+        - ii. **Push Notifications (Optional but Recommended for Robustness)**: Sent from the backend server (e.g., via FCM for Android, APNS for iOS).
+            - Useful for ensuring reminder delivery even if the app is not active or for cross-device reminders.
+            - Requires backend infrastructure for scheduling and sending.
+    b. **Notification Content**:
+        - i. Task Title.
+        - ii. Due time (if applicable).
+        - iii. Short description snippet (optional).
+        - iv. App icon and name.
+    c. **Notification Channels (Android Specific)**:
+        - i. Use appropriate notification channels (e.g., "Task Reminders", "Overdue Tasks").
+        - ii. Allow users to customize channel settings (sound, vibration, importance) in system settings.
+    d. **Sound & Vibration**:
+        - i. Customizable default notification sound.
+        - ii. Option for vibration.
+        - iii. User can override per-app or per-channel system settings.
+3. **Notification Actions & Interactivity:**
+    a. **Standard Actions**:
+        - i. **Mark as Done**: Completes the task directly from the notification.
+        - ii. **Snooze**: Dismisses the notification and schedules a new reminder for a short period later (e.g., 5, 10, 15 minutes).
+        - iii. **View Task**: Opens the app to the specific task details screen.
+    b. **Quick Reply (Advanced)**: For certain notifications, allow a quick text reply that could be added as a comment to the task.
+4. **Snooze Functionality:**
+    a. Predefined snooze options (e.g., 5 min, 15 min, 1 hour).
+    b. Option for custom snooze time/date.
+5. **User Settings for Reminders & Notifications:**
+    a. **Default Reminder Times**: Allow users to set default reminder preferences for new tasks (e.g., "always remind 30 minutes before").
+    b. **Enable/Disable Notifications**: Global switch for all task notifications.
+    c. **Notification Sound & Vibration Preferences** (if not solely relying on system channel settings).
+    d. **Quiet Hours/Do Not Disturb**: Respect system DND settings or offer in-app quiet hours.
+6. **Persistence & Reliability:**
+    a. Reminders must persist even if the app is closed or the device is restarted. This usually involves scheduling with the OS.
+    b. If using server-side push, ensure reliable delivery and handling of unreceived notifications (e.g., when device was offline).
+7. **Contextual/Smart Reminders (Optional - Links to ML Features):**
+    a. **Location-based reminders**: Trigger when the user arrives at or leaves a specific location (requires location permission and geofencing).
+    b. **Time-based suggestions for reminders**: e.g., "You usually set a reminder 1 hour before for work tasks. Add one?"
 
 ---
 
@@ -200,7 +273,7 @@
 
 1. **Dashboard ("Today's Overview")**
     a. Display **High Priority / Due Today**  
-    b. “See All” links to Task screen (filtered)  
+    b. "See All" links to Task screen (filtered)  
 2. **Goals:**
     a. Tasks linked to goals update progress  
 3. **Statistics/Profile:**
@@ -242,7 +315,7 @@
 1. **Collaborative Filtering**  
 2. **Content-Based Filtering** (using NLP)  
 3. **Rule-Based System**:
-    a. If goal = “Fitness”, suggest "Workout today"  
+    a. If goal = "Fitness", suggest "Workout today"  
     b. If Monday, suggest "Plan your week"  
 4. **Sequence Modeling** (Advanced):  
     a. Task A → Task B flow  

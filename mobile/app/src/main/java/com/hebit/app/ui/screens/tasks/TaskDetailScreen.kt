@@ -104,7 +104,7 @@ fun TaskDetailScreen(
             }
         }
     }
-
+    
     Scaffold(
         topBar = {
             TopAppBar(
@@ -326,7 +326,7 @@ fun TaskDetailScreen(
                             
                             // Check if all subtasks are completed and the parent task isn't already completed
                             val parentTaskShouldBeCompleted = newProgress == 100 && !task.isCompleted && updatedSubtasks.isNotEmpty()
-
+                            
                             val updatedTask = task.copy(
                                 progress = newProgress,
                                 metadata = updatedMetadata,
