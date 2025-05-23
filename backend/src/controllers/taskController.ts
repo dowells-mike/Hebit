@@ -171,7 +171,7 @@ export const updateTask = catchAsync(async (req: AuthRequest, res: Response) => 
   delete updates.user;
   
   const changedFields = Object.keys(updates);
-  if (changedFields.length > 0 && changedFields[0] !== 'metadata' && changedFields[0] !== 'recurrence') {
+  if (changedFields.length > 0 && changedFields[0] !== 'metadata' && changedFields[0] !== 'rrule') {
     taskMetadata.lastModifiedField = changedFields[0];
   }
   
@@ -203,7 +203,7 @@ export const updateTask = catchAsync(async (req: AuthRequest, res: Response) => 
     updates.metadata = taskMetadata;
   }
 
-  // Recurrence is handled directly if present in req.body as updates.recurrence
+  // rrule is now a top-level field in updates if provided in req.body
 
   const updatedTask = await Task.findByIdAndUpdate(
     taskId,
@@ -226,7 +226,7 @@ export const updateTask = catchAsync(async (req: AuthRequest, res: Response) => 
       category: updatedTask.category,
       parentTaskId: updatedTask.parentTaskId,
       tags: updatedTask.tags,
-      recurrence: updatedTask.recurrence,
+      rrule: updatedTask.rrule,
       reminderTime: updatedTask.reminderTime,
       effort: updatedTask.effort,
       complexity: updatedTask.complexity,

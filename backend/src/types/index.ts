@@ -63,11 +63,7 @@ export interface TaskDocument {
   category?: string;
   parentTaskId?: string;           // For hierarchical tasks
   tags?: string[];
-  recurrence?: {                   // Recurring task pattern
-    frequency: 'daily' | 'weekly' | 'monthly';
-    interval: number;
-    endDate?: Date;
-  };
+  rrule?: string;                  // iCalendar RRULE string for recurrence
   reminderTime?: Date;             // When to remind
   effort?: number;                 // Estimated effort (1-5)
   complexity?: number;             // Task complexity (1-5) for ML

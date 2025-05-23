@@ -56,18 +56,9 @@ const taskSchema = new Schema<TaskDocument>(
         type: String
       }
     ],
-    recurrence: {
-      frequency: {
-        type: String,
-        enum: ['daily', 'weekly', 'monthly']
-      },
-      interval: {
-        type: Number,
-        min: 1
-      },
-      endDate: {
-        type: Date
-      }
+    rrule: {
+      type: String,
+      trim: true
     },
     reminderTime: {
       type: Date
