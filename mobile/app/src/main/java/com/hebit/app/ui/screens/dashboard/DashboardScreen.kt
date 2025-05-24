@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -33,6 +34,8 @@ import com.hebit.app.ui.screens.habits.HabitViewModel
 import com.hebit.app.ui.screens.tasks.TaskViewModel
 import com.hebit.app.ui.screens.goals.viewmodel.GoalListViewModel
 import com.hebit.app.ui.screens.goals.viewmodel.GoalListState
+import com.hebit.app.util.formatRecurrencePattern
+import com.hebit.app.util.parseRRuleStringToPattern
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -360,7 +363,17 @@ fun PriorityTasksList(onTaskClick: (String) -> Unit, tasksState: Resource<List<T
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     tasks.forEach { task ->
-                        TaskCard(task = task, onClick = { onTaskClick(task.id) })
+                        // Calculate recurrence summary and check for reminders
+                        val recurrencePattern = parseRRuleStringToPattern(task.recurrenceRuleString)
+                        val recurrenceSummary = formatRecurrencePattern(recurrencePattern, task.recurrenceStartDate?.toLocalDate())
+                        val hasReminders = task.reminders?.isNotEmpty() == true
+
+                        TaskCard(
+                            task = task, 
+                            onClick = { onTaskClick(task.id) },
+                            recurrenceSummary = if (recurrencePattern.type != com.hebit.app.domain.model.RecurrenceType.NONE) recurrenceSummary else null,
+                            hasReminders = hasReminders
+                        )
                     }
                 }
             }
@@ -383,11 +396,16 @@ fun PriorityTasksList(onTaskClick: (String) -> Unit, tasksState: Resource<List<T
 }
 
 @Composable
-fun TaskCard(task: Task, onClick: () -> Unit) {
+fun TaskCard(
+    task: Task, 
+    onClick: () -> Unit,
+    recurrenceSummary: String? = null,
+    hasReminders: Boolean = false
+) {
     Card(
         modifier = Modifier
             .width(280.dp)
-            .height(140.dp),
+            .heightIn(min = 140.dp, max = 180.dp),
         onClick = onClick
     ) {
         Column(
@@ -396,64 +414,107 @@ fun TaskCard(task: Task, onClick: () -> Unit) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = task.category ?: "Uncategorized",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = task.category ?: "Uncategorized",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        
+                        Text(
+                            text = task.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                     
+                    if (task.priority >= 3) { // High priority
+                        Icon(
+                            imageVector = Icons.Default.Flag,
+                            contentDescription = "High Priority",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                // Recurrence and Reminder Info
+                if (!recurrenceSummary.isNullOrEmpty() || hasReminders) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(top = 4.dp)
+                    ) {
+                        if (!recurrenceSummary.isNullOrEmpty()) {
+                            Icon(
+                                imageVector = Icons.Default.Repeat,
+                                contentDescription = "Recurrence",
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = recurrenceSummary,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                        }
+                        if (hasReminders) {
+                            if (!recurrenceSummary.isNullOrEmpty()) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
+                            Icon(
+                                imageVector = Icons.Outlined.Notifications,
+                                contentDescription = "Has reminders",
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Bottom aligned content (Due Date & Progress)
+            Column {
+                task.dueDateTime?.let {
+                    val formattedTime = it.format(DateTimeFormatter.ofPattern("MMM d, hh:mm a"))
                     Text(
-                        text = task.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
+                        text = "Due $formattedTime",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.padding(top = 4.dp)
                     )
                 }
                 
-                if (task.priority >= 3) { // High priority
-                    Icon(
-                        imageVector = Icons.Default.Flag,
-                        contentDescription = "High Priority",
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-            
-            task.dueDateTime?.let {
-                val formattedTime = it.format(DateTimeFormatter.ofPattern("MMM d, hh:mm a"))
-                Text(
-                    text = "Due $formattedTime",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline
-                )
-            }
-            
-            if (task.progress > 0) {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        LinearProgressIndicator(
-                            progress = { task.progress / 100f },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(4.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "${task.progress}%",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline
-                        )
+                if (task.progress > 0) {
+                    Column(modifier = Modifier.padding(top = 4.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            LinearProgressIndicator(
+                                progress = { task.progress / 100f },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(4.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "${task.progress}%",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
                     }
                 }
             }
