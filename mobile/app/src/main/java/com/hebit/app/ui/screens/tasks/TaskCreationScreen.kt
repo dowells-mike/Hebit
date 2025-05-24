@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -138,6 +139,54 @@ fun generateRRuleString(pattern: RecurrencePattern, dtStartDate: LocalDate?): St
     
     val recurObject = recurBuilder.build()
     return recurObject.toString()
+}
+
+// Helper function to format RecurrencePattern into a user-friendly string
+fun formatRecurrencePattern(pattern: RecurrencePattern): String {
+    if (pattern.type == RecurrenceType.NONE) return "Not repeating"
+
+    val parts = mutableListOf<String>()
+
+    // Type and Interval
+    val typeName = when (pattern.type) {
+        RecurrenceType.DAILY -> "Day"
+        RecurrenceType.WEEKLY -> "Week"
+        RecurrenceType.MONTHLY -> "Month"
+        RecurrenceType.YEARLY -> "Year"
+        else -> ""
+    }
+    parts.add(
+        when {
+            pattern.interval > 1 -> "Every ${pattern.interval} ${typeName}s"
+            else -> typeName // Singular, e.g., "Daily", "Weekly"
+        }
+    )
+    // For Daily, Weekly etc. it should be Adverb form e.g. "Daily", "Weekly"
+    // So, if interval is 1, it should be pattern.type.name.lowercase().replaceFirstChar { it.titlecase() }
+    if (pattern.interval == 1) {
+        parts[0] = pattern.type.name.lowercase().replaceFirstChar { it.titlecase() }
+    } else {
+        parts[0] = "Every ${pattern.interval} ${typeName.lowercase()}s"
+    }
+
+
+    // Days of Week (for Weekly)
+    if (pattern.type == RecurrenceType.WEEKLY && pattern.daysOfWeek.isNotEmpty()) {
+        val dayNames = pattern.daysOfWeek.sorted().mapNotNull {
+            when (it) {
+                1 -> "Mon"; 2 -> "Tue"; 3 -> "Wed"; 4 -> "Thu"; 5 -> "Fri"; 6 -> "Sat"; 7 -> "Sun"
+                else -> null
+            }
+        }.joinToString(", ")
+        if (dayNames.isNotEmpty()) parts.add("on $dayNames")
+    }
+
+    // End Date
+    pattern.endDate?.let {
+        parts.add("until ${it.format(DateTimeFormatter.ofPattern("MMM d, yyyy"))}")
+    }
+
+    return parts.joinToString(", ")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -814,13 +863,7 @@ fun TaskCreationScreen(
                 Spacer(modifier = Modifier.weight(1f))
                 
                 Text(
-                    text = when(recurrencePattern.type) {
-                        RecurrenceType.NONE -> "Not repeating"
-                        RecurrenceType.DAILY -> "Daily"
-                        RecurrenceType.WEEKLY -> "Weekly"
-                        RecurrenceType.MONTHLY -> "Monthly"
-                        RecurrenceType.YEARLY -> "Yearly"
-                    },
+                    text = formatRecurrencePattern(recurrencePattern), // Use the new formatter
                     style = MaterialTheme.typography.bodyMedium
                 )
                 
@@ -1290,12 +1333,14 @@ fun TaskCreationScreen(
                         Spacer(modifier = Modifier.height(16.dp))
                         Text("Repeat on", style = MaterialTheme.typography.bodyLarge)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Row(
+                        // Changed from Row to LazyRow for horizontal scrolling
+                        LazyRow(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceAround // Or SpaceBetween
+                            horizontalArrangement = Arrangement.spacedBy(4.dp) // Adds a small space between chips
                         ) {
                             val days = listOf("Mo", "Tu", "We", "Th", "Fr", "Sa", "Su")
-                            days.forEachIndexed { index, dayLabel ->
+                            items(days.size) { index -> // Use items(count) for LazyRow
+                                val dayLabel = days[index]
                                 val dayNumber = index + 1 // 1 for Monday, ..., 7 for Sunday
                                 val isSelected = tempDaysOfWeek.contains(dayNumber)
                                 FilterChip(
@@ -1305,11 +1350,10 @@ fun TaskCreationScreen(
                                             tempDaysOfWeek.remove(dayNumber)
                                         } else {
                                             tempDaysOfWeek.add(dayNumber)
-                                            // tempDaysOfWeek.sort() // Optional: keep sorted
                                         }
                                     },
                                     label = { Text(dayLabel) },
-                                    modifier = Modifier.padding(horizontal = 2.dp) // Adjust spacing as needed
+                                    modifier = Modifier.padding(horizontal = 2.dp) 
                                 )
                             }
                         }
