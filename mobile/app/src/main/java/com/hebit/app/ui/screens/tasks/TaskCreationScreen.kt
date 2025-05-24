@@ -60,6 +60,18 @@ import com.hebit.app.ui.screens.tasks.parseReminderSettings
 import com.hebit.app.ui.screens.categories.CategoryViewModel
 import com.hebit.app.domain.model.Category
 
+// Imports for ical4j
+import net.fortuna.ical4j.model.Recur
+import net.fortuna.ical4j.model.DateList
+import net.fortuna.ical4j.model.DateTime // For parsing UNTIL if it includes time
+import java.time.ZoneId // For converting ical4j Date to LocalDate
+import net.fortuna.ical4j.model.WeekDay // For BYDAY parsing
+// Required for Recur.Builder and Frequency
+import net.fortuna.ical4j.model.Recur.Builder as RecurBuilder
+import net.fortuna.ical4j.model.parameter.Value
+import net.fortuna.ical4j.model.property.RRule
+import java.util.Date // For converting LocalDate to java.util.Date for UNTIL
+
 data class RecurrencePattern(
     val type: RecurrenceType = RecurrenceType.NONE,
     val interval: Int = 1,
@@ -73,6 +85,58 @@ data class ReminderSettings(
     val time: LocalTime? = null,
     val date: LocalDate? = null
 )
+
+// Helper function to generate RRULE string
+fun generateRRuleString(pattern: RecurrencePattern, dtStartDate: LocalDate?): String? {
+    if (pattern.type == RecurrenceType.NONE || dtStartDate == null) {
+        return null
+    }
+
+    val recurBuilder = RecurBuilder()
+
+    when (pattern.type) {
+        RecurrenceType.DAILY -> recurBuilder.frequency(Recur.Frequency.DAILY)
+        RecurrenceType.WEEKLY -> recurBuilder.frequency(Recur.Frequency.WEEKLY)
+        RecurrenceType.MONTHLY -> recurBuilder.frequency(Recur.Frequency.MONTHLY)
+        RecurrenceType.YEARLY -> recurBuilder.frequency(Recur.Frequency.YEARLY)
+        RecurrenceType.NONE -> return null
+    }
+
+    recurBuilder.interval(pattern.interval)
+
+    // UNTIL - End date for recurrence
+    pattern.endDate?.let {
+        // Convert LocalDate to java.util.Date for ical4j
+        // Note: ical4j's DateTime for UNTIL is inclusive.
+        // The time component for UNTIL should ideally be end-of-day for the specified date.
+        // For simplicity, creating it from LocalDate at start of day, then ical4j handles it.
+        // Or, explicitly make it end of day: it.atTime(LocalTime.MAX).atZone(ZoneId.systemDefault()).toInstant()
+        val utilDate = Date.from(it.atStartOfDay(ZoneId.systemDefault()).toInstant())
+        recurBuilder.until(DateTime(utilDate))
+    }
+
+    // Placeholder for BYDAY - to be implemented when UI supports daysOfWeek
+    if (pattern.type == RecurrenceType.WEEKLY && pattern.daysOfWeek.isNotEmpty()) {
+        val weekDayList = pattern.daysOfWeek.mapNotNull { dayNum ->
+            when (dayNum) {
+                1 -> WeekDay.MO
+                2 -> WeekDay.TU
+                3 -> WeekDay.WE
+                4 -> WeekDay.TH
+                5 -> WeekDay.FR
+                6 -> WeekDay.SA
+                7 -> WeekDay.SU
+                else -> null
+            }
+        }
+        if (weekDayList.isNotEmpty()) {
+            recurBuilder.dayList(weekDayList)
+        }
+    }
+    
+    val recurObject = recurBuilder.build()
+    return recurObject.toString()
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -163,53 +227,52 @@ fun TaskCreationScreen(
                 selectedCategoryName = task.category ?: "Uncategorized"
                 selectedCategoryObject = availableCategories.find { it.name == task.category }
                 
-                // Load recurrence pattern from new recurrence fields
-                if (task.recurrenceRuleString != null) {
-                    // Basic parsing of RRULE string - THIS IS A SIMPLIFIED PLACEHOLDER
-                    // A proper RRULE parsing library or more detailed logic is needed here.
-                    var parsedType = RecurrenceType.NONE
-                    var parsedInterval = 1
-                    var parsedEndDate: LocalDate? = null
-
-                    val parts = task.recurrenceRuleString.split(";")
-                    parts.forEach { part ->
-                        val keyValue = part.split("=")
-                        if (keyValue.size == 2) {
-                            when (keyValue[0]) {
-                                "FREQ" -> {
-                                    try {
-                                        parsedType = RecurrenceType.valueOf(keyValue[1])
-                                    } catch (e: IllegalArgumentException) { /* Keep default */ }
-                                }
-                                "INTERVAL" -> {
-                                    parsedInterval = keyValue[1].toIntOrNull() ?: 1
-                                }
-                                "UNTIL" -> {
-                                    try {
-                                        //UNTIL=20240715T235959Z - Basic parsing, needs to be robust
-                                        if (keyValue[1].length >= 8) {
-                                            val dateStr = keyValue[1].substring(0, 8)
-                                            parsedEndDate = LocalDate.parse(dateStr, DateTimeFormatter.BASIC_ISO_DATE)
-                                        }
-                                    } catch (e: Exception) { /* Keep default */ }
-                                }
-                            }
+                // Load recurrence pattern from new recurrence fields using ical4j
+                if (task.recurrenceRuleString != null && task.recurrenceRuleString.isNotBlank()) {
+                    try {
+                        val recur = Recur(task.recurrenceRuleString)
+                        val parsedType = recur.frequency?.let {
+                            try { RecurrenceType.valueOf(it.name) } catch (e: IllegalArgumentException) { RecurrenceType.NONE }
+                        } ?: RecurrenceType.NONE
+                        
+                        val parsedInterval = recur.interval.takeIf { it != -1 } ?: 1 // recur.interval is -1 if not set
+                        
+                        val parsedEndDate = recur.until?.let { icalDate ->
+                            // Convert java.util.Date from ical4j to java.time.LocalDate
+                            java.time.Instant.ofEpochMilli(icalDate.time)
+                                .atZone(ZoneId.systemDefault())
+                                .toLocalDate()
                         }
+                        
+                        // Parse BYDAY for daysOfWeek
+                        val parsedDaysOfWeek = recur.dayList?.mapNotNull { weekDay ->
+                            when (weekDay.day) {
+                                WeekDay.SU -> 7
+                                WeekDay.MO -> 1
+                                WeekDay.TU -> 2
+                                WeekDay.WE -> 3
+                                WeekDay.TH -> 4
+                                WeekDay.FR -> 5
+                                WeekDay.SA -> 6
+                                else -> null // Should not happen for standard days
+                            }
+                        }?.sorted() ?: emptyList()
+                        
+                        recurrencePattern = RecurrencePattern(
+                            type = parsedType,
+                            interval = parsedInterval,
+                            endDate = parsedEndDate,
+                            daysOfWeek = parsedDaysOfWeek
+                        )
+                    } catch (e: Exception) {
+                        Log.e("TaskCreationScreen", "Error parsing RRULE string with ical4j: ${task.recurrenceRuleString}", e)
+                        recurrencePattern = RecurrencePattern() // Default on parsing error
                     }
-                    recurrencePattern = RecurrencePattern(
-                        type = parsedType,
-                        interval = parsedInterval,
-                        endDate = parsedEndDate
-                        // daysOfWeek would also need parsing from BYDAY if present in RRULE
-                    )
-                    // task.recurrenceStartDate could be used to set the initial selectedDate if relevant
-                    // and if the recurrence starts from a specific point different from the first due date.
-                    // For now, selectedDate is taken from task.dueDateTime
                 } else {
                     recurrencePattern = RecurrencePattern() // Default if no rule string
                 }
                 
-                // Load reminder settings from metadata (remains as string in metadata for now)
+                // Load reminder settings from metadata
                 task.metadata["reminder"]?.let { reminderValue ->
                     if (reminderValue is String) {
                         val reminderStr = reminderValue
@@ -372,17 +435,19 @@ fun TaskCreationScreen(
                 actions = {
                     TextButton(
                         onClick = {
+                            val rruleStringValue = generateRRuleString(recurrencePattern, selectedDate)
                             val taskData = TaskCreationData(
                                 title = taskTitle,
                                 description = taskDescription.ifBlank { null },
                                 dueDate = selectedDate,
                                 dueTime = selectedTime,
                                 priority = selectedPriority,
-                                category = selectedCategoryName,
+                                category = if (selectedCategoryName == "Uncategorized") null else selectedCategoryName,
                                 labels = emptyList(),
                                 subtasks = currentSubtasks.toList(),
-                                recurrencePattern = recurrencePattern,
-                                reminderSettings = reminderSettings
+                                reminderSettings = reminderSettings,
+                                rruleString = rruleStringValue,
+                                recurrenceStartDate = if (rruleStringValue != null) selectedDate else null
                             )
                             
                             if (isEditMode) {
@@ -628,7 +693,7 @@ fun TaskCreationScreen(
                     contentDescription = "Category",
                     tint = selectedCategoryObject?.color?.let { 
                         try { Color(android.graphics.Color.parseColor(it)) } 
-                        catch (e: Exception) { MaterialTheme.colorScheme.primary }
+                        catch (e: IllegalArgumentException) { MaterialTheme.colorScheme.primary }
                     } ?: MaterialTheme.colorScheme.primary
                 )
                 
@@ -914,7 +979,9 @@ fun TaskCreationScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 OutlinedButton(
-                    onClick = onDismiss,
+                    onClick = {
+                        if (isEditMode) onCancel() else onDismiss()
+                    },
                     modifier = Modifier
                         .weight(1f)
                         .padding(end = 8.dp)
@@ -924,19 +991,26 @@ fun TaskCreationScreen(
                 
                 Button(
                     onClick = {
+                        val rruleStringValue = generateRRuleString(recurrencePattern, selectedDate)
                         val taskData = TaskCreationData(
                             title = taskTitle,
                             description = taskDescription.ifBlank { null },
                             dueDate = selectedDate,
                             dueTime = selectedTime,
                             priority = selectedPriority,
-                            category = selectedCategoryName,
+                            category = if (selectedCategoryName == "Uncategorized") null else selectedCategoryName,
                             labels = emptyList(),
                             subtasks = currentSubtasks.toList(),
-                            recurrencePattern = recurrencePattern,
-                            reminderSettings = reminderSettings
+                            reminderSettings = reminderSettings,
+                            rruleString = rruleStringValue,
+                            recurrenceStartDate = if (rruleStringValue != null) selectedDate else null
                         )
-                        onSaveTask(taskData)
+                        if (isEditMode) {
+                            viewModel.updateTaskWithData(taskId, taskData)
+                            onSaveComplete()
+                        } else {
+                            onSaveTask(taskData)
+                        }
                     },
                     enabled = taskTitle.isNotBlank(),
                     modifier = Modifier
@@ -1090,7 +1164,14 @@ fun TaskCreationScreen(
     if (showRecurrenceOptions) {
         var tempRecurrenceType by remember { mutableStateOf(recurrencePattern.type) }
         var tempInterval by remember { mutableStateOf(recurrencePattern.interval.toString()) }
-        
+        var tempEndDate by remember { mutableStateOf(recurrencePattern.endDate) }
+        var showEndDatePicker by remember { mutableStateOf(false) }
+        var tempDaysOfWeek by remember { mutableStateOf(recurrencePattern.daysOfWeek.toMutableStateList()) }
+
+        val recurrenceEndDatePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = tempEndDate?.toEpochDay()?.let { it * 24 * 60 * 60 * 1000 }
+        )
+
         AlertDialog(
             onDismissRequest = { showRecurrenceOptions = false },
             title = { Text("Set Recurrence") },
@@ -1165,14 +1246,73 @@ fun TaskCreationScreen(
                     singleLine = true
                 )
                     }
+
+                    // End Date Picker
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Ends", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showEndDatePicker = true }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Outlined.EventBusy, contentDescription = "End Date", tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = tempEndDate?.format(DateTimeFormatter.ofPattern("MMM dd, yyyy")) ?: "Never",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+
+                    // Days of Week Picker (only for Weekly recurrence)
+                    if (tempRecurrenceType == RecurrenceType.WEEKLY) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Repeat on", style = MaterialTheme.typography.bodyLarge)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceAround // Or SpaceBetween
+                        ) {
+                            val days = listOf("Mo", "Tu", "We", "Th", "Fr", "Sa", "Su")
+                            days.forEachIndexed { index, dayLabel ->
+                                val dayNumber = index + 1 // 1 for Monday, ..., 7 for Sunday
+                                val isSelected = tempDaysOfWeek.contains(dayNumber)
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = {
+                                        if (isSelected) {
+                                            tempDaysOfWeek.remove(dayNumber)
+                                        } else {
+                                            tempDaysOfWeek.add(dayNumber)
+                                            // tempDaysOfWeek.sort() // Optional: keep sorted
+                                        }
+                                    },
+                                    label = { Text(dayLabel) },
+                                    modifier = Modifier.padding(horizontal = 2.dp) // Adjust spacing as needed
+                                )
+                            }
+                        }
+                    }
                 }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
+                        // Validate that at least one day is selected for weekly recurrence
+                        if (tempRecurrenceType == RecurrenceType.WEEKLY && tempDaysOfWeek.isEmpty()) {
+                            // Optionally show a toast or error message to the user
+                            // For now, just defaulting to not saving or reverting type to NONE
+                            // This behavior might need refinement (e.g. prevent dialog close)
+                            Log.w("TaskCreationScreen", "Weekly recurrence selected but no days chosen.")
+                            // Potentially set tempRecurrenceType = RecurrenceType.NONE here or handle error
+                        }
                         recurrencePattern = RecurrencePattern(
                             type = tempRecurrenceType,
-                            interval = tempInterval.toIntOrNull() ?: 1
+                            interval = tempInterval.toIntOrNull() ?: 1,
+                            endDate = tempEndDate,
+                            daysOfWeek = tempDaysOfWeek.toList().sorted() // Save sorted list
                         )
                         showRecurrenceOptions = false
                     }
@@ -1186,6 +1326,54 @@ fun TaskCreationScreen(
                 }
             }
         )
+    }
+    
+    // Date Picker Dialog for Recurrence End Date
+    if (showEndDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showEndDatePicker = false },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        recurrenceEndDatePickerState.selectedDateMillis?.let { millis ->
+                            tempEndDate = LocalDate.ofEpochDay(millis / (24 * 60 * 60 * 1000))
+                        }
+                        showEndDatePicker = false
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(
+                        onClick = { 
+                            tempEndDate = null // Clear the end date
+                            showEndDatePicker = false 
+                        }
+                    ) {
+                        Text("Clear (Never)")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TextButton(
+                        onClick = { showEndDatePicker = false }
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+            }
+        ) {
+            DatePicker(
+                state = recurrenceEndDatePickerState,
+                // Prevent selecting a date before the task's start/due date if set
+                dateValidator = { utcDateMillis ->
+                    val selectedInstant = java.time.Instant.ofEpochMilli(utcDateMillis)
+                    val selectedLocalDate = selectedInstant.atZone(ZoneId.systemDefault()).toLocalDate()
+                    val taskStartDate = selectedDate ?: LocalDate.now() // Use task's due/start date or today
+                    selectedLocalDate.isAfter(taskStartDate.minusDays(1)) // Allow same day
+                }
+            )
+        }
     }
     
     // Reminder Settings Dialog

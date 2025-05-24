@@ -131,7 +131,8 @@ class TaskViewModel @Inject constructor(
             Log.d("TaskViewModel", "Creating task from TaskCreationData: ${taskData.title}, priority: ${taskData.priority}, category: ${taskData.category}")
             
             val dueDateTime = if (taskData.dueDate != null) {
-                taskData.dueDate.atTime(taskData.dueTime ?: java.time.LocalTime.now())
+                // Use LocalTime.MIDNIGHT if dueTime is null, or a specific time if available.
+                taskData.dueDate.atTime(taskData.dueTime ?: java.time.LocalTime.MIDNIGHT)
             } else null
             
             val priority = when (taskData.priority) {
@@ -150,29 +151,20 @@ class TaskViewModel @Inject constructor(
             // recurrenceStartDate: LocalDateTime?
             // recurrenceExceptions: List<LocalDateTime>?
 
-            var taskRecurrenceRuleString: String? = null
-            var taskRecurrenceStartDate: LocalDateTime? = null
-            // var taskRecurrenceExceptions: List<LocalDateTime>? = null // TODO: Add if TaskCreationData supports exceptions
-
-            taskData.recurrencePattern?.let {
-                if (it.type != RecurrenceType.NONE) {
-                    // This is a simplified mapping. A full RRULE might be constructed here or passed through.
-                    // For now, let's assume TaskCreationData holds enough info for a basic RRULE string
-                    // or that we will primarily use recurrenceRuleString directly if provided by UI.
-                    // This part might need significant enhancement for full RRULE generation.
-                    taskRecurrenceRuleString = "FREQ=${it.type.name};INTERVAL=${it.interval}" 
-                    if (it.endDate != null) {
-                        taskRecurrenceRuleString += ";UNTIL=${it.endDate.format(DateTimeFormatter.BASIC_ISO_DATE).replace("-", "")}T235959Z"
-                    }
-                    // DTSTART would typically be the initial due date of the task if it's recurring from that point.
-                    // For now, setting it based on dueDateTime, but this needs careful handling.
-                    taskRecurrenceStartDate = dueDateTime 
-                }
-            }
+            // REMOVED old logic based on taskData.recurrencePattern
+            // var taskRecurrenceRuleString: String? = null
+            // var taskRecurrenceStartDate: LocalDateTime? = null
+            // taskData.recurrencePattern?.let { ... }
             
             val reminderData = taskData.reminderSettings?.let {
-                if (it.isEnabled) "${it.minutes},${it.time?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: ""}" else null
-            }
+                if (it.isEnabled) {
+                    val timePart = it.time?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: ""
+                    // Ensure minutes is always positive for "X minutes before"
+                    val minutesPart = if (it.minutes > 0 && it.time == null) it.minutes.toString() else ""
+                    // Construct string carefully
+                    if (timePart.isNotEmpty()) timePart else minutesPart
+                } else null
+            }?.ifEmpty { null } // Ensure empty string becomes null
             
             val task = Task(
                 id = "",
@@ -188,13 +180,13 @@ class TaskViewModel @Inject constructor(
                 metadata = mapOf(
                     "subtasks" to subtasksData,
                     "reminder" to reminderData
-                ).filterValues { it != null } as Map<String, String>,
+                ).filterValues { it != null }.mapValues { it.value.toString() }, // Ensure all values are strings
                 
-                // NEW RECURRENCE FIELDS
-                recurrenceRuleString = taskRecurrenceRuleString,
-                recurrenceStartDate = taskRecurrenceStartDate,
-                recurrenceExceptions = emptyList(), // Placeholder, needs to be populated if UI supports it
-                reminders = emptyList() // Placeholder, map reminderData to List<Reminder> here later
+                // NEW RECURRENCE FIELDS - Directly from TaskCreationData
+                recurrenceRuleString = taskData.rruleString,
+                recurrenceStartDate = taskData.recurrenceStartDate?.atStartOfDay(), // DTSTART is date only, time can be added if needed
+                recurrenceExceptions = emptyList(), // Placeholder
+                reminders = emptyList() // Placeholder
             )
             
             taskRepository.createTask(task)
@@ -396,71 +388,62 @@ class TaskViewModel @Inject constructor(
     
     fun updateTaskWithData(taskId: String, taskData: TaskCreationData) {
         viewModelScope.launch {
-            Log.d("TaskViewModel", "Updating task $taskId from TaskCreationData: $taskData")
-                    
-                    val dueDateTime = if (taskData.dueDate != null) {
-                        taskData.dueDate.atTime(taskData.dueTime ?: java.time.LocalTime.now())
-                    } else null
-                    
-                    val priority = when (taskData.priority) {
-                        com.hebit.app.domain.model.TaskPriority.HIGH -> 3
-                        com.hebit.app.domain.model.TaskPriority.MEDIUM -> 2
-                        com.hebit.app.domain.model.TaskPriority.LOW -> 1
-                    }
-                    
-                    val subtasksData = if (taskData.subtasks.isNotEmpty()) {
-                        taskData.subtasks.joinToString(",") { "${it.id}:${it.title}:${it.isCompleted}" }
-                    } else null
-                    
-            val recurrenceRuleDto = taskData.recurrencePattern?.let {
-                if (it.type == RecurrenceType.NONE) null
-                else RecurrenceRuleDto(
-                    frequency = it.type.name.lowercase(),
-                    interval = it.interval,
-                    endDate = it.endDate?.format(DateTimeFormatter.ISO_LOCAL_DATE)
-                )
+            val existingTaskResource = selectedTaskState.value
+            if (existingTaskResource !is Resource.Success || existingTaskResource.data == null) {
+                Log.e("TaskViewModel", "Attempted to update task, but existing task not loaded or is null.")
+                _selectedTaskState.value = Resource.Error("Original task not found for update.")
+                return@launch
+            }
+            val existingTask = existingTaskResource.data
+
+            val dueDateTime = if (taskData.dueDate != null) {
+                taskData.dueDate.atTime(taskData.dueTime ?: existingTask.dueDateTime?.toLocalTime() ?: java.time.LocalTime.MIDNIGHT)
+            } else null
+
+            val priority = when (taskData.priority) {
+                com.hebit.app.domain.model.TaskPriority.HIGH -> 3
+                com.hebit.app.domain.model.TaskPriority.MEDIUM -> 2
+                com.hebit.app.domain.model.TaskPriority.LOW -> 1
             }
 
-                    val reminderData = taskData.reminderSettings?.let {
-                if (it.isEnabled) "${it.minutes},${it.time?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: ""}" else null
-                    }
-                    
-            // Fetch existing task to ensure we don't overwrite fields not in TaskCreationData
-            // Or, construct a Task object with only the updatable fields, if your TaskRepository.updateTask handles partial updates.
-            // For now, assuming we need to pass a full Task object, which means we might need to fetch it first if not all fields are in TaskCreationData.
-            // However, the current TaskRepositoryImpl.updateTask takes a full Task object and maps it to UpdateTaskRequest.
-            // The UpdateTaskRequest DTO has nullable fields, implying partial updates are possible at the API level.
-            // Let's construct a Task object with the available data, assuming TaskRepository.updateTask handles it.
+            val subtasksData = if (taskData.subtasks.isNotEmpty()) {
+                taskData.subtasks.joinToString(",") { "${it.id}:${it.title}:${it.isCompleted}" }
+            } else null
+
+            // REMOVED old logic based on taskData.recurrencePattern
+
+            val reminderData = taskData.reminderSettings?.let {
+                if (it.isEnabled) {
+                    val timePart = it.time?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: ""
+                    val minutesPart = if (it.minutes > 0 && it.time == null) it.minutes.toString() else ""
+                    if (timePart.isNotEmpty()) timePart else minutesPart
+                } else null
+            }?.ifEmpty { null }
 
             val updatedTaskDomainObject = Task(
-                id = taskId, // Crucial for update
-                        title = taskData.title,
-                        description = taskData.description ?: "",
+                id = taskId, 
+                title = taskData.title,
+                description = taskData.description ?: existingTask.description,
                 category = if (taskData.category == "Uncategorized") null else taskData.category,
-                        dueDateTime = dueDateTime,
-                        priority = priority,
-                progress = selectedTaskState.value.data?.progress ?: 0, // Preserve existing progress or default
-                isCompleted = selectedTaskState.value.data?.isCompleted ?: false, // Preserve existing completion or default
-                createdAt = selectedTaskState.value.data?.createdAt ?: LocalDateTime.now(), // Preserve or use placeholder
-                updatedAt = LocalDateTime.now(), // This will be set by backend
-                // recurrenceRule = recurrenceRuleDto, // OLD FIELD - THIS WAS THE ERROR
+                dueDateTime = dueDateTime,
+                priority = priority,
+                progress = existingTask.progress, 
+                isCompleted = existingTask.isCompleted, 
+                createdAt = existingTask.createdAt, // Preserve original creation date
+                updatedAt = LocalDateTime.now(),    // Set new update date
                 metadata = mapOf(
                     "subtasks" to subtasksData,
                     "reminder" to reminderData
-                ).filterValues { it != null } as Map<String, String>,
+                ).filterValues { it != null }.mapValues { it.value.toString() },
 
-                // NEW RECURRENCE FIELDS - Similar to how it was done in createTask
-                // This assumes recurrenceRuleDto is an instance of the old RecurrenceRuleDto 
-                // and needs to be mapped to the new fields. This logic should mirror createTask or be refined.
-                recurrenceRuleString = recurrenceRuleDto?.let { 
-                    if (it.frequency == null) null 
-                    else "FREQ=${it.frequency.uppercase()};INTERVAL=${it.interval ?: 1}" + 
-                         (it.endDate?.let { ed -> ";UNTIL=${ed.replace("-", "")}T235959Z" } ?: "")
-                },
-                recurrenceStartDate = if (recurrenceRuleDto != null && recurrenceRuleDto.frequency != null) dueDateTime else null, // Or derive from existing task if not changing
-                recurrenceExceptions = selectedTaskState.value.data?.recurrenceExceptions ?: emptyList(), // Preserve existing or default
-                reminders = selectedTaskState.value.data?.reminders ?: emptyList() // Preserve existing or default. TODO: Map from taskData if provided
+                // NEW RECURRENCE FIELDS - Directly from TaskCreationData
+                recurrenceRuleString = taskData.rruleString,
+                recurrenceStartDate = taskData.recurrenceStartDate?.atStartOfDay(),
+                recurrenceExceptions = existingTask.recurrenceExceptions, // Preserve existing exceptions
+                reminders = existingTask.reminders // Preserve existing reminders
             )
+
+            Log.d("TaskViewModel", "Updating task ID: $taskId with data: Title - ${updatedTaskDomainObject.title}, RRULE - ${updatedTaskDomainObject.recurrenceRuleString}, DTSTART - ${updatedTaskDomainObject.recurrenceStartDate}")
 
             taskRepository.updateTask(updatedTaskDomainObject)
                 .catch { e ->

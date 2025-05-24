@@ -6,6 +6,7 @@ hiltAndroid = "2.48.1"
 hiltCompiler = "2.48.1"
 hiltNavigationCompose = "1.2.0"
 hiltNavigationComposeVersion = "1.1.0"
+ical4j = "3.2.4"
 kotlin = "2.0.0"
 coreKtx = "1.10.1"
 junit = "4.13.2"
@@ -30,6 +31,7 @@ lifecycleCompose = "2.7.0"
 navigationCompose = "2.7.6"
 securityCryptoKtx = "1.0.0"
 composeMaterial = "1.4.1"
+uiautomatorV18 = "2.2.0-alpha1"
 
 [libraries]
 # Existing libraries...
@@ -40,6 +42,7 @@ androidx-material-icons-extended = { module = "androidx.compose.material:materia
 hilt-android-v2481 = { module = "com.google.dagger:hilt-android", version.ref = "hiltAndroid" }
 converter-moshi = { module = "com.squareup.retrofit2:converter-moshi", version.ref = "converterMoshi" }
 hilt-compiler-v2481 = { module = "com.google.dagger:hilt-compiler", version.ref = "hiltCompiler" }
+ical4j = { module = "org.mnode.ical4j:ical4j", version.ref = "ical4j" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
@@ -81,6 +84,7 @@ lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-ru
 navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 androidx-security-crypto-ktx = { group = "androidx.security", name = "security-crypto-ktx", version.ref = "securityCryptoKtx" }
 androidx-compose-material = { group = "androidx.wear.compose", name = "compose-material", version.ref = "composeMaterial" }
+androidx-uiautomator-v18 = { group = "androidx.test.uiautomator", name = "uiautomator-v18", version.ref = "uiautomatorV18" }
 
 [plugins]
 # Existing plugins...

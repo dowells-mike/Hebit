@@ -39,6 +39,12 @@ android {
     buildFeatures {
         compose = true
     }
+
+    packaging {
+        resources.excludes.add("META-INF/INDEX.LIST")
+        resources.excludes.add("META-INF/groovy/org.codehaus.groovy.runtime.ExtensionModule")
+        resources.excludes.add("META-INF/groovy-release-info.properties")
+    }
 }
 
 dependencies {
@@ -54,6 +60,7 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.compose.material)
+    implementation(libs.androidx.uiautomator.v18)
     // implementation(libs.androidx.security.crypto.ktx) // Temporarily disabled due to dependency issues
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
@@ -95,4 +102,7 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)
+
+    //..other
+    implementation(libs.ical4j)
 }
