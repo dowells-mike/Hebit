@@ -1,8 +1,10 @@
 import { Response } from 'express';
 import { catchAsync, AppError } from '../middleware/errorHandler';
 import { Task, ProductivityMetrics, User } from '../models';
-import { AuthRequest } from '../types';
+import { AuthRequest, TaskDocument } from '../types';
 import * as mlService from '../services/mlService';
+import { calculateUpcomingOccurrences } from '../utils/recurrenceUtils';
+import { HydratedDocument } from 'mongoose';
 
 /**
  * @desc    Get all tasks for a user
@@ -67,9 +69,20 @@ export const getTasks = catchAsync(async (req: AuthRequest, res: Response) => {
   }
   
   // Execute the query with filters and sort
-  const tasks = await Task.find(filter).sort(sort);
+  const tasksMongo: HydratedDocument<TaskDocument>[] = await Task.find(filter).sort(sort);
+
+  // For each recurring task, calculate upcoming occurrences
+  const tasksWithOccurrences = await Promise.all(
+    tasksMongo.map(async (taskDoc: HydratedDocument<TaskDocument>) => {
+      const taskObject: TaskDocument = taskDoc.toObject(); // Explicitly type taskObject
+      if (taskObject.recurrenceRule && taskObject.recurrenceStartDate) {
+        (taskObject as any).upcomingOccurrences = calculateUpcomingOccurrences(taskObject, 5, new Date());
+      }
+      return taskObject; // Return the modified plain object
+    })
+  );
   
-  res.status(200).json(tasks);
+  res.status(200).json(tasksWithOccurrences);
 });
 
 /**
@@ -81,19 +94,30 @@ export const getTaskById = catchAsync(async (req: AuthRequest, res: Response) =>
   const userId = req.user?._id;
   const taskId = req.params.id;
   
-  const task = await Task.findOne({ _id: taskId, user: userId });
+  // taskFromDb is a Mongoose document (or null)
+  const taskFromDb: HydratedDocument<TaskDocument> | null = await Task.findOne({ _id: taskId, user: userId });
   
-  if (!task) {
+  if (!taskFromDb) {
     throw new AppError('Task not found', 404);
   }
   
+  // Convert to plain object for further processing and response
+  const taskObject: TaskDocument = taskFromDb.toObject();
+
   // Get sub-tasks if they exist
   const subTasks = await Task.find({ parentTaskId: taskId, user: userId });
+
+  let upcomingOccurrences: Date[] = [];
+  // Use taskObject (TaskDocument) for calculateUpcomingOccurrences
+  if (taskObject.recurrenceRule && taskObject.recurrenceStartDate) {
+    upcomingOccurrences = calculateUpcomingOccurrences(taskObject, 5, new Date());
+  }
   
-  // Return task with sub-tasks
+  // Return task with sub-tasks and upcoming occurrences
   res.status(200).json({
-    ...task.toObject(),
-    subTasks
+    ...taskObject, // Spread the plain object
+    subTasks,
+    upcomingOccurrences
   });
 });
 
