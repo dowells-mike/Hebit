@@ -73,12 +73,12 @@ import net.fortuna.ical4j.model.parameter.Value
 import net.fortuna.ical4j.model.property.RRule
 import java.util.Date // For converting LocalDate to java.util.Date for UNTIL
 
-data class RecurrencePattern(
-    val type: RecurrenceType = RecurrenceType.NONE,
-    val interval: Int = 1,
-    val endDate: LocalDate? = null,
-    val daysOfWeek: List<Int> = emptyList() // For weekly recurrence
-)
+// Import new recurrence models and utils
+import com.hebit.app.domain.model.RecurrencePattern
+import com.hebit.app.domain.model.RecurrenceType
+import com.hebit.app.util.generateRRuleString
+import com.hebit.app.util.formatRecurrencePattern
+import com.hebit.app.util.parseRRuleStringToPattern
 
 data class ReminderSettings(
     val isEnabled: Boolean = false,
@@ -86,108 +86,6 @@ data class ReminderSettings(
     val time: LocalTime? = null,
     val date: LocalDate? = null
 )
-
-// Helper function to generate RRULE string
-fun generateRRuleString(pattern: RecurrencePattern, dtStartDate: LocalDate?): String? {
-    if (pattern.type == RecurrenceType.NONE || dtStartDate == null) {
-        return null
-    }
-
-    val recurBuilder = RecurBuilder()
-
-    when (pattern.type) {
-        RecurrenceType.DAILY -> recurBuilder.frequency(Recur.Frequency.DAILY)
-        RecurrenceType.WEEKLY -> recurBuilder.frequency(Recur.Frequency.WEEKLY)
-        RecurrenceType.MONTHLY -> recurBuilder.frequency(Recur.Frequency.MONTHLY)
-        RecurrenceType.YEARLY -> recurBuilder.frequency(Recur.Frequency.YEARLY)
-        RecurrenceType.NONE -> return null
-    }
-
-    recurBuilder.interval(pattern.interval)
-
-    // UNTIL - End date for recurrence
-    pattern.endDate?.let {
-        // Convert LocalDate to java.util.Date for ical4j
-        // Note: ical4j's DateTime for UNTIL is inclusive.
-        // The time component for UNTIL should ideally be end-of-day for the specified date.
-        // For simplicity, creating it from LocalDate at start of day, then ical4j handles it.
-        // Or, explicitly make it end of day: it.atTime(LocalTime.MAX).atZone(ZoneId.systemDefault()).toInstant()
-        val utilDate = Date.from(it.atStartOfDay(ZoneId.systemDefault()).toInstant())
-        recurBuilder.until(DateTime(utilDate))
-    }
-
-    // Placeholder for BYDAY - to be implemented when UI supports daysOfWeek
-    if (pattern.type == RecurrenceType.WEEKLY && pattern.daysOfWeek.isNotEmpty()) {
-        val kotlinWeekDayList = pattern.daysOfWeek.mapNotNull { dayNum ->
-            when (dayNum) {
-                1 -> WeekDay.MO
-                2 -> WeekDay.TU
-                3 -> WeekDay.WE
-                4 -> WeekDay.TH
-                5 -> WeekDay.FR
-                6 -> WeekDay.SA
-                7 -> WeekDay.SU
-                else -> null
-            }
-        }
-        if (kotlinWeekDayList.isNotEmpty()) {
-            val ical4jWeekDayList = net.fortuna.ical4j.model.WeekDayList()
-            kotlinWeekDayList.forEach { ical4jWeekDayList.add(it) }
-            recurBuilder.dayList(ical4jWeekDayList) // Use ical4j WeekDayList
-        }
-    }
-    
-    val recurObject = recurBuilder.build()
-    return recurObject.toString()
-}
-
-// Helper function to format RecurrencePattern into a user-friendly string
-fun formatRecurrencePattern(pattern: RecurrencePattern): String {
-    if (pattern.type == RecurrenceType.NONE) return "Not repeating"
-
-    val parts = mutableListOf<String>()
-
-    // Type and Interval
-    val typeName = when (pattern.type) {
-        RecurrenceType.DAILY -> "Day"
-        RecurrenceType.WEEKLY -> "Week"
-        RecurrenceType.MONTHLY -> "Month"
-        RecurrenceType.YEARLY -> "Year"
-        else -> ""
-    }
-    parts.add(
-        when {
-            pattern.interval > 1 -> "Every ${pattern.interval} ${typeName}s"
-            else -> typeName // Singular, e.g., "Daily", "Weekly"
-        }
-    )
-    // For Daily, Weekly etc. it should be Adverb form e.g. "Daily", "Weekly"
-    // So, if interval is 1, it should be pattern.type.name.lowercase().replaceFirstChar { it.titlecase() }
-    if (pattern.interval == 1) {
-        parts[0] = pattern.type.name.lowercase().replaceFirstChar { it.titlecase() }
-    } else {
-        parts[0] = "Every ${pattern.interval} ${typeName.lowercase()}s"
-    }
-
-
-    // Days of Week (for Weekly)
-    if (pattern.type == RecurrenceType.WEEKLY && pattern.daysOfWeek.isNotEmpty()) {
-        val dayNames = pattern.daysOfWeek.sorted().mapNotNull {
-            when (it) {
-                1 -> "Mon"; 2 -> "Tue"; 3 -> "Wed"; 4 -> "Thu"; 5 -> "Fri"; 6 -> "Sat"; 7 -> "Sun"
-                else -> null
-            }
-        }.joinToString(", ")
-        if (dayNames.isNotEmpty()) parts.add("on $dayNames")
-    }
-
-    // End Date
-    pattern.endDate?.let {
-        parts.add("until ${it.format(DateTimeFormatter.ofPattern("MMM d, yyyy"))}")
-    }
-
-    return parts.joinToString(", ")
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -279,49 +177,7 @@ fun TaskCreationScreen(
                 selectedCategoryObject = availableCategories.find { it.name == task.category }
                 
                 // Load recurrence pattern from new recurrence fields using ical4j
-                if (task.recurrenceRuleString != null && task.recurrenceRuleString.isNotBlank()) {
-                    try {
-                        val recur = Recur(task.recurrenceRuleString)
-                        val parsedType = recur.frequency?.let {
-                            try { RecurrenceType.valueOf(it.name) } catch (e: IllegalArgumentException) { RecurrenceType.NONE }
-                        } ?: RecurrenceType.NONE
-                        
-                        val parsedInterval = recur.interval.takeIf { it != -1 } ?: 1 // recur.interval is -1 if not set
-                        
-                        val parsedEndDate = recur.until?.let { icalDate ->
-                            // Convert java.util.Date from ical4j to java.time.LocalDate
-                            java.time.Instant.ofEpochMilli(icalDate.time)
-                                .atZone(ZoneId.systemDefault())
-                                .toLocalDate()
-                        }
-                        
-                        // Parse BYDAY for daysOfWeek
-                        val parsedDaysOfWeek = recur.dayList?.mapNotNull { weekDay ->
-                            when (weekDay.day) {
-                                WeekDay.SU -> 7
-                                WeekDay.MO -> 1
-                                WeekDay.TU -> 2
-                                WeekDay.WE -> 3
-                                WeekDay.TH -> 4
-                                WeekDay.FR -> 5
-                                WeekDay.SA -> 6
-                                else -> null // Should not happen for standard days
-                            }
-                        }?.sorted() ?: emptyList()
-                        
-                        recurrencePattern = RecurrencePattern(
-                            type = parsedType,
-                            interval = parsedInterval,
-                            endDate = parsedEndDate,
-                            daysOfWeek = parsedDaysOfWeek
-                        )
-                    } catch (e: Exception) {
-                        Log.e("TaskCreationScreen", "Error parsing RRULE string with ical4j: ${task.recurrenceRuleString}", e)
-                        recurrencePattern = RecurrencePattern() // Default on parsing error
-                    }
-                } else {
-                    recurrencePattern = RecurrencePattern() // Default if no rule string
-                }
+                recurrencePattern = parseRRuleStringToPattern(task.recurrenceRuleString)
                 
                 // Load reminder settings from metadata
                 task.metadata["reminder"]?.let { reminderValue ->
