@@ -9,6 +9,7 @@ import com.hebit.app.domain.model.TaskStatus
 interface TaskRepository {
     suspend fun getTasks(): Flow<Resource<List<Task>>>
     suspend fun getTaskById(id: String): Flow<Resource<Task>>
+    suspend fun getTaskByIdOnce(taskId: String): Resource<Task?>
     suspend fun createTask(task: Task): Flow<Resource<Task>>
     suspend fun updateTask(task: Task): Flow<Resource<Task>>
     suspend fun deleteTask(id: String): Flow<Resource<Boolean>>

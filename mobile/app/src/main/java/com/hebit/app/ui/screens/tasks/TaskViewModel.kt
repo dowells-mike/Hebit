@@ -1,5 +1,6 @@
 package com.hebit.app.ui.screens.tasks
 
+import android.app.Application
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -22,9 +23,11 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import com.hebit.app.domain.model.Reminder
 import com.hebit.app.domain.model.ReminderType
+import com.hebit.app.util.ReminderScheduler
 
 @HiltViewModel
 class TaskViewModel @Inject constructor(
+    private val application: Application,
     private val taskRepository: TaskRepository,
     private val categorySuggestionService: CategorySuggestionService
 ) : ViewModel() {
@@ -131,7 +134,6 @@ class TaskViewModel @Inject constructor(
             Log.d("TaskViewModel", "Creating task from TaskCreationData: ${taskData.title}, priority: ${taskData.priority}, category: ${taskData.category}")
             
             val dueDateTime = if (taskData.dueDate != null) {
-                // Use LocalTime.MIDNIGHT if dueTime is null, or a specific time if available.
                 taskData.dueDate.atTime(taskData.dueTime ?: java.time.LocalTime.MIDNIGHT)
             } else null
             
@@ -145,15 +147,7 @@ class TaskViewModel @Inject constructor(
                 taskData.subtasks.joinToString(",") { "${it.id}:${it.title}:${it.isCompleted}" }
             } else null
             
-            // RECURRENCE: This part needs to align with the new Task domain model fields
-            // The Task domain model now expects: 
-            // recurrenceRuleString: String? 
-            // recurrenceStartDate: LocalDateTime?
-            // recurrenceExceptions: List<LocalDateTime>?
-
-            // REMOVED old logic based on taskData.recurrencePattern
-            
-            val task = Task(
+            val taskToCreate = Task(
                 id = "",
                 title = taskData.title,
                 description = taskData.description ?: "",
@@ -166,24 +160,27 @@ class TaskViewModel @Inject constructor(
                 updatedAt = LocalDateTime.now(),
                 metadata = mapOf(
                     "subtasks" to subtasksData
-                ).filterValues { it != null }.mapValues { it.value.toString() }, // Ensure all values are strings
-                
-                // NEW RECURRENCE FIELDS - Directly from TaskCreationData
+                ).filterValues { it != null }.mapValues { it.value.toString() },
                 recurrenceRuleString = taskData.rruleString,
-                recurrenceStartDate = taskData.recurrenceStartDate?.atStartOfDay(), // DTSTART is date only, time can be added if needed
-                recurrenceExceptions = emptyList(), // Placeholder
-                reminders = taskData.reminders ?: emptyList() // USE NEW FIELD
+                recurrenceStartDate = taskData.recurrenceStartDate?.atStartOfDay(),
+                recurrenceExceptions = emptyList(),
+                reminders = taskData.reminders ?: emptyList()
             )
             
-            taskRepository.createTask(task)
+            taskRepository.createTask(taskToCreate)
                 .catch { e ->
-                    // Log and handle error
                     Log.e("TaskViewModel", "Error creating task: ${e.message}", e)
                 }
                 .collect { result ->
                     when (result) {
                         is Resource.Success -> {
-                            Log.d("TaskViewModel", "Task created successfully: ${result.data?.id}, title: ${result.data?.title}, priority: ${result.data?.priority}")
+                            val createdTask = result.data
+                            Log.d("TaskViewModel", "Task created successfully: ${createdTask?.id}, title: ${createdTask?.title}, priority: ${createdTask?.priority}")
+                            if (createdTask?.reminders?.isNotEmpty() == true) {
+                                createdTask.reminders.forEach { reminder ->
+                                    ReminderScheduler.scheduleReminder(application.applicationContext, createdTask, reminder)
+                                }
+                            }
                             loadTasks()
                         }
                         is Resource.Error -> {
@@ -285,20 +282,29 @@ class TaskViewModel @Inject constructor(
     fun toggleTaskCompletion(taskId: String) {
         viewModelScope.launch {
             Log.d("TaskViewModel", "Toggling completion for task ID: $taskId")
-            // Optimistically update the UI first for better perceived performance
-            val currentSelectedTask = (_selectedTaskState.value as? Resource.Success<Task?>)?.data
-            if (currentSelectedTask?.id == taskId) {
-                _selectedTaskState.value = Resource.Success(currentSelectedTask.copy(isCompleted = !currentSelectedTask.isCompleted, updatedAt = LocalDateTime.now()))
+            
+            // Fetch the task to get its current state and reminders
+            val taskToToggleResource = taskRepository.getTaskByIdOnce(taskId)
+            if (taskToToggleResource !is Resource.Success || taskToToggleResource.data == null) {
+                Log.e("TaskViewModel", "Failed to fetch task $taskId for toggling completion.")
+                _tasksState.value = Resource.Error("Failed to toggle task: Original task not found.")
+                return@launch
+            }
+            val taskToToggle = taskToToggleResource.data
+            val newCompletionState = !taskToToggle.isCompleted
+
+            // Optimistically update the UI for selected task if it matches
+            if (_selectedTaskState.value.data?.id == taskId) {
+                _selectedTaskState.value = Resource.Success(taskToToggle.copy(isCompleted = newCompletionState, updatedAt = LocalDateTime.now()))
             }
             
             taskRepository.toggleTaskCompletion(taskId)
                 .catch { e ->
                     Log.e("TaskViewModel", "Error toggling task completion in VM: ${e.message}", e)
-                    // Revert optimistic update if error occurs
-                    if (currentSelectedTask?.id == taskId) {
-                        _selectedTaskState.value = Resource.Success(currentSelectedTask) // Revert to original
+                    if (_selectedTaskState.value.data?.id == taskId) {
+                         _selectedTaskState.value = Resource.Success(taskToToggle) // Revert optimistic update
                     }
-                     _tasksState.value = Resource.Error("Failed to toggle task: ${e.message}") // Notify error for the list
+                     _tasksState.value = Resource.Error("Failed to toggle task: ${e.message}")
                 }
                 .collect { result ->
                     when (result) {
@@ -306,32 +312,28 @@ class TaskViewModel @Inject constructor(
                             val updatedTask = result.data
                             Log.d("TaskViewModel", "Task toggled successfully in VM: ${updatedTask?.id}, completed: ${updatedTask?.isCompleted}")
                             if (updatedTask != null) {
-                                _selectedTaskState.value = Resource.Success(updatedTask)
-                                
-                                val currentTasks = (_tasksState.value as? Resource.Success)?.data?.toMutableList()
-                                if (currentTasks != null) {
-                                    val index = currentTasks.indexOfFirst { it.id == updatedTask.id }
-                                    if (index != -1) {
-                                        currentTasks[index] = updatedTask
-                                        _tasksState.value = Resource.Success(currentTasks.toList())
-                                    } else {
-                                loadTasks()
-                                    }
-                            } else {
-                                    loadTasks() 
-                                }
-
-                                // If task is now completed, archive it immediately
+                                // If task is now completed, cancel its reminders
                                 if (updatedTask.isCompleted) {
-                                    archiveTask(updatedTask.id) // This will further update the state and remove it from the list
+                                    updatedTask.reminders?.forEach { reminder ->
+                                        ReminderScheduler.cancelReminder(application.applicationContext, updatedTask.id, reminder)
+                                    }
+                                    // Archive it immediately
+                                    archiveTask(updatedTask.id) 
+                                } else {
+                                    // If task is marked incomplete, re-schedule its reminders
+                                    updatedTask.reminders?.forEach { reminder ->
+                                        ReminderScheduler.scheduleReminder(application.applicationContext, updatedTask, reminder)
+                                    }
                                 }
+                                _selectedTaskState.value = Resource.Success(updatedTask)
+                                loadTasks() // Refresh list to reflect changes
                             }
                         }
                         is Resource.Error -> {
                             Log.e("TaskViewModel", "Error from repository toggling task: ${result.message}")
                             // Revert optimistic update if API call fails
-                            if (currentSelectedTask?.id == taskId) {
-                                 _selectedTaskState.value = Resource.Success(currentSelectedTask) // Revert to original
+                            if (_selectedTaskState.value.data?.id == taskId) {
+                                 _selectedTaskState.value = Resource.Success(_selectedTaskState.value.data) // Revert to original
                             }
                             // Optionally, set a general error state for the list or selected task
                              _tasksState.value = Resource.Error("API error toggling task: ${result.message}")
@@ -352,17 +354,27 @@ class TaskViewModel @Inject constructor(
             updatedAt = LocalDateTime.now()
         )
         
-        updateTask(updatedTask)
+        updateTask(updatedTask) // This will call the main updateTask which should handle reminders if they change
     }
     
     fun deleteTask(taskId: String) {
         viewModelScope.launch {
+            // Fetch the task to get its reminders before deleting
+            val taskResource = taskRepository.getTaskByIdOnce(taskId) // Assumes a one-shot fetch method
+            if (taskResource is Resource.Success && taskResource.data != null) {
+                taskResource.data.reminders?.forEach { reminder ->
+                    ReminderScheduler.cancelReminder(application.applicationContext, taskId, reminder)
+                }
+            } else {
+                Log.w("TaskViewModel", "Could not fetch task $taskId before deletion to cancel reminders, or task has no reminders.")
+            }
+
             taskRepository.deleteTask(taskId)
                 .catch { e ->
-                    // Handle error
+                    Log.e("TaskViewModel", "Error deleting task $taskId: ${e.message}", e)
                 }
                 .collect { _ ->
-                    // Reload tasks after deleting
+                    Log.d("TaskViewModel", "Task $taskId deleted successfully")
                     loadTasks()
                 }
         }
@@ -381,22 +393,25 @@ class TaskViewModel @Inject constructor(
                 return@launch
             }
             val existingTask = existingTaskResource.data
+
+            // Cancel old reminders for the existing task before updating
+            existingTask.reminders?.forEach { oldReminder ->
+                ReminderScheduler.cancelReminder(application.applicationContext, existingTask.id, oldReminder)
+            }
                     
-                    val dueDateTime = if (taskData.dueDate != null) {
+            val dueDateTime = if (taskData.dueDate != null) {
                 taskData.dueDate.atTime(taskData.dueTime ?: existingTask.dueDateTime?.toLocalTime() ?: java.time.LocalTime.MIDNIGHT)
-                    } else null
-                    
-                    val priority = when (taskData.priority) {
-                        com.hebit.app.domain.model.TaskPriority.HIGH -> 3
-                        com.hebit.app.domain.model.TaskPriority.MEDIUM -> 2
-                        com.hebit.app.domain.model.TaskPriority.LOW -> 1
-                    }
-                    
-                    val subtasksData = if (taskData.subtasks.isNotEmpty()) {
-                        taskData.subtasks.joinToString(",") { "${it.id}:${it.title}:${it.isCompleted}" }
-                    } else null
-                    
-            // REMOVED old logic based on taskData.recurrencePattern
+            } else null
+            
+            val priority = when (taskData.priority) {
+                com.hebit.app.domain.model.TaskPriority.HIGH -> 3
+                com.hebit.app.domain.model.TaskPriority.MEDIUM -> 2
+                com.hebit.app.domain.model.TaskPriority.LOW -> 1
+            }
+            
+            val subtasksData = if (taskData.subtasks.isNotEmpty()) {
+                taskData.subtasks.joinToString(",") { "${it.id}:${it.title}:${it.isCompleted}" }
+            } else null
             
             val updatedTaskDomainObject = Task(
                 id = taskId, 
@@ -425,14 +440,20 @@ class TaskViewModel @Inject constructor(
             taskRepository.updateTask(updatedTaskDomainObject)
                 .catch { e ->
                     Log.e("TaskViewModel", "Error updating task $taskId: ${e.message}", e)
-                    // Optionally update some UI state to show error
                 }
                 .collect { result ->
                     when (result) {
                         is Resource.Success -> {
+                            val updatedTask = result.data
                             Log.d("TaskViewModel", "Task $taskId updated successfully")
+                            // Schedule new reminders for the updated task
+                            if (updatedTask?.reminders?.isNotEmpty() == true) {
+                                updatedTask.reminders.forEach { newReminder ->
+                                    ReminderScheduler.scheduleReminder(application.applicationContext, updatedTask, newReminder)
+                                }
+                            }
                             loadTasks() // Refresh the task list
-                            _selectedTaskState.value = Resource.Success(result.data)
+                            _selectedTaskState.value = Resource.Success(updatedTask)
                         }
                         is Resource.Error -> {
                             Log.e("TaskViewModel", "API Error updating task $taskId: ${result.message}")
@@ -448,6 +469,17 @@ class TaskViewModel @Inject constructor(
     fun archiveTask(taskId: String) {
         viewModelScope.launch {
             Log.d("TaskViewModel", "Archiving task: $taskId")
+
+            // Fetch the task to get its reminders before archiving
+            val taskResource = taskRepository.getTaskByIdOnce(taskId) // Assumes a one-shot fetch method
+            if (taskResource is Resource.Success && taskResource.data != null) {
+                taskResource.data.reminders?.forEach { reminder ->
+                    ReminderScheduler.cancelReminder(application.applicationContext, taskId, reminder)
+                }
+            } else {
+                Log.w("TaskViewModel", "Could not fetch task $taskId before archiving to cancel reminders, or task has no reminders.")
+            }
+
             taskRepository.updateTaskStatus(taskId, com.hebit.app.domain.model.TaskStatus.ARCHIVED)
                 .catch { e ->
                     Log.e("TaskViewModel", "Error archiving task $taskId: ${e.message}", e)

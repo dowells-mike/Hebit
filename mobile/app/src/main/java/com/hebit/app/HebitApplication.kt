@@ -1,6 +1,11 @@
 package com.hebit.app
 
+import android.annotation.SuppressLint
 import android.app.Application
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Context
+import android.os.Build
 import android.util.Log
 import com.hebit.app.domain.ml.CategorySuggestionService
 import dagger.hilt.android.HiltAndroidApp
@@ -22,11 +27,18 @@ class HebitApplication : Application() {
     
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     
+    companion object {
+        const val TASK_REMINDER_CHANNEL_ID = "task_reminders_channel"
+    }
+
     override fun onCreate() {
         super.onCreate()
         
         // Initialize ML components
         initializeML()
+
+        // Create notification channels
+        createNotificationChannels()
     }
     
     private fun initializeML() {
@@ -42,6 +54,28 @@ class HebitApplication : Application() {
         }
     }
     
+    @SuppressLint("ObsoleteSdkInt")
+    private fun createNotificationChannels() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val name = "Task Reminders"
+            val descriptionText = "Notifications for upcoming task deadlines and reminders"
+            val importance = NotificationManager.IMPORTANCE_HIGH
+            val channel = NotificationChannel(TASK_REMINDER_CHANNEL_ID, name, importance).apply {
+                description = descriptionText
+                // Optional: Configure light, vibration, etc.
+                // enableLights(true)
+                // lightColor = Color.RED
+                // enableVibration(true)
+                // vibrationPattern = longArrayOf(100, 200, 300, 400, 500, 400, 300, 200, 400)
+            }
+            // Register the channel with the system
+            val notificationManager: NotificationManager =
+                getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+            Log.i("HebitApplication", "Task Reminders notification channel created.")
+        }
+    }
+
     override fun onTerminate() {
         // Clean up ML resources
         categorySuggestionService.close()

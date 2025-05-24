@@ -7,6 +7,9 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Required for setting exact alarms on Android 12 (API 31) and above -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        tools:ignore="ProtectedPermissions" />
 
     <application
         android:name=".HebitApplication"
@@ -29,6 +32,17 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Reminder BroadcastReceiver -->
+        <receiver
+            android:name=".util.ReminderBroadcastReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.hebit.app.ACTION_SHOW_REMINDER" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
 </manifest>

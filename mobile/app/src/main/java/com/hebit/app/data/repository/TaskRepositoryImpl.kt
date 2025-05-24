@@ -82,6 +82,29 @@ class TaskRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun getTaskByIdOnce(taskId: String): Resource<Task?> {
+        return try {
+            val response = apiService.getTaskById(taskId)
+            if (response.isSuccessful && response.body() != null) {
+                val task = mapTaskDtoToDomain(response.body()!!)
+                Resource.Success(task)
+            } else {
+                val errorMessage = response.errorBody()?.string() ?: "Unknown error occurred getting task $taskId"
+                Log.e("TaskRepositoryImpl", "Error getTaskByIdOnce for $taskId: $errorMessage")
+                Resource.Error(errorMessage)
+            }
+        } catch (e: HttpException) {
+            Log.e("TaskRepositoryImpl", "HttpException getTaskByIdOnce for $taskId: ${e.message()}", e)
+            Resource.Error("Server error: ${e.message()}")
+        } catch (e: IOException) {
+            Log.e("TaskRepositoryImpl", "IOException getTaskByIdOnce for $taskId: ${e.localizedMessage}", e)
+            Resource.Error("Network error: ${e.localizedMessage ?: "Check your internet connection"}")
+        } catch (e: Exception) {
+            Log.e("TaskRepositoryImpl", "Exception getTaskByIdOnce for $taskId: ${e.localizedMessage}", e)
+            Resource.Error("Unexpected error: ${e.localizedMessage ?: "An unexpected error occurred"}")
+        }
+    }
+
     override suspend fun createTask(task: Task): Flow<Resource<Task>> = flow {
         emit(Resource.Loading())
         
