@@ -760,22 +760,13 @@ fun TaskDetailContent(
         
         if (hasSubtasks) {
             item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
-                    ) {
-                        Text(
-                            text = "Subtasks (${subtasks.count { it.isCompleted }}/${subtasks.size})",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                        
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                        
+                Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                    Text(
+                        text = "Subtasks (${subtasks.count { it.isCompleted }}/${subtasks.size})",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                    if (subtasks.isNotEmpty()) {
                         subtasks.forEachIndexed { index, subtask ->
                             Row(
                                 modifier = Modifier
@@ -785,33 +776,24 @@ fun TaskDetailContent(
                             ) {
                                 Checkbox(
                                     checked = subtask.isCompleted,
-                                    onCheckedChange = { isChecked ->
-                                        onSubtaskToggle(index, isChecked)
-                                    }
+                                    onCheckedChange = { isChecked -> onSubtaskToggle(index, isChecked) }
                                 )
-                                
                                 Text(
                                     text = subtask.title,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    textDecoration = if (subtask.isCompleted) 
-                                        TextDecoration.LineThrough 
-                                    else 
-                                        TextDecoration.None,
+                                    textDecoration = if (subtask.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
                                     modifier = Modifier.padding(start = 8.dp)
                                 )
                             }
-                            
                             if (index < subtasks.size - 1) {
-                                HorizontalDivider(
-                                    modifier = Modifier
-                                        .padding(start = 40.dp)
-                                        .padding(vertical = 4.dp),
-                                    thickness = 0.5.dp
-                                )
+                                HorizontalDivider(modifier = Modifier.padding(start = 40.dp, top = 4.dp, bottom = 4.dp), thickness = 0.5.dp)
                             }
                         }
+                    } else {
+                        Text("No subtasks yet.", style = MaterialTheme.typography.bodySmall)
                     }
                 }
+                HorizontalDivider()
             }
         }
         
@@ -979,62 +961,6 @@ fun TaskDetailContent(
                 HorizontalDivider()
             }
             item { Spacer(modifier = Modifier.height(16.dp)) } // Add some space at the end
-        }
-
-        // Subtasks Section
-        item {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Text(
-                        text = "Subtasks (${subtasks.count { it.isCompleted }}/${subtasks.size})",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                    
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                    
-                    subtasks.forEachIndexed { index, subtask ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Checkbox(
-                                checked = subtask.isCompleted,
-                                onCheckedChange = { isChecked ->
-                                    onSubtaskToggle(index, isChecked)
-                                }
-                            )
-                            
-                            Text(
-                                text = subtask.title,
-                                style = MaterialTheme.typography.bodyMedium,
-                                textDecoration = if (subtask.isCompleted) 
-                                    TextDecoration.LineThrough 
-                                else 
-                                    TextDecoration.None,
-                                modifier = Modifier.padding(start = 8.dp)
-                            )
-                        }
-                        
-                        if (index < subtasks.size - 1) {
-                            HorizontalDivider(
-                                modifier = Modifier
-                                    .padding(start = 40.dp)
-                                    .padding(vertical = 4.dp),
-                                thickness = 0.5.dp
-                            )
-                        }
-                    }
-                }
-            }
         }
     }
 }

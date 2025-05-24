@@ -443,7 +443,7 @@ fun TaskItem(
                 }
 
                 // Display Recurrence Info
-                recurrenceSummary?.let { summary ->
+                if (recurrenceSummary != null) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(top = if (showSpacer) 4.dp else 2.dp)
@@ -456,29 +456,55 @@ fun TaskItem(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                            text = summary,
+                            text = recurrenceSummary,
                             style = MaterialTheme.typography.bodySmall,
                             color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    showSpacer = true // Ensure spacer is shown if recurrence is present
+                    showSpacer = true
+                }
+
+                // Combined Date and Recurrence Info Row
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = if (showSpacer) 4.dp else 2.dp)) {
+                    val displayDate = nextUpcomingOccurrence ?: taskDueDateTime // Prioritize next upcoming, fallback to task due date
+                    val isDisplayDateOverdue = displayDate?.toLocalDate()?.isBefore(today) ?: false
+
+                    if (displayDate != null) {
+                        Icon(
+                            imageVector = if (nextUpcomingOccurrence != null) Icons.Default.NextPlan else Icons.Default.Event,
+                            contentDescription = if (nextUpcomingOccurrence != null) "Next occurrence" else "Due date",
+                            modifier = Modifier.size(16.dp),
+                            tint = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else if (isDisplayDateOverdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = displayDate.format(DateTimeFormatter.ofPattern("MMM d, hh:mm a")),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else if (isDisplayDateOverdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    if (!recurrenceSummary.isNullOrEmpty()) {
+                        if (displayDate != null) { // Add spacer only if a date is also shown
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Icon(
+                            imageVector = Icons.Default.Repeat,
+                            contentDescription = "Recurrence",
+                            modifier = Modifier.size(16.dp),
+                            tint = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = recurrenceSummary, // Show the summary like "Daily, until..."
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+                    }
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = if (showSpacer) 4.dp else 2.dp)) {
-                    task.dueDateTime?.let {
-                        val dateText = when (it.toLocalDate()) {
-                            today -> "Today"
-                            else -> it.format(DateTimeFormatter.ofPattern("MMM d"))
-                        }
-                        val timeText = it.format(DateTimeFormatter.ofPattern("h:mm a"))
-                        Text(
-                            text = "$dateText, $timeText",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        showSpacer = true
-                    }
-
                     task.category?.let { categoryName ->
                         if (categoryName.isNotBlank() && categoryName.lowercase() != "uncategorized") {
                             if (task.dueDateTime != null) {
@@ -498,59 +524,6 @@ fun TaskItem(
                                 )
                             }
                         }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (taskDueDateTime != null) {
-                        Icon(
-                            imageVector = Icons.Default.Event,
-                            contentDescription = "Due date",
-                            modifier = Modifier.size(16.dp),
-                            tint = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else if (isOverdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = taskDueDateTime.format(DateTimeFormatter.ofPattern("MMM d, yyyy hh:mm a")),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else if (isOverdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    // Display recurrence summary (already exists)
-                    if (!recurrenceSummary.isNullOrEmpty()) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Icon(
-                            imageVector = Icons.Default.Repeat,
-                            contentDescription = "Recurrence",
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = recurrenceSummary,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1
-                        )
-                    }
-                }
-                // Display next upcoming occurrence if available
-                if (nextUpcomingOccurrence != null) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.NextPlan, // Using NextPlan icon
-                            contentDescription = "Next occurrence",
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Next: ${nextUpcomingOccurrence.format(DateTimeFormatter.ofPattern("MMM d, yyyy hh:mm a"))}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
                     }
                 }
 
