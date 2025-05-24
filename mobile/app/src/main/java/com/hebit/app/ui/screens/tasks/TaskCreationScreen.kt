@@ -910,7 +910,7 @@ fun TaskCreationScreen(
                             viewModel.updateTaskWithData(taskId, taskData)
                             onSaveComplete()
                         } else {
-                            onSaveTask(taskData)
+                        onSaveTask(taskData)
                         }
                     },
                     enabled = taskTitle.isNotBlank(),
@@ -1089,7 +1089,7 @@ fun TaskCreationScreen(
                 // You might also want to override isSelectableYear if needed, though yearRange often suffices
             }
         )
-
+        
         AlertDialog(
             onDismissRequest = { showRecurrenceOptions = false },
             title = { Text("Set Recurrence") },

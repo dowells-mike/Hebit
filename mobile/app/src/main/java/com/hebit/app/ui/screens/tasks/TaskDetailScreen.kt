@@ -50,6 +50,7 @@ import com.hebit.app.domain.model.RecurrenceType
 import com.hebit.app.util.parseRRuleStringToPattern
 import com.hebit.app.util.formatRecurrencePattern
 
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaskDetailScreen(
@@ -940,11 +941,98 @@ fun TaskDetailContent(
                         leadingContent = {
                             Icon(
                                 Icons.Default.Repeat,
-                                contentDescription = "Recurrence"
+                                contentDescription = "Recurrence Rule"
                             )
                         },
-                        supportingContent = { Text(formatRecurrencePattern(pattern)) }
+                        supportingContent = { Text(formatRecurrencePattern(pattern, task.recurrenceStartDate?.toLocalDate())) }
                     )
+                }
+            }
+        }
+
+        // New: Upcoming Occurrences Section
+        if (!task.upcomingOccurrences.isNullOrEmpty()) {
+            item {
+                Column(modifier = Modifier.padding(top = 8.dp)) {
+                    Text(
+                        text = "Upcoming Occurrences (Next ${task.upcomingOccurrences?.take(5)?.size ?: 0})".trim(),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(start = 16.dp, bottom = 8.dp)
+                    )
+                }
+            }
+            items(task.upcomingOccurrences!!.take(5)) { occurrenceDate -> // Take up to 5
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            occurrenceDate.format(DateTimeFormatter.ofPattern("EEE, MMM d, yyyy 'at' hh:mm a")),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    },
+                    leadingContent = {
+                        Icon(
+                            Icons.Default.EventAvailable,
+                            contentDescription = "Upcoming Occurrence"
+                        )
+                    }
+                )
+                HorizontalDivider()
+            }
+            item { Spacer(modifier = Modifier.height(16.dp)) } // Add some space at the end
+        }
+
+        // Subtasks Section
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        text = "Subtasks (${subtasks.count { it.isCompleted }}/${subtasks.size})",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    
+                    subtasks.forEachIndexed { index, subtask ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = subtask.isCompleted,
+                                onCheckedChange = { isChecked ->
+                                    onSubtaskToggle(index, isChecked)
+                                }
+                            )
+                            
+                            Text(
+                                text = subtask.title,
+                                style = MaterialTheme.typography.bodyMedium,
+                                textDecoration = if (subtask.isCompleted) 
+                                    TextDecoration.LineThrough 
+                                else 
+                                    TextDecoration.None,
+                                modifier = Modifier.padding(start = 8.dp)
+                            )
+                        }
+                        
+                        if (index < subtasks.size - 1) {
+                            HorizontalDivider(
+                                modifier = Modifier
+                                    .padding(start = 40.dp)
+                                    .padding(vertical = 4.dp),
+                                thickness = 0.5.dp
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -1032,8 +1120,8 @@ fun ReminderDialog(
                 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
                         .clickable { useSpecificTime = false }
                         .padding(vertical = 8.dp)
                 ) {
@@ -1050,12 +1138,12 @@ fun ReminderDialog(
                 }
                 
                 if (!useSpecificTime) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
                             .padding(start = 32.dp, top = 8.dp, bottom = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                         val minutesOptions = listOf(5, 15, 30, 60, 120, 1440)
                         minutesOptions.chunked(3).forEach { rowOptions ->
                             Row(
@@ -1095,18 +1183,18 @@ fun ReminderDialog(
                     RadioButton(
                         selected = useSpecificTime,
                         onClick = { useSpecificTime = true }
-                    )
-                    
-                    Text(
+                            )
+                            
+                            Text(
                         text = "At specific time",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(start = 8.dp)
-                    )
-                }
-                
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(start = 8.dp)
+                            )
+                        }
+                        
                 if (useSpecificTime) {
                     Row(
-                        modifier = Modifier
+                                modifier = Modifier
                             .fillMaxWidth()
                             .padding(start = 32.dp, top = 8.dp, bottom = 16.dp),
                         verticalAlignment = Alignment.CenterVertically

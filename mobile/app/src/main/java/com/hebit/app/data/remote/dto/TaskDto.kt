@@ -32,7 +32,8 @@ data class TaskDto(
     @Json(name = "recurrenceRule") val recurrenceRule: String? = null, // RRULE string
     @Json(name = "recurrenceStartDate") val recurrenceStartDate: String? = null, // ISO DateTime string
     @Json(name = "recurrenceExceptions") val recurrenceExceptions: List<String>? = null, // List of ISO DateTime strings
-    val reminders: List<ReminderDto>? = null
+    val reminders: List<ReminderDto>? = null,
+    @Json(name = "upcomingOccurrences") val upcomingOccurrences: List<String>? = null // Added: List of ISO DateTime strings
 )
 
 @JsonClass(generateAdapter = true)

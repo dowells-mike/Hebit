@@ -38,6 +38,7 @@ import kotlinx.coroutines.launch
 import com.hebit.app.ui.screens.tasks.getSubtaskProgressCounts
 import com.hebit.app.util.parseRRuleStringToPattern
 import com.hebit.app.util.formatRecurrencePattern
+import java.time.LocalDateTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -79,13 +80,13 @@ fun TaskListScreen(
     val swipeStates = remember { mutableMapOf<String, SwipeToDismissBoxState>() }
     val coroutineScope = rememberCoroutineScope()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Tasks") },
-                actions = {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Tasks") },
+                    actions = {
                     IconButton(onClick = { /* TODO: Implement search functionality */ }) {
-                        Icon(Icons.Default.Search, contentDescription = "Search")
+                            Icon(Icons.Default.Search, contentDescription = "Search")
                     }
                     Box { // Box to anchor the DropdownMenu
                         IconButton(onClick = { showMoreMenu = true }) {
@@ -112,121 +113,88 @@ fun TaskListScreen(
                             )
                             // Add other menu items here if needed
                         }
-                    }
-                }
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = { onCreateTaskClick() }) {
-                Icon(Icons.Default.Add, contentDescription = "Add Task")
-            }
-        },
-        bottomBar = {
-            BottomAppBar {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    BottomNavItem(
-                        icon = Icons.Default.Home,
-                        label = "Home",
-                        selected = false,
-                        onClick = onHomeClick
-                    )
-                    
-                    BottomNavItem(
-                        icon = Icons.Default.CheckCircle,
-                        label = "Tasks",
-                        selected = true,
-                        onClick = { /* Already on tasks */ }
-                    )
-                    
-                    BottomNavItem(
-                        icon = Icons.Default.Loop,
-                        label = "Habits",
-                        selected = false,
-                        onClick = onHabitsClick
-                    )
-                    
-                    BottomNavItem(
-                        icon = Icons.Default.Flag,
-                        label = "Goals",
-                        selected = false,
-                        onClick = onGoalsClick
-                    )
-                    
-                    BottomNavItem(
-                        icon = Icons.Default.Person,
-                        label = "Profile",
-                        selected = false,
-                        onClick = onProfileClick
-                    )
-                }
-            }
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            // Search bar
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = { Text("Search tasks...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                singleLine = true
-            )
-            
-            // Task list
-            when (tasksState) {
-                is Resource.Loading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
-                }
-                
-                is Resource.Error -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = "Error loading tasks",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                            Text(
-                                text = (tasksState as Resource.Error).message ?: "Unknown error",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Button(onClick = { viewModel.loadTasks() }) {
-                                Text("Retry")
-                            }
                         }
                     }
+                )
+            },
+            floatingActionButton = {
+            FloatingActionButton(onClick = { onCreateTaskClick() }) {
+                    Icon(Icons.Default.Add, contentDescription = "Add Task")
                 }
+            },
+            bottomBar = {
+                BottomAppBar {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        BottomNavItem(
+                            icon = Icons.Default.Home,
+                            label = "Home",
+                            selected = false,
+                            onClick = onHomeClick
+                        )
+                        
+                        BottomNavItem(
+                            icon = Icons.Default.CheckCircle,
+                            label = "Tasks",
+                            selected = true,
+                            onClick = { /* Already on tasks */ }
+                        )
+                        
+                        BottomNavItem(
+                            icon = Icons.Default.Loop,
+                            label = "Habits",
+                            selected = false,
+                            onClick = onHabitsClick
+                        )
+                        
+                        BottomNavItem(
+                            icon = Icons.Default.Flag,
+                            label = "Goals",
+                            selected = false,
+                            onClick = onGoalsClick
+                        )
+                        
+                        BottomNavItem(
+                            icon = Icons.Default.Person,
+                            label = "Profile",
+                            selected = false,
+                            onClick = onProfileClick
+                        )
+                    }
+                }
+            }
+        ) { paddingValues ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
+                // Search bar
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("Search tasks...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    singleLine = true
+                )
                 
-                is Resource.Success -> {
-                    val tasks = (tasksState as Resource.Success<List<Task>>).data ?: emptyList()
-                    val filteredTasks = tasks.filter {
-                        searchQuery.isEmpty() || 
-                        it.title.contains(searchQuery, ignoreCase = true) ||
-                        it.description.contains(searchQuery, ignoreCase = true)
+                // Task list
+                when (tasksState) {
+                    is Resource.Loading -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
                     }
                     
-                    if (filteredTasks.isEmpty()) {
+                    is Resource.Error -> {
                         Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
@@ -234,31 +202,64 @@ fun TaskListScreen(
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                if (searchQuery.isNotEmpty()) {
-                                    Text(
-                                        text = "No tasks match your search",
-                                        style = MaterialTheme.typography.titleMedium
-                                    )
-                                } else {
-                                    Text(
-                                        text = "No tasks yet",
-                                        style = MaterialTheme.typography.titleMedium
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = "Tap + to create your first task",
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
+                                Text(
+                                    text = "Error loading tasks",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                                Text(
+                                    text = (tasksState as Resource.Error).message ?: "Unknown error",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Button(onClick = { viewModel.loadTasks() }) {
+                                    Text("Retry")
                                 }
                             }
                         }
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(filteredTasks, key = { task -> task.id }) { task ->
+                    }
+                    
+                    is Resource.Success -> {
+                        val tasks = (tasksState as Resource.Success<List<Task>>).data ?: emptyList()
+                        val filteredTasks = tasks.filter {
+                            searchQuery.isEmpty() || 
+                            it.title.contains(searchQuery, ignoreCase = true) ||
+                            it.description.contains(searchQuery, ignoreCase = true)
+                        }
+                        
+                        if (filteredTasks.isEmpty()) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    if (searchQuery.isNotEmpty()) {
+                                        Text(
+                                            text = "No tasks match your search",
+                                            style = MaterialTheme.typography.titleMedium
+                                        )
+                                    } else {
+                                        Text(
+                                            text = "No tasks yet",
+                                            style = MaterialTheme.typography.titleMedium
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = "Tap + to create your first task",
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(filteredTasks, key = { task -> task.id }) { task ->
                                 val dismissState = rememberSwipeToDismissBoxState(
                                     confirmValueChange = { proposedTargetValue ->
                                         if (proposedTargetValue == SwipeToDismissBoxValue.EndToStart) {
@@ -376,10 +377,17 @@ fun TaskItem(
     recurrenceSummary: String? = null
 ) {
     val today = java.time.LocalDate.now()
-    val tomorrow = today.plusDays(1)
+    val isOverdue = task.dueDateTime?.toLocalDate()?.isBefore(today) ?: false
+    val taskDueDateTime = task.dueDateTime
+    val (subtaskCompletedCount, totalSubtasks) = getSubtaskProgressCounts(task.metadata["subtasks"] as? String)
 
-    // Get subtask progress
-    val subtaskProgress = getSubtaskProgressCounts(task.metadata["subtasks"])
+    // Helper to find the next relevant upcoming occurrence
+    val nextUpcomingOccurrence = remember(task.upcomingOccurrences, task.dueDateTime) {
+        task.upcomingOccurrences?.firstOrNull { occurrence ->
+            val comparisonDateTime = task.dueDateTime?.takeIf { it.isAfter(LocalDateTime.now()) } ?: LocalDateTime.now()
+            occurrence.isAfter(comparisonDateTime)
+        }
+    }
 
     Card(
         modifier = Modifier
@@ -398,23 +406,23 @@ fun TaskItem(
                 onCheckedChange = { onTaskToggle() },
                 modifier = Modifier.padding(end = 10.dp)
             )
-
+            
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .padding(end = 8.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) { // Row for title and subtask count
-                    Text(
-                        text = task.title,
-                        style = MaterialTheme.typography.titleMedium,
+                Text(
+                    text = task.title,
+                    style = MaterialTheme.typography.titleMedium,
                         textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
                         color = if (task.isCompleted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface
                     )
-                    if (subtaskProgress.total > 0) {
+                    if (subtaskCompletedCount > 0) {
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "(${subtaskProgress.completed}/${subtaskProgress.total})",
+                            text = "(${subtaskCompletedCount}/${totalSubtasks})",
                             style = MaterialTheme.typography.bodySmall, // Or titleSmall if preferred
                             color = if (task.isCompleted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                         )
@@ -422,7 +430,7 @@ fun TaskItem(
                 }
 
                 var showSpacer = false
-
+                
                 if (task.description.isNotBlank()) {
                     Text(
                         text = task.description,
@@ -447,7 +455,7 @@ fun TaskItem(
                             tint = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(
+                    Text(
                             text = summary,
                             style = MaterialTheme.typography.bodySmall,
                             color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant
@@ -460,7 +468,6 @@ fun TaskItem(
                     task.dueDateTime?.let {
                         val dateText = when (it.toLocalDate()) {
                             today -> "Today"
-                            tomorrow -> "Tomorrow"
                             else -> it.format(DateTimeFormatter.ofPattern("MMM d"))
                         }
                         val timeText = it.format(DateTimeFormatter.ofPattern("h:mm a"))
@@ -493,22 +500,77 @@ fun TaskItem(
                         }
                     }
                 }
-            }
 
-            val priorityColor = when (task.priority) {
-                3 -> MaterialTheme.colorScheme.error
-                2 -> MaterialTheme.colorScheme.tertiary
-                1 -> MaterialTheme.colorScheme.secondary
-                else -> Color.Transparent
-            }
-            if (task.priority > 0) {
-                 Box(
-                    modifier = Modifier
-                        .size(10.dp)
-                        .background(if (task.isCompleted) priorityColor.copy(alpha = 0.5f) else priorityColor, shape = androidx.compose.foundation.shape.CircleShape)
-                )
-            } else {
-                Spacer(modifier = Modifier.size(10.dp))
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (taskDueDateTime != null) {
+                        Icon(
+                            imageVector = Icons.Default.Event,
+                            contentDescription = "Due date",
+                            modifier = Modifier.size(16.dp),
+                            tint = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else if (isOverdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = taskDueDateTime.format(DateTimeFormatter.ofPattern("MMM d, yyyy hh:mm a")),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else if (isOverdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    // Display recurrence summary (already exists)
+                    if (!recurrenceSummary.isNullOrEmpty()) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(
+                            imageVector = Icons.Default.Repeat,
+                            contentDescription = "Recurrence",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = recurrenceSummary,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+                    }
+                }
+                // Display next upcoming occurrence if available
+                if (nextUpcomingOccurrence != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.NextPlan, // Using NextPlan icon
+                            contentDescription = "Next occurrence",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Next: ${nextUpcomingOccurrence.format(DateTimeFormatter.ofPattern("MMM d, yyyy hh:mm a"))}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
+                if (totalSubtasks > 0) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = if (showSpacer) 4.dp else 2.dp)) {
+                        task.priority?.let { priority ->
+                            val priorityColor = when (priority) {
+                                3 -> MaterialTheme.colorScheme.error
+                                2 -> MaterialTheme.colorScheme.tertiary
+                                1 -> MaterialTheme.colorScheme.secondary
+                                else -> Color.Transparent
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .background(if (task.isCompleted) priorityColor.copy(alpha = 0.5f) else priorityColor, shape = androidx.compose.foundation.shape.CircleShape)
+                            )
+                        }
+                    }
+                }
             }
         }
     }

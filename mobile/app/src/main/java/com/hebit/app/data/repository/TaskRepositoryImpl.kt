@@ -424,7 +424,7 @@ class TaskRepositoryImpl @Inject constructor(
             id = dto._id,
             title = dto.title,
             description = dto.description ?: "",
-            category = dto.category,
+            category = dto.category ?: "General",
             dueDateTime = parsedDueDateTime,
             priority = priorityInt,
             progress = dto.progress ?: 0,
@@ -434,15 +434,19 @@ class TaskRepositoryImpl @Inject constructor(
             metadata = dto.metadata ?: emptyMap(),
             recurrenceRuleString = dto.recurrenceRule,
             recurrenceStartDate = dto.recurrenceStartDate?.let { LocalDateTime.parse(it, dateFormatter) },
-            recurrenceExceptions = dto.recurrenceExceptions?.mapNotNull { exDateString ->
-                try {
-                    LocalDateTime.parse(exDateString, dateFormatter)
-                } catch (e: Exception) {
-                    Log.e("TaskRepositoryImpl", "Failed to parse recurrence exception date: $exDateString", e)
+            recurrenceExceptions = dto.recurrenceExceptions?.mapNotNull {
+                try { LocalDateTime.parse(it, dateFormatter) } catch (e: Exception) { 
+                    Log.e("TaskRepositoryImpl", "Failed to parse recurrence exception date: $it", e)
+                    null 
+                }
+            },
+            reminders = dto.reminders?.map { reminderDtoToDomain(it) } ?: emptyList(),
+            upcomingOccurrences = dto.upcomingOccurrences?.mapNotNull  {
+                try { LocalDateTime.parse(it, dateFormatter) } catch (e: Exception) {
+                    Log.e("TaskRepositoryImpl", "Failed to parse upcoming occurrence date: $it", e)
                     null
                 }
-            } ?: emptyList(),
-            reminders = dto.reminders?.map { reminderDtoToDomain(it) } ?: emptyList()
+            } ?: emptyList()
         )
     }
 

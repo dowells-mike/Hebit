@@ -62,7 +62,7 @@ fun generateRRuleString(pattern: RecurrencePattern, dtStartDate: LocalDate?): St
 }
 
 // Helper function to format RecurrencePattern into a user-friendly string
-fun formatRecurrencePattern(pattern: RecurrencePattern): String {
+fun formatRecurrencePattern(pattern: RecurrencePattern, dtStartDate: LocalDate? = null): String {
     if (pattern.type == RecurrenceType.NONE) return "Not repeating"
 
     val parts = mutableListOf<String>()

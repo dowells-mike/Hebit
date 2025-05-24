@@ -19,5 +19,6 @@ data class Task(
     val recurrenceRuleString: String? = null, // Stores the full RRULE string
     val recurrenceStartDate: LocalDateTime? = null, // DTSTART
     val recurrenceExceptions: List<LocalDateTime>? = emptyList(), // EXDATEs
-    val reminders: List<Reminder> = emptyList()
+    val reminders: List<Reminder> = emptyList(),
+    val upcomingOccurrences: List<LocalDateTime>? = emptyList() // Added
 ) 

@@ -395,24 +395,24 @@ class TaskViewModel @Inject constructor(
                 return@launch
             }
             val existingTask = existingTaskResource.data
-
-            val dueDateTime = if (taskData.dueDate != null) {
+                    
+                    val dueDateTime = if (taskData.dueDate != null) {
                 taskData.dueDate.atTime(taskData.dueTime ?: existingTask.dueDateTime?.toLocalTime() ?: java.time.LocalTime.MIDNIGHT)
-            } else null
-
-            val priority = when (taskData.priority) {
-                com.hebit.app.domain.model.TaskPriority.HIGH -> 3
-                com.hebit.app.domain.model.TaskPriority.MEDIUM -> 2
-                com.hebit.app.domain.model.TaskPriority.LOW -> 1
-            }
-
-            val subtasksData = if (taskData.subtasks.isNotEmpty()) {
-                taskData.subtasks.joinToString(",") { "${it.id}:${it.title}:${it.isCompleted}" }
-            } else null
-
+                    } else null
+                    
+                    val priority = when (taskData.priority) {
+                        com.hebit.app.domain.model.TaskPriority.HIGH -> 3
+                        com.hebit.app.domain.model.TaskPriority.MEDIUM -> 2
+                        com.hebit.app.domain.model.TaskPriority.LOW -> 1
+                    }
+                    
+                    val subtasksData = if (taskData.subtasks.isNotEmpty()) {
+                        taskData.subtasks.joinToString(",") { "${it.id}:${it.title}:${it.isCompleted}" }
+                    } else null
+                    
             // REMOVED old logic based on taskData.recurrencePattern
-
-            val reminderData = taskData.reminderSettings?.let {
+                    
+                    val reminderData = taskData.reminderSettings?.let {
                 if (it.isEnabled) {
                     val timePart = it.time?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: ""
                     val minutesPart = if (it.minutes > 0 && it.time == null) it.minutes.toString() else ""
