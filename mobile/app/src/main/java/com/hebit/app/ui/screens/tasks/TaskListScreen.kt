@@ -477,7 +477,7 @@ fun TaskItem(
                             tint = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(
+                    Text(
                             text = recurrenceSummary, // Show the summary like "Daily, until..."
                             style = MaterialTheme.typography.bodySmall,
                             color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant,

@@ -750,7 +750,7 @@ fun TaskCreationScreen(
                     },
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
+                            Icon(
                     imageVector = Icons.Outlined.Notifications,
                     contentDescription = "Reminders",
                     tint = MaterialTheme.colorScheme.primary
@@ -768,7 +768,7 @@ fun TaskCreationScreen(
                     color = if (reminders.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Icon(
+                    Icon(
                     imageVector = Icons.Default.ChevronRight,
                     contentDescription = "Select Reminders"
                 )
@@ -883,81 +883,81 @@ fun TaskCreationScreen(
                         // You might also want to override isSelectableYear if needed, though yearRange often suffices
                     }
                 )
-                
-                AlertDialog(
-                    onDismissRequest = { showRecurrenceOptions = false },
-                    title = { Text("Set Recurrence") },
-                    text = {
-                        Column(
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            // Recurrence type options
-                            Text("Repeat", style = MaterialTheme.typography.bodyLarge)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            
-                            Column {
-                                RecurrenceType.values().forEach { type ->
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                tempRecurrenceType = type
-                                            }
-                                            .padding(vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        RadioButton(
-                                            selected = tempRecurrenceType == type,
-                                            onClick = {
-                                                tempRecurrenceType = type
-                                            }
-                                        )
-                                        
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        
-                                        Text(
-                                            text = when(type) {
-                                                RecurrenceType.NONE -> "Do not repeat"
-                                                RecurrenceType.DAILY -> "Daily"
-                                                RecurrenceType.WEEKLY -> "Weekly"
-                                                RecurrenceType.MONTHLY -> "Monthly"
-                                                RecurrenceType.YEARLY -> "Yearly"
-                                            },
-                                            style = MaterialTheme.typography.bodyMedium
-                                        )
+        
+        AlertDialog(
+            onDismissRequest = { showRecurrenceOptions = false },
+            title = { Text("Set Recurrence") },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    // Recurrence type options
+                    Text("Repeat", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Column {
+                        RecurrenceType.values().forEach { type ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        tempRecurrenceType = type
                                     }
-                                }
-                            }
-                            
-                            // Show interval settings if a recurrence type is selected
-                            if (tempRecurrenceType != RecurrenceType.NONE) {
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Text("Repeat every", style = MaterialTheme.typography.bodyLarge)
-                                Spacer(modifier = Modifier.height(8.dp))
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = tempRecurrenceType == type,
+                                    onClick = {
+                                        tempRecurrenceType = type
+                                    }
+                                )
                                 
+                                Spacer(modifier = Modifier.width(8.dp))
+                                
+                                Text(
+                                    text = when(type) {
+                                        RecurrenceType.NONE -> "Do not repeat"
+                                        RecurrenceType.DAILY -> "Daily"
+                                        RecurrenceType.WEEKLY -> "Weekly"
+                                        RecurrenceType.MONTHLY -> "Monthly"
+                                        RecurrenceType.YEARLY -> "Yearly"
+                                    },
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        }
+                    }
+                    
+                    // Show interval settings if a recurrence type is selected
+                    if (tempRecurrenceType != RecurrenceType.NONE) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Repeat every", style = MaterialTheme.typography.bodyLarge)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
                 OutlinedTextField(
-                                    value = tempInterval,
-                                    onValueChange = { 
-                                        // Only allow numeric input
-                                        if (it.isEmpty() || it.all { char -> char.isDigit() }) {
-                                            tempInterval = it
-                                        }
-                                    },
-                                    label = { 
-                                        Text(
-                                            when(tempRecurrenceType) {
-                                                RecurrenceType.DAILY -> "days"
-                                                RecurrenceType.WEEKLY -> "weeks"
-                                                RecurrenceType.MONTHLY -> "months"
-                                                RecurrenceType.YEARLY -> "years"
-                                                else -> ""
-                                            }
-                                        ) 
-                                    },
+                            value = tempInterval,
+                            onValueChange = { 
+                                // Only allow numeric input
+                                if (it.isEmpty() || it.all { char -> char.isDigit() }) {
+                                    tempInterval = it
+                                }
+                            },
+                            label = { 
+                                Text(
+                                    when(tempRecurrenceType) {
+                                        RecurrenceType.DAILY -> "days"
+                                        RecurrenceType.WEEKLY -> "weeks"
+                                        RecurrenceType.MONTHLY -> "months"
+                                        RecurrenceType.YEARLY -> "years"
+                                        else -> ""
+                                    }
+                                ) 
+                            },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
-                            }
+                    }
 
                             // End Date Picker
                             Spacer(modifier = Modifier.height(16.dp))
@@ -1008,11 +1008,11 @@ fun TaskCreationScreen(
                                     }
                                 }
                             }
-                        }
-                    },
-                    confirmButton = {
-                        TextButton(
-                            onClick = {
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
                                 // Validate that at least one day is selected for weekly recurrence
                                 if (tempRecurrenceType == RecurrenceType.WEEKLY && tempDaysOfWeek.isEmpty()) {
                                     // Optionally show a toast or error message to the user
@@ -1021,24 +1021,24 @@ fun TaskCreationScreen(
                                     Log.w("TaskCreationScreen", "Weekly recurrence selected but no days chosen.")
                                     // Potentially set tempRecurrenceType = RecurrenceType.NONE here or handle error
                                 }
-                                recurrencePattern = RecurrencePattern(
-                                    type = tempRecurrenceType,
+                        recurrencePattern = RecurrencePattern(
+                            type = tempRecurrenceType,
                                     interval = tempInterval.toIntOrNull() ?: 1,
                                     endDate = tempEndDate,
                                     daysOfWeek = tempDaysOfWeek.toList().sorted() // Save sorted list
-                                )
-                                showRecurrenceOptions = false
-                            }
-                        ) {
-                            Text("Save")
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showRecurrenceOptions = false }) {
-                            Text("Cancel")
-                        }
+                        )
+                        showRecurrenceOptions = false
                     }
-                )
+                ) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRecurrenceOptions = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
                 // Moved Date Picker Dialog for Recurrence End Date INSIDE the if (showRecurrenceOptions) block
                 if (showEndDatePicker) {
                     DatePickerDialog(
@@ -1082,9 +1082,9 @@ fun TaskCreationScreen(
             }
 
             // Bottom buttons
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
                     .padding(vertical = 16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -1124,7 +1124,7 @@ fun TaskCreationScreen(
                         onDismiss() // Close the dialog/screen
                     },
                     enabled = taskTitle.isNotBlank(),
-                    modifier = Modifier
+                            modifier = Modifier
                         .weight(1f)
                         .padding(start = 8.dp)
                 ) {
@@ -1212,7 +1212,7 @@ fun TaskCreationScreen(
                                     },
                                     leadingContent = {
                                         Box(
-                                            modifier = Modifier
+                                modifier = Modifier
                                                 .size(24.dp)
                                                 .background(
                                                     color = try {
@@ -1261,7 +1261,7 @@ fun TaskCreationScreen(
                     Text("Done")
                 }
             },
-            dismissButton = { 
+            dismissButton = {
                 // Optional: Only show cancel if you want a different action from "Done" when no selection is made.
                 // Otherwise, "Done" can also act as dismiss.
                 TextButton(onClick = { showCategoryPicker = false }) {
