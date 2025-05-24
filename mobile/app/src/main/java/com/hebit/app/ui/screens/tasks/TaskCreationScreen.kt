@@ -79,6 +79,11 @@ import com.hebit.app.domain.model.RecurrenceType
 import com.hebit.app.util.generateRRuleString
 import com.hebit.app.util.formatRecurrencePattern
 import com.hebit.app.util.parseRRuleStringToPattern
+import com.hebit.app.domain.model.Reminder
+import com.hebit.app.domain.model.ReminderType
+import java.time.Instant
+import java.time.LocalDateTime
+import java.util.Calendar
 
 data class ReminderSettings(
     val isEnabled: Boolean = false,
@@ -86,6 +91,32 @@ data class ReminderSettings(
     val time: LocalTime? = null,
     val date: LocalDate? = null
 )
+
+// Function to format the reminder summary
+fun formatRemindersSummary(reminders: List<Reminder>, taskDueDate: LocalDate?): String {
+    if (reminders.isEmpty()) return "No reminder"
+    if (reminders.size == 1) {
+        val reminder = reminders.first()
+        return when (reminder.type) {
+            ReminderType.RELATIVE -> {
+                val offset = reminder.offsetMinutes?.let { Math.abs(it) } ?: 0
+                when {
+                    offset == 0 -> "At time of due date"
+                    offset < 60 -> "$offset minutes before"
+                    offset % 60 == 0 -> {
+                        val hours = offset / 60
+                        if (hours == 1) "1 hour before" else "$hours hours before"
+                    }
+                    else -> "$offset minutes before" // e.g. 75 minutes
+                }
+            }
+            ReminderType.ABSOLUTE -> {
+                reminder.absoluteDateTime?.format(DateTimeFormatter.ofPattern("MMM d, h:mm a")) ?: "On specific date"
+            }
+        }
+    }
+    return "${reminders.size} reminders set"
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -130,9 +161,11 @@ fun TaskCreationScreen(
     val currentSubtasks = remember { mutableStateListOf<SubTask>() }
     var newSubtaskTitle by remember { mutableStateOf("") }
     
-    // Reminder settings
-    var showReminderOptions by remember { mutableStateOf(false) }
-    var reminderSettings by remember { mutableStateOf(ReminderSettings()) }
+    // Reminder states
+    var showReminderDialog by remember { mutableStateOf(false) }
+    var reminders by remember { mutableStateOf<List<Reminder>>(emptyList()) }
+    var showAddEditReminderDialog by remember { mutableStateOf(false) } // New state for Add/Edit dialog
+    var editingReminder by remember { mutableStateOf<Reminder?>(null) } // To hold reminder being edited, or null for new
     
     // Permission states
     var hasNotificationPermission by remember { 
@@ -164,7 +197,7 @@ fun TaskCreationScreen(
             val task = (taskState as? Resource.Success)?.data
             if (task != null) {
                 taskTitle = task.title
-                taskDescription = task.description
+                taskDescription = task.description ?: "" // Ensure not null
                 selectedDate = task.dueDateTime?.toLocalDate()
                 selectedTime = task.dueDateTime?.toLocalTime()
                 selectedPriority = when (task.priority) {
@@ -174,48 +207,17 @@ fun TaskCreationScreen(
                     else -> TaskPriority.MEDIUM
                 }
                 selectedCategoryName = task.category ?: "Uncategorized"
-                selectedCategoryObject = availableCategories.find { it.name == task.category }
+                // selectedCategoryObject will be updated by another LaunchedEffect based on availableCategories
                 
-                // Load recurrence pattern from new recurrence fields using ical4j
                 recurrencePattern = parseRRuleStringToPattern(task.recurrenceRuleString)
                 
-                // Load reminder settings from metadata
-                task.metadata["reminder"]?.let { reminderValue ->
-                    if (reminderValue is String) {
-                        val reminderStr = reminderValue
-                    val parts = reminderStr.split(",")
-                    if (parts.isNotEmpty()) {
-                        val minutes = parts[0].toIntOrNull() ?: 15
-                        val timeString = parts.getOrNull(1) ?: ""
-                        
-                        if (timeString.isNotBlank()) {
-                            reminderSettings = ReminderSettings(
-                                isEnabled = true,
-                                minutes = 0,
-                                time = try {
-                                    LocalTime.parse(timeString, DateTimeFormatter.ofPattern("h:mm a"))
-                                } catch (e: Exception) {
-                                    null
-                                }
-                            )
-                        } else {
-                            reminderSettings = ReminderSettings(
-                                isEnabled = true,
-                                minutes = minutes
-                            )
-                            }
-                        }
-                    }
-                }
-                
-                // Load subtasks if available
-                task.metadata["subtasks"]?.let { subtasksValue ->
-                    if (subtasksValue is String) {
-                        // Ensure we're updating the correct state list
-                        currentSubtasks.clear()
-                        currentSubtasks.addAll(parseSubtasks(subtasksValue))
-                    }
-                }
+                // Load reminders from the new field
+                reminders = task.reminders ?: emptyList()
+
+                // Load subtasks from metadata
+                val subtasksString = task.metadata["subtasks"] as? String
+                currentSubtasks.clear()
+                currentSubtasks.addAll(parseSubtasks(subtasksString)) // parseSubtasks is expected to handle null input gracefully
             }
         }
     }
@@ -352,7 +354,7 @@ fun TaskCreationScreen(
                                 category = if (selectedCategoryName == "Uncategorized") null else selectedCategoryName,
                                 labels = emptyList(),
                                 subtasks = currentSubtasks.toList(),
-                                reminderSettings = reminderSettings,
+                                reminders = reminders,
                                 rruleString = rruleStringValue,
                                 recurrenceStartDate = if (rruleStringValue != null) selectedDate else null
                             )
@@ -733,8 +735,26 @@ fun TaskCreationScreen(
             
             Divider()
             
-            // Subtasks section
+            // Reminder section
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showReminderDialog = true },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Reminders", style = MaterialTheme.typography.bodyLarge)
+                val remindersSummary = formatRemindersSummary(reminders, selectedDate) 
                 Text(
+                    text = remindersSummary,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (reminders.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary
+                )
+            }
+            HorizontalDivider(modifier = Modifier.padding(top = 12.dp, bottom = 8.dp))
+            
+            // Subtasks section
+            Text(
                 "Subtasks",
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
@@ -813,65 +833,232 @@ fun TaskCreationScreen(
             
             HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
             
-            // Reminder settings
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp)
-                    .clickable { 
-                        // Request notification permission if needed before showing reminder options
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotificationPermission) {
-                            requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        } else {
-                            showReminderOptions = true
+            // Recurrence Options Dialog
+            if (showRecurrenceOptions) {
+                var tempRecurrenceType by remember { mutableStateOf(recurrencePattern.type) }
+                var tempInterval by remember { mutableStateOf(recurrencePattern.interval.toString()) }
+                var tempEndDate by remember { mutableStateOf(recurrencePattern.endDate) }
+                var showEndDatePicker by remember { mutableStateOf(false) }
+                var tempDaysOfWeek by remember { mutableStateOf(recurrencePattern.daysOfWeek.toMutableStateList()) }
+
+                // Date validator for the recurrence end date picker state
+                val recurrenceEndDateValidator = { utcDateMillis: Long ->
+                    val selectedInstant = java.time.Instant.ofEpochMilli(utcDateMillis)
+                    val selectedLocalDate = selectedInstant.atZone(ZoneId.systemDefault()).toLocalDate()
+                    // Use task's main selectedDate as the earliest possible start for recurrence end date
+                    // or today if selectedDate is null.
+                    val taskStartDate = selectedDate ?: LocalDate.now() 
+                    selectedLocalDate.isAfter(taskStartDate.minusDays(1)) // Allow recurrence to end on the same day it starts
+                }
+
+                val recurrenceEndDatePickerState = rememberDatePickerState(
+                    initialSelectedDateMillis = tempEndDate?.toEpochDay()?.let { it * 24 * 60 * 60 * 1000L },
+                    yearRange = IntRange(LocalDate.now().year, LocalDate.now().year + 100), // Optional: restrict year range
+                    selectableDates = object : SelectableDates {
+                        override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                            return recurrenceEndDateValidator(utcTimeMillis)
+                        }
+                        // You might also want to override isSelectableYear if needed, though yearRange often suffices
+                    }
+                )
+                
+                AlertDialog(
+                    onDismissRequest = { showRecurrenceOptions = false },
+                    title = { Text("Set Recurrence") },
+                    text = {
+                        Column(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            // Recurrence type options
+                            Text("Repeat", style = MaterialTheme.typography.bodyLarge)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            Column {
+                                RecurrenceType.values().forEach { type ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                tempRecurrenceType = type
+                                            }
+                                            .padding(vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        RadioButton(
+                                            selected = tempRecurrenceType == type,
+                                            onClick = {
+                                                tempRecurrenceType = type
+                                            }
+                                        )
+                                        
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        
+                                        Text(
+                                            text = when(type) {
+                                                RecurrenceType.NONE -> "Do not repeat"
+                                                RecurrenceType.DAILY -> "Daily"
+                                                RecurrenceType.WEEKLY -> "Weekly"
+                                                RecurrenceType.MONTHLY -> "Monthly"
+                                                RecurrenceType.YEARLY -> "Yearly"
+                                            },
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                    }
+                                }
+                            }
+                            
+                            // Show interval settings if a recurrence type is selected
+                            if (tempRecurrenceType != RecurrenceType.NONE) {
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text("Repeat every", style = MaterialTheme.typography.bodyLarge)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                
+                OutlinedTextField(
+                                    value = tempInterval,
+                                    onValueChange = { 
+                                        // Only allow numeric input
+                                        if (it.isEmpty() || it.all { char -> char.isDigit() }) {
+                                            tempInterval = it
+                                        }
+                                    },
+                                    label = { 
+                                        Text(
+                                            when(tempRecurrenceType) {
+                                                RecurrenceType.DAILY -> "days"
+                                                RecurrenceType.WEEKLY -> "weeks"
+                                                RecurrenceType.MONTHLY -> "months"
+                                                RecurrenceType.YEARLY -> "years"
+                                                else -> ""
+                                            }
+                                        ) 
+                                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                            }
+
+                            // End Date Picker
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text("Ends", style = MaterialTheme.typography.bodyLarge)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showEndDatePicker = true }
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Outlined.EventBusy, contentDescription = "End Date", tint = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = tempEndDate?.format(DateTimeFormatter.ofPattern("MMM dd, yyyy")) ?: "Never",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+
+                            // Days of Week Picker (only for Weekly recurrence)
+                            if (tempRecurrenceType == RecurrenceType.WEEKLY) {
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text("Repeat on", style = MaterialTheme.typography.bodyLarge)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                // Changed from Row to LazyRow for horizontal scrolling
+                                LazyRow(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp) // Adds a small space between chips
+                                ) {
+                                    val days = listOf("Mo", "Tu", "We", "Th", "Fr", "Sa", "Su")
+                                    items(days.size) { index -> // Use items(count) for LazyRow
+                                        val dayLabel = days[index]
+                                        val dayNumber = index + 1 // 1 for Monday, ..., 7 for Sunday
+                                        val isSelected = tempDaysOfWeek.contains(dayNumber)
+                                        FilterChip(
+                                            selected = isSelected,
+                                            onClick = {
+                                                if (isSelected) {
+                                                    tempDaysOfWeek.remove(dayNumber)
+                                                } else {
+                                                    tempDaysOfWeek.add(dayNumber)
+                                                }
+                                            },
+                                            label = { Text(dayLabel) },
+                                            modifier = Modifier.padding(horizontal = 2.dp) 
+                                        )
+                                    }
+                                }
+                            }
                         }
                     },
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                        Icon(
-                    imageVector = Icons.Outlined.Notifications,
-                    contentDescription = "Reminder",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                
-                Spacer(modifier = Modifier.width(8.dp))
-                
-                Text(
-                    text = "Reminder",
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                
-                Spacer(modifier = Modifier.weight(1f))
-                
-                // Fix complex expression issue with smart cast
-                val reminder = remember(reminderSettings) {
-                    if (reminderSettings.isEnabled) {
-                        val time = reminderSettings.time
-                        if (time != null) {
-                            "${time.format(DateTimeFormatter.ofPattern("h:mm a"))}"
-                        } else {
-                            "${reminderSettings.minutes} minutes before"
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                // Validate that at least one day is selected for weekly recurrence
+                                if (tempRecurrenceType == RecurrenceType.WEEKLY && tempDaysOfWeek.isEmpty()) {
+                                    // Optionally show a toast or error message to the user
+                                    // For now, just defaulting to not saving or reverting type to NONE
+                                    // This behavior might need refinement (e.g. prevent dialog close)
+                                    Log.w("TaskCreationScreen", "Weekly recurrence selected but no days chosen.")
+                                    // Potentially set tempRecurrenceType = RecurrenceType.NONE here or handle error
+                                }
+                                recurrencePattern = RecurrencePattern(
+                                    type = tempRecurrenceType,
+                                    interval = tempInterval.toIntOrNull() ?: 1,
+                                    endDate = tempEndDate,
+                                    daysOfWeek = tempDaysOfWeek.toList().sorted() // Save sorted list
+                                )
+                                showRecurrenceOptions = false
+                            }
+                        ) {
+                            Text("Save")
                         }
-                    } else {
-                        "No reminder"
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showRecurrenceOptions = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+                // Moved Date Picker Dialog for Recurrence End Date INSIDE the if (showRecurrenceOptions) block
+                if (showEndDatePicker) {
+                    DatePickerDialog(
+                        onDismissRequest = { showEndDatePicker = false },
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    recurrenceEndDatePickerState.selectedDateMillis?.let { millis ->
+                                        tempEndDate = LocalDate.ofEpochDay(millis / (24 * 60 * 60 * 1000L)) // Added L for Long
+                                    }
+                                    showEndDatePicker = false
+                                }
+                            ) {
+                                Text("OK")
+                            }
+                        },
+                        dismissButton = {
+                            Row {
+                                TextButton(
+                                    onClick = { 
+                                        tempEndDate = null // Clear the end date
+                                        showEndDatePicker = false 
+                                    }
+                                ) {
+                                    Text("Clear (Never)")
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                TextButton(
+                                    onClick = { showEndDatePicker = false }
+                                ) {
+                                    Text("Cancel")
+                                }
+                            }
+                        }
+                    ) {
+                        DatePicker(
+                            state = recurrenceEndDatePickerState
+                        )
                     }
                 }
-                
-                Text(
-                    text = reminder,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                
-                Spacer(modifier = Modifier.width(8.dp))
-                
-                        Icon(
-                    imageVector = Icons.Default.ChevronRight,
-                            contentDescription = "Select"
-                )
             }
-            
-            Divider()
-            
+
             // Bottom buttons
             Row(
                 modifier = Modifier
@@ -892,26 +1079,27 @@ fun TaskCreationScreen(
                 
                 Button(
                     onClick = {
-                        val rruleStringValue = generateRRuleString(recurrencePattern, selectedDate)
                         val taskData = TaskCreationData(
                             title = taskTitle,
-                            description = taskDescription.ifBlank { null },
+                            description = taskDescription,
                             dueDate = selectedDate,
                             dueTime = selectedTime,
                             priority = selectedPriority,
-                            category = if (selectedCategoryName == "Uncategorized") null else selectedCategoryName,
-                            labels = emptyList(),
+                            category = if (selectedCategoryObject?.name == "Uncategorized") null else selectedCategoryObject?.name,
+                            labels = emptyList(), 
                             subtasks = currentSubtasks.toList(),
-                            reminderSettings = reminderSettings,
-                            rruleString = rruleStringValue,
-                            recurrenceStartDate = if (rruleStringValue != null) selectedDate else null
+                            rruleString = if (recurrencePattern.type != RecurrenceType.NONE) generateRRuleString(recurrencePattern, selectedDate) else null,
+                            recurrenceStartDate = if (recurrencePattern.type != RecurrenceType.NONE) selectedDate else null,
+                            reminders = reminders
                         )
                         if (isEditMode) {
+                            Log.d("TaskCreationScreen", "Updating task ID: $taskId with data: Title - ${taskData.title}, RRULE - ${taskData.rruleString}, Reminders: ${taskData.reminders?.size}")
                             viewModel.updateTaskWithData(taskId, taskData)
-                            onSaveComplete()
                         } else {
-                        onSaveTask(taskData)
+                            Log.d("TaskCreationScreen", "Creating new task with data: Title - ${taskData.title}, RRULE - ${taskData.rruleString}, Reminders: ${taskData.reminders?.size}")
+                            onSaveTask(taskData)
                         }
+                        onDismiss() // Close the dialog/screen
                     },
                     enabled = taskTitle.isNotBlank(),
                     modifier = Modifier
@@ -1061,394 +1249,37 @@ fun TaskCreationScreen(
         )
     }
     
-    // Recurrence Options Dialog
-    if (showRecurrenceOptions) {
-        var tempRecurrenceType by remember { mutableStateOf(recurrencePattern.type) }
-        var tempInterval by remember { mutableStateOf(recurrencePattern.interval.toString()) }
-        var tempEndDate by remember { mutableStateOf(recurrencePattern.endDate) }
-        var showEndDatePicker by remember { mutableStateOf(false) }
-        var tempDaysOfWeek by remember { mutableStateOf(recurrencePattern.daysOfWeek.toMutableStateList()) }
-
-        // Date validator for the recurrence end date picker state
-        val recurrenceEndDateValidator = { utcDateMillis: Long ->
-            val selectedInstant = java.time.Instant.ofEpochMilli(utcDateMillis)
-            val selectedLocalDate = selectedInstant.atZone(ZoneId.systemDefault()).toLocalDate()
-            // Use task's main selectedDate as the earliest possible start for recurrence end date
-            // or today if selectedDate is null.
-            val taskStartDate = selectedDate ?: LocalDate.now() 
-            selectedLocalDate.isAfter(taskStartDate.minusDays(1)) // Allow recurrence to end on the same day it starts
-        }
-
-        val recurrenceEndDatePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = tempEndDate?.toEpochDay()?.let { it * 24 * 60 * 60 * 1000L },
-            yearRange = IntRange(LocalDate.now().year, LocalDate.now().year + 100), // Optional: restrict year range
-            selectableDates = object : SelectableDates {
-                override fun isSelectableDate(utcTimeMillis: Long): Boolean {
-                    return recurrenceEndDateValidator(utcTimeMillis)
-                }
-                // You might also want to override isSelectableYear if needed, though yearRange often suffices
-            }
+    if (showReminderDialog) {
+        ReminderListDialog(
+            reminders = reminders,
+            onAddReminder = {
+                editingReminder = null 
+                showAddEditReminderDialog = true
+                // showReminderDialog = false // Keep ReminderListDialog open in the background for now
+            },
+            onDeleteReminder = { reminderToDelete ->
+                reminders = reminders.filterNot { it == reminderToDelete }
+            },
+            onDismiss = { showReminderDialog = false }
         )
-        
-        AlertDialog(
-            onDismissRequest = { showRecurrenceOptions = false },
-            title = { Text("Set Recurrence") },
-            text = {
-                Column(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    // Recurrence type options
-                    Text("Repeat", style = MaterialTheme.typography.bodyLarge)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Column {
-                        RecurrenceType.values().forEach { type ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        tempRecurrenceType = type
-                                    }
-                                    .padding(vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(
-                                    selected = tempRecurrenceType == type,
-                                    onClick = {
-                                        tempRecurrenceType = type
-                                    }
-                                )
-                                
-                                Spacer(modifier = Modifier.width(8.dp))
-                                
-                                Text(
-                                    text = when(type) {
-                                        RecurrenceType.NONE -> "Do not repeat"
-                                        RecurrenceType.DAILY -> "Daily"
-                                        RecurrenceType.WEEKLY -> "Weekly"
-                                        RecurrenceType.MONTHLY -> "Monthly"
-                                        RecurrenceType.YEARLY -> "Yearly"
-                                    },
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                            }
-                        }
-                    }
-                    
-                    // Show interval settings if a recurrence type is selected
-                    if (tempRecurrenceType != RecurrenceType.NONE) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text("Repeat every", style = MaterialTheme.typography.bodyLarge)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                OutlinedTextField(
-                            value = tempInterval,
-                            onValueChange = { 
-                                // Only allow numeric input
-                                if (it.isEmpty() || it.all { char -> char.isDigit() }) {
-                                    tempInterval = it
-                                }
-                            },
-                            label = { 
-                                Text(
-                                    when(tempRecurrenceType) {
-                                        RecurrenceType.DAILY -> "days"
-                                        RecurrenceType.WEEKLY -> "weeks"
-                                        RecurrenceType.MONTHLY -> "months"
-                                        RecurrenceType.YEARLY -> "years"
-                                        else -> ""
-                                    }
-                                ) 
-                            },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-                    }
+    }
 
-                    // End Date Picker
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("Ends", style = MaterialTheme.typography.bodyLarge)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { showEndDatePicker = true }
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Outlined.EventBusy, contentDescription = "End Date", tint = MaterialTheme.colorScheme.primary)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = tempEndDate?.format(DateTimeFormatter.ofPattern("MMM dd, yyyy")) ?: "Never",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-
-                    // Days of Week Picker (only for Weekly recurrence)
-                    if (tempRecurrenceType == RecurrenceType.WEEKLY) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text("Repeat on", style = MaterialTheme.typography.bodyLarge)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        // Changed from Row to LazyRow for horizontal scrolling
-                        LazyRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp) // Adds a small space between chips
-                        ) {
-                            val days = listOf("Mo", "Tu", "We", "Th", "Fr", "Sa", "Su")
-                            items(days.size) { index -> // Use items(count) for LazyRow
-                                val dayLabel = days[index]
-                                val dayNumber = index + 1 // 1 for Monday, ..., 7 for Sunday
-                                val isSelected = tempDaysOfWeek.contains(dayNumber)
-                                FilterChip(
-                                    selected = isSelected,
-                                    onClick = {
-                                        if (isSelected) {
-                                            tempDaysOfWeek.remove(dayNumber)
-                                        } else {
-                                            tempDaysOfWeek.add(dayNumber)
-                                        }
-                                    },
-                                    label = { Text(dayLabel) },
-                                    modifier = Modifier.padding(horizontal = 2.dp) 
-                                )
-                            }
-                        }
-                    }
+    if (showAddEditReminderDialog) {
+        AddEditReminderDialog(
+            initialReminder = editingReminder, // Pass current reminder for editing, or null for new
+            taskDueDate = selectedDate, // Pass the task's due date for context
+            onSave = { reminder ->
+                if (editingReminder == null) { // Adding new reminder
+                    reminders = reminders + reminder
+                } else { // Updating existing reminder
+                    reminders = reminders.map { if (it == editingReminder) reminder else it }
                 }
+                showAddEditReminderDialog = false
+                editingReminder = null // Reset editing state
             },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        // Validate that at least one day is selected for weekly recurrence
-                        if (tempRecurrenceType == RecurrenceType.WEEKLY && tempDaysOfWeek.isEmpty()) {
-                            // Optionally show a toast or error message to the user
-                            // For now, just defaulting to not saving or reverting type to NONE
-                            // This behavior might need refinement (e.g. prevent dialog close)
-                            Log.w("TaskCreationScreen", "Weekly recurrence selected but no days chosen.")
-                            // Potentially set tempRecurrenceType = RecurrenceType.NONE here or handle error
-                        }
-                        recurrencePattern = RecurrencePattern(
-                            type = tempRecurrenceType,
-                            interval = tempInterval.toIntOrNull() ?: 1,
-                            endDate = tempEndDate,
-                            daysOfWeek = tempDaysOfWeek.toList().sorted() // Save sorted list
-                        )
-                        showRecurrenceOptions = false
-                    }
-                ) {
-                    Text("Save")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRecurrenceOptions = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
-        // Moved Date Picker Dialog for Recurrence End Date INSIDE the if (showRecurrenceOptions) block
-        if (showEndDatePicker) {
-            DatePickerDialog(
-                onDismissRequest = { showEndDatePicker = false },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            recurrenceEndDatePickerState.selectedDateMillis?.let { millis ->
-                                tempEndDate = LocalDate.ofEpochDay(millis / (24 * 60 * 60 * 1000L)) // Added L for Long
-                            }
-                            showEndDatePicker = false
-                        }
-                    ) {
-                        Text("OK")
-                    }
-                },
-                dismissButton = {
-                    Row {
-                        TextButton(
-                            onClick = { 
-                                tempEndDate = null // Clear the end date
-                                showEndDatePicker = false 
-                            }
-                        ) {
-                            Text("Clear (Never)")
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        TextButton(
-                            onClick = { showEndDatePicker = false }
-                        ) {
-                            Text("Cancel")
-                        }
-                    }
-                }
-            ) {
-                DatePicker(
-                    state = recurrenceEndDatePickerState
-                )
-            }
-        }
-    } // End of if(showRecurrenceOptions)
-    
-    // Reminder Settings Dialog
-    if (showReminderOptions) {
-        var tempEnabled by remember { mutableStateOf(reminderSettings.isEnabled) }
-        var tempMinutes by remember { mutableStateOf(reminderSettings.minutes.toString()) }
-        var tempTime by remember { mutableStateOf(reminderSettings.time ?: LocalTime.now()) }
-        var showReminderTimePicker by remember { mutableStateOf(false) }
-        
-        // Function to show time picker
-        fun showReminderTimePickerDialog() {
-            TimePickerDialog(
-                context,
-                { _, hourOfDay, minute ->
-                    tempTime = LocalTime.of(hourOfDay, minute)
-                },
-                tempTime.hour,
-                tempTime.minute,
-                false
-            ).show()
-        }
-        
-        // Handle reminder time picker
-        LaunchedEffect(showReminderTimePicker) {
-            if (showReminderTimePicker) {
-                showReminderTimePickerDialog()
-                showReminderTimePicker = false
-            }
-        }
-        
-        AlertDialog(
-            onDismissRequest = { showReminderOptions = false },
-            title = { Text("Set Reminder") },
-            text = {
-                Column(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Enable reminder",
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.weight(1f)
-                        )
-                        
-                        Switch(
-                            checked = tempEnabled,
-                            onCheckedChange = { tempEnabled = it }
-                        )
-                    }
-                    
-                    if (tempEnabled) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        // Option type selection
-                        Text("Reminder Type", style = MaterialTheme.typography.bodyLarge)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        var useExactTime by remember { mutableStateOf(reminderSettings.time != null) }
-                        
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = !useExactTime,
-                                onClick = { useExactTime = false }
-                            )
-                            
-                            Spacer(modifier = Modifier.width(8.dp))
-                            
-                            Text(
-                                text = "Minutes before due date",
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.clickable { useExactTime = false }
-                            )
-                        }
-                        
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = useExactTime,
-                                onClick = { useExactTime = true }
-                            )
-                            
-                            Spacer(modifier = Modifier.width(8.dp))
-                            
-                            Text(
-                                text = "At specific time",
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.clickable { useExactTime = true }
-                            )
-                        }
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        if (useExactTime) {
-                            // Specific time selection
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { showReminderTimePicker = true }
-                                    .padding(vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Schedule,
-                                    contentDescription = "Time",
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                                
-                                Spacer(modifier = Modifier.width(8.dp))
-                                
-                                Text(
-                                    text = tempTime.format(DateTimeFormatter.ofPattern("h:mm a")),
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                            }
-                        } else {
-                            // Minutes before selection
-                            OutlinedTextField(
-                                value = tempMinutes,
-                                onValueChange = { 
-                                    // Only allow numeric input
-                                    if (it.isEmpty() || it.all { char -> char.isDigit() }) {
-                                        tempMinutes = it
-                                    }
-                                },
-                                label = { Text("Minutes before") },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        reminderSettings = ReminderSettings(
-                            isEnabled = tempEnabled,
-                            minutes = tempMinutes.toIntOrNull() ?: 15,
-                            time = if (tempEnabled && reminderSettings.time != null) tempTime else null
-                        )
-                        showReminderOptions = false
-                    }
-                ) {
-                    Text("Save")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showReminderOptions = false }) {
-                    Text("Cancel")
-                }
+            onDismiss = {
+                showAddEditReminderDialog = false
+                editingReminder = null // Reset editing state
             }
         )
     }
@@ -1513,3 +1344,243 @@ fun FlowRow(
 }
 
 // Utility functions have been moved to TaskUtils.kt to avoid duplicates
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ReminderListDialog(
+    reminders: List<Reminder>,
+    onAddReminder: () -> Unit,
+    onDeleteReminder: (Reminder) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Manage Reminders") },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                if (reminders.isEmpty()) {
+                    Text(
+                        text = "No reminders set. Tap \"Add Reminder\" to create one.",
+                        modifier = Modifier.padding(16.dp),
+                        textAlign = TextAlign.Center
+                    )
+                } else {
+                    LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
+                        items(reminders) { reminder ->
+                            // TODO: Create formatReminderItem(reminder: Reminder) for better display
+                            val reminderText = when (reminder.type) {
+                                ReminderType.RELATIVE -> "${reminder.offsetMinutes?.let { Math.abs(it) }} minutes before"
+                                ReminderType.ABSOLUTE -> reminder.absoluteDateTime?.format(DateTimeFormatter.ofPattern("MMM d, h:mm a")) ?: "Specific time"
+                            }
+                            ListItem(
+                                headlineContent = { Text(reminderText) },
+                                trailingContent = {
+                                    IconButton(onClick = { onDeleteReminder(reminder) }) {
+                                        Icon(Icons.Default.Delete, contentDescription = "Delete Reminder")
+                                    }
+                                }
+                            )
+                            HorizontalDivider()
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onAddReminder) {
+                Text("Add Reminder")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Done")
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddEditReminderDialog(
+    initialReminder: Reminder? = null, // Pass existing reminder for editing, null for new
+    taskDueDate: LocalDate?, // Needed for context if setting absolute reminder relative to due date initially
+    onSave: (Reminder) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var selectedType by remember { mutableStateOf(initialReminder?.type ?: ReminderType.RELATIVE) }
+    
+    // For RELATIVE type
+    var offsetMinutesString by remember { 
+        mutableStateOf(initialReminder?.offsetMinutes?.let { Math.abs(it) }?.toString() ?: "15") 
+    }
+
+    // For ABSOLUTE type
+    val initialAbsoluteDateTime = initialReminder?.absoluteDateTime ?: taskDueDate?.atTime(LocalTime.now().hour, LocalTime.now().minute)
+    var absoluteDate by remember { mutableStateOf(initialAbsoluteDateTime?.toLocalDate()) }
+    var absoluteTime by remember { mutableStateOf(initialAbsoluteDateTime?.toLocalTime()) }
+
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    // DatePickerState for the ABSOLUTE reminder date
+    val absoluteDatePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = absoluteDate?.atStartOfDay(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (initialReminder == null) "Add Reminder" else "Edit Reminder") },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                // Type Selector (Relative vs Absolute)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    listOf(ReminderType.RELATIVE, ReminderType.ABSOLUTE).forEach { type ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.clickable { selectedType = type }
+                        ) {
+                            RadioButton(
+                                selected = selectedType == type,
+                                onClick = { selectedType = type }
+                            )
+                            Text(type.name.lowercase().replaceFirstChar { it.uppercase() })
+                        }
+                    }
+                }
+                HorizontalDivider(Modifier.padding(vertical = 8.dp))
+
+                when (selectedType) {
+                    ReminderType.RELATIVE -> {
+                        OutlinedTextField(
+                            value = offsetMinutesString,
+                            onValueChange = { value -> offsetMinutesString = value.filter { it.isDigit() } },
+                            label = { Text("Minutes Before Due Time") },
+                            placeholder = { Text("e.g., 15") },
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                            modifier = Modifier.fillMaxWidth(),
+                            leadingIcon = { Icon(Icons.Default.Schedule, "Offset")}
+                        )
+                        Text(
+                            text = "Reminder will trigger this many minutes before the task's due date/time.",
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                    ReminderType.ABSOLUTE -> {
+                        // Date Picker
+                        Text("Specific Date & Time", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom=8.dp))
+                        Button(
+                            onClick = { showDatePicker = true }, 
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Event, contentDescription = "Date", modifier = Modifier.padding(end=8.dp))
+                            Text(absoluteDate?.format(DateTimeFormatter.ofPattern("MMM d, yyyy")) ?: "Select Date")
+                        }
+                        if (showDatePicker) {
+                            DatePickerDialog(
+                                onDismissRequest = { showDatePicker = false },
+                                confirmButton = {
+                                    TextButton(onClick = { 
+                                        absoluteDatePickerState.selectedDateMillis?.let { millis ->
+                                            absoluteDate = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
+                                        }
+                                        showDatePicker = false 
+                                    }) { Text("OK") }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+                                }
+                            ) {
+                                DatePicker(state = absoluteDatePickerState)
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        // Time Picker
+                        Button(
+                            onClick = { showTimePicker = true }, 
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = absoluteDate != null
+                        ) {
+                            Icon(Icons.Default.Schedule, contentDescription = "Time", modifier = Modifier.padding(end=8.dp))
+                            Text(absoluteTime?.format(DateTimeFormatter.ofPattern("h:mm a")) ?: "Select Time")
+                        }
+                        if (showTimePicker && absoluteDate != null) {
+                            TimePickerDialog(
+                                context = context,
+                                initialTime = absoluteTime ?: LocalTime.now(),
+                                onTimeSelected = { time -> absoluteTime = time },
+                                onDismiss = { showTimePicker = false }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val reminder = when (selectedType) {
+                        ReminderType.RELATIVE -> {
+                            val offset = offsetMinutesString.toIntOrNull() ?: 15
+                            Reminder(type = ReminderType.RELATIVE, offsetMinutes = -offset) // Negative for "before"
+                        }
+                        ReminderType.ABSOLUTE -> {
+                            if (absoluteDate != null && absoluteTime != null) {
+                                Reminder(type = ReminderType.ABSOLUTE, absoluteDateTime = LocalDateTime.of(absoluteDate, absoluteTime))
+                            } else null // Invalid absolute reminder if date or time is missing
+                        }
+                    }
+                    reminder?.let { onSave(it) }
+                    onDismiss()
+                },
+                // Enable save only if data is valid
+                enabled = when(selectedType) {
+                    ReminderType.RELATIVE -> offsetMinutesString.isNotBlank() && offsetMinutesString.toIntOrNull() != null
+                    ReminderType.ABSOLUTE -> absoluteDate != null && absoluteTime != null
+                }
+            ) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+fun TimePickerDialog(
+    context: Context,
+    initialTime: LocalTime,
+    onTimeSelected: (LocalTime) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val calendar = Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, initialTime.hour)
+        set(Calendar.MINUTE, initialTime.minute)
+    }
+
+    val timePickerDialog = android.app.TimePickerDialog(
+        context,
+        { _, hourOfDay, minute ->
+            onTimeSelected(LocalTime.of(hourOfDay, minute))
+        },
+        calendar.get(Calendar.HOUR_OF_DAY),
+        calendar.get(Calendar.MINUTE),
+        false // Use 24-hour format or not, false for AM/PM
+    )
+    
+    timePickerDialog.setOnDismissListener { 
+        onDismiss()
+    }
+    // Ensure the dialog is shown. 
+    // We need to manage its visibility from where it's called (using showTimePicker state).
+    // This composable's role is to configure and provide the dialog instance.
+    // A LaunchedEffect in the caller can show it.
+    // However, for simplicity in this direct usage, we might just show it directly if this composable is invoked.
+    // Let's reconsider: the AddEditReminderDialog already has `if (showTimePicker ...)`
+    // So this composable should just be the dialog itself.
+    // We need to make sure it's shown when this composable enters the composition.
+    LaunchedEffect(Unit) { // Show when composable enters the composition
+        timePickerDialog.show()
+    }
+}

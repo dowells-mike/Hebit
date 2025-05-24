@@ -2,7 +2,8 @@ package com.hebit.app.domain.model
 
 // Ensure RecurrencePattern is not imported if it's removed from fields
 // import com.hebit.app.ui.screens.tasks.RecurrencePattern 
-import com.hebit.app.ui.screens.tasks.ReminderSettings
+// import com.hebit.app.ui.screens.tasks.ReminderSettings // REMOVE THIS IMPORT
+import com.hebit.app.domain.model.Reminder // ADD THIS IMPORT
 import com.hebit.app.ui.screens.tasks.SubTask
 import java.time.LocalDate
 import java.time.LocalTime
@@ -17,7 +18,8 @@ data class TaskCreationData(
     val labels: List<String>, 
     val subtasks: List<SubTask>,
     // recurrencePattern: RecurrencePattern, // This line is now removed
-    val reminderSettings: ReminderSettings,
+    // val reminderSettings: ReminderSettings, // REMOVE THIS LINE
+    val reminders: List<Reminder>? = null, // ADD THIS LINE
 
     // New fields for iCalendar RRULE
     val rruleString: String? = null,

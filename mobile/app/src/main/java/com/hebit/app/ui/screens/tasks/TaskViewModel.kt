@@ -152,19 +152,6 @@ class TaskViewModel @Inject constructor(
             // recurrenceExceptions: List<LocalDateTime>?
 
             // REMOVED old logic based on taskData.recurrencePattern
-            // var taskRecurrenceRuleString: String? = null
-            // var taskRecurrenceStartDate: LocalDateTime? = null
-            // taskData.recurrencePattern?.let { ... }
-            
-            val reminderData = taskData.reminderSettings?.let {
-                if (it.isEnabled) {
-                    val timePart = it.time?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: ""
-                    // Ensure minutes is always positive for "X minutes before"
-                    val minutesPart = if (it.minutes > 0 && it.time == null) it.minutes.toString() else ""
-                    // Construct string carefully
-                    if (timePart.isNotEmpty()) timePart else minutesPart
-                } else null
-            }?.ifEmpty { null } // Ensure empty string becomes null
             
             val task = Task(
                 id = "",
@@ -178,15 +165,14 @@ class TaskViewModel @Inject constructor(
                 createdAt = LocalDateTime.now(),
                 updatedAt = LocalDateTime.now(),
                 metadata = mapOf(
-                    "subtasks" to subtasksData,
-                    "reminder" to reminderData
+                    "subtasks" to subtasksData
                 ).filterValues { it != null }.mapValues { it.value.toString() }, // Ensure all values are strings
                 
                 // NEW RECURRENCE FIELDS - Directly from TaskCreationData
                 recurrenceRuleString = taskData.rruleString,
                 recurrenceStartDate = taskData.recurrenceStartDate?.atStartOfDay(), // DTSTART is date only, time can be added if needed
                 recurrenceExceptions = emptyList(), // Placeholder
-                reminders = emptyList() // Placeholder
+                reminders = taskData.reminders ?: emptyList() // USE NEW FIELD
             )
             
             taskRepository.createTask(task)
@@ -411,15 +397,7 @@ class TaskViewModel @Inject constructor(
                     } else null
                     
             // REMOVED old logic based on taskData.recurrencePattern
-                    
-                    val reminderData = taskData.reminderSettings?.let {
-                if (it.isEnabled) {
-                    val timePart = it.time?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: ""
-                    val minutesPart = if (it.minutes > 0 && it.time == null) it.minutes.toString() else ""
-                    if (timePart.isNotEmpty()) timePart else minutesPart
-                } else null
-            }?.ifEmpty { null }
-
+            
             val updatedTaskDomainObject = Task(
                 id = taskId, 
                 title = taskData.title,
@@ -432,15 +410,14 @@ class TaskViewModel @Inject constructor(
                 createdAt = existingTask.createdAt, // Preserve original creation date
                 updatedAt = LocalDateTime.now(),    // Set new update date
                 metadata = mapOf(
-                    "subtasks" to subtasksData,
-                    "reminder" to reminderData
+                    "subtasks" to subtasksData
                 ).filterValues { it != null }.mapValues { it.value.toString() },
 
                 // NEW RECURRENCE FIELDS - Directly from TaskCreationData
                 recurrenceRuleString = taskData.rruleString,
                 recurrenceStartDate = taskData.recurrenceStartDate?.atStartOfDay(),
                 recurrenceExceptions = existingTask.recurrenceExceptions, // Preserve existing exceptions
-                reminders = existingTask.reminders // Preserve existing reminders
+                reminders = taskData.reminders ?: existingTask.reminders ?: emptyList() // USE NEW FIELD, FALLBACK TO EXISTING
             )
 
             Log.d("TaskViewModel", "Updating task ID: $taskId with data: Title - ${updatedTaskDomainObject.title}, RRULE - ${updatedTaskDomainObject.recurrenceRuleString}, DTSTART - ${updatedTaskDomainObject.recurrenceStartDate}")
