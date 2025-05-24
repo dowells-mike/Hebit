@@ -183,6 +183,20 @@ export const updateTask = catchAsync(async (req: AuthRequest, res: Response) => 
     delete updates.due_date; // Remove the snake_case version if it was spread
   }
 
+  // Process remindersRequest
+  if (req.body.remindersRequest && Array.isArray(req.body.remindersRequest)) {
+    updates.reminders = req.body.remindersRequest.map((r: any) => {
+      const reminder: any = { type: r.type };
+      if (r.type === 'absolute' && r.absolute_time) {
+        reminder.absoluteDateTime = new Date(r.absolute_time);
+      } else if (r.type === 'relative' && r.offset_minutes !== undefined) {
+        reminder.offsetMinutes = r.offset_minutes;
+      }
+      return reminder;
+    });
+    delete updates.remindersRequest; // Remove the original snake_case version
+  }
+
   // Initialize taskMetadata safely, using existing task.metadata or an empty object
   let taskMetadata: any = task.metadata ? { ...task.metadata } : {};
 
