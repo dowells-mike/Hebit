@@ -1,5 +1,7 @@
 package com.hebit.app.ui.screens.tasks
 
+import com.hebit.app.domain.model.RecurrenceType
+
 /**
  * Utility functions for task-related operations
  * These were previously duplicated across multiple files

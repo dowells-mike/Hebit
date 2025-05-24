@@ -37,7 +37,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import java.util.Calendar
-import com.hebit.app.ui.screens.tasks.RecurrenceType
 import com.hebit.app.ui.screens.categories.CategoryViewModel
 import com.hebit.app.domain.model.Category
 import java.time.LocalDateTime
@@ -47,6 +46,7 @@ import android.util.Log
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.ui.text.style.TextAlign
+import com.hebit.app.domain.model.RecurrenceType
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
