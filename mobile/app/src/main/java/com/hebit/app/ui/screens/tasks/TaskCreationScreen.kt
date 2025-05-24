@@ -117,7 +117,7 @@ fun generateRRuleString(pattern: RecurrencePattern, dtStartDate: LocalDate?): St
 
     // Placeholder for BYDAY - to be implemented when UI supports daysOfWeek
     if (pattern.type == RecurrenceType.WEEKLY && pattern.daysOfWeek.isNotEmpty()) {
-        val weekDayList = pattern.daysOfWeek.mapNotNull { dayNum ->
+        val kotlinWeekDayList = pattern.daysOfWeek.mapNotNull { dayNum ->
             when (dayNum) {
                 1 -> WeekDay.MO
                 2 -> WeekDay.TU
@@ -129,8 +129,10 @@ fun generateRRuleString(pattern: RecurrencePattern, dtStartDate: LocalDate?): St
                 else -> null
             }
         }
-        if (weekDayList.isNotEmpty()) {
-            recurBuilder.dayList(weekDayList)
+        if (kotlinWeekDayList.isNotEmpty()) {
+            val ical4jWeekDayList = net.fortuna.ical4j.model.WeekDayList()
+            kotlinWeekDayList.forEach { ical4jWeekDayList.add(it) }
+            recurBuilder.dayList(ical4jWeekDayList) // Use ical4j WeekDayList
         }
     }
     
@@ -1168,8 +1170,25 @@ fun TaskCreationScreen(
         var showEndDatePicker by remember { mutableStateOf(false) }
         var tempDaysOfWeek by remember { mutableStateOf(recurrencePattern.daysOfWeek.toMutableStateList()) }
 
+        // Date validator for the recurrence end date picker state
+        val recurrenceEndDateValidator = { utcDateMillis: Long ->
+            val selectedInstant = java.time.Instant.ofEpochMilli(utcDateMillis)
+            val selectedLocalDate = selectedInstant.atZone(ZoneId.systemDefault()).toLocalDate()
+            // Use task's main selectedDate as the earliest possible start for recurrence end date
+            // or today if selectedDate is null.
+            val taskStartDate = selectedDate ?: LocalDate.now() 
+            selectedLocalDate.isAfter(taskStartDate.minusDays(1)) // Allow recurrence to end on the same day it starts
+        }
+
         val recurrenceEndDatePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = tempEndDate?.toEpochDay()?.let { it * 24 * 60 * 60 * 1000 }
+            initialSelectedDateMillis = tempEndDate?.toEpochDay()?.let { it * 24 * 60 * 60 * 1000L },
+            yearRange = IntRange(LocalDate.now().year, LocalDate.now().year + 100), // Optional: restrict year range
+            selectableDates = object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                    return recurrenceEndDateValidator(utcTimeMillis)
+                }
+                // You might also want to override isSelectableYear if needed, though yearRange often suffices
+            }
         )
 
         AlertDialog(
@@ -1326,55 +1345,47 @@ fun TaskCreationScreen(
                 }
             }
         )
-    }
-    
-    // Date Picker Dialog for Recurrence End Date
-    if (showEndDatePicker) {
-        DatePickerDialog(
-            onDismissRequest = { showEndDatePicker = false },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        recurrenceEndDatePickerState.selectedDateMillis?.let { millis ->
-                            tempEndDate = LocalDate.ofEpochDay(millis / (24 * 60 * 60 * 1000))
-                        }
-                        showEndDatePicker = false
-                    }
-                ) {
-                    Text("OK")
-                }
-            },
-            dismissButton = {
-                Row {
-                    TextButton(
-                        onClick = { 
-                            tempEndDate = null // Clear the end date
-                            showEndDatePicker = false 
+        // Moved Date Picker Dialog for Recurrence End Date INSIDE the if (showRecurrenceOptions) block
+        if (showEndDatePicker) {
+            DatePickerDialog(
+                onDismissRequest = { showEndDatePicker = false },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            recurrenceEndDatePickerState.selectedDateMillis?.let { millis ->
+                                tempEndDate = LocalDate.ofEpochDay(millis / (24 * 60 * 60 * 1000L)) // Added L for Long
+                            }
+                            showEndDatePicker = false
                         }
                     ) {
-                        Text("Clear (Never)")
+                        Text("OK")
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    TextButton(
-                        onClick = { showEndDatePicker = false }
-                    ) {
-                        Text("Cancel")
+                },
+                dismissButton = {
+                    Row {
+                        TextButton(
+                            onClick = { 
+                                tempEndDate = null // Clear the end date
+                                showEndDatePicker = false 
+                            }
+                        ) {
+                            Text("Clear (Never)")
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        TextButton(
+                            onClick = { showEndDatePicker = false }
+                        ) {
+                            Text("Cancel")
+                        }
                     }
                 }
+            ) {
+                DatePicker(
+                    state = recurrenceEndDatePickerState
+                )
             }
-        ) {
-            DatePicker(
-                state = recurrenceEndDatePickerState,
-                // Prevent selecting a date before the task's start/due date if set
-                dateValidator = { utcDateMillis ->
-                    val selectedInstant = java.time.Instant.ofEpochMilli(utcDateMillis)
-                    val selectedLocalDate = selectedInstant.atZone(ZoneId.systemDefault()).toLocalDate()
-                    val taskStartDate = selectedDate ?: LocalDate.now() // Use task's due/start date or today
-                    selectedLocalDate.isAfter(taskStartDate.minusDays(1)) // Allow same day
-                }
-            )
         }
-    }
+    } // End of if(showRecurrenceOptions)
     
     // Reminder Settings Dialog
     if (showReminderOptions) {
