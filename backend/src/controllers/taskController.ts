@@ -188,7 +188,7 @@ export const updateTask = catchAsync(async (req: AuthRequest, res: Response) => 
     updates.reminders = req.body.remindersRequest.map((r: any) => {
       const reminder: any = { type: r.type };
       if (r.type === 'absolute' && r.absolute_time) {
-        reminder.absoluteDateTime = new Date(r.absolute_time);
+        reminder.absoluteTime = new Date(r.absolute_time);
       } else if (r.type === 'relative' && r.offset_minutes !== undefined) {
         reminder.offsetMinutes = r.offset_minutes;
       }
