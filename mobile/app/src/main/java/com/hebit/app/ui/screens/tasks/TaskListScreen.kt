@@ -388,7 +388,7 @@ fun TaskItem(
             occurrence.isAfter(comparisonDateTime)
         }
     }
-
+    
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -442,27 +442,6 @@ fun TaskItem(
                     showSpacer = true
                 }
 
-                // Display Recurrence Info
-                if (recurrenceSummary != null) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(top = if (showSpacer) 4.dp else 2.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Repeat,
-                            contentDescription = "Recurrence",
-                            modifier = Modifier.size(16.dp), // Smaller icon
-                            tint = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                            text = recurrenceSummary,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    showSpacer = true
-                }
 
                 // Combined Date and Recurrence Info Row
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = if (showSpacer) 4.dp else 2.dp)) {
@@ -488,7 +467,7 @@ fun TaskItem(
                         if (displayDate != null) { // Add spacer only if a date is also shown
                             Spacer(modifier = Modifier.width(8.dp))
                         }
-                        Icon(
+                Icon(
                             imageVector = Icons.Default.Repeat,
                             contentDescription = "Recurrence",
                             modifier = Modifier.size(16.dp),
