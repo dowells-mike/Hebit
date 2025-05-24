@@ -36,6 +36,8 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import com.hebit.app.ui.screens.tasks.getSubtaskProgressCounts
+import com.hebit.app.util.parseRRuleStringToPattern
+import com.hebit.app.util.formatRecurrencePattern
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -312,10 +314,13 @@ fun TaskListScreen(
                                         }
                                     }
                                 ) {
+                                    val recurrencePattern = parseRRuleStringToPattern(task.recurrenceRuleString)
+                                    val recurrenceSummary = formatRecurrencePattern(recurrencePattern)
                                     TaskItem(
                                         task = task,
                                         onTaskClick = { onTaskClick(task.id) },
-                                        onTaskToggle = { viewModel.toggleTaskCompletion(task.id) }
+                                        onTaskToggle = { viewModel.toggleTaskCompletion(task.id) },
+                                        recurrenceSummary = if (recurrencePattern.type != com.hebit.app.domain.model.RecurrenceType.NONE) recurrenceSummary else null
                                     )
                                 }
                             }
@@ -367,7 +372,8 @@ fun TaskListScreen(
 fun TaskItem(
     task: Task,
     onTaskClick: () -> Unit,
-    onTaskToggle: () -> Unit
+    onTaskToggle: () -> Unit,
+    recurrenceSummary: String? = null
 ) {
     val today = java.time.LocalDate.now()
     val tomorrow = today.plusDays(1)
@@ -428,7 +434,29 @@ fun TaskItem(
                     showSpacer = true
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = if (task.description.isNotBlank()) 4.dp else 2.dp)) {
+                // Display Recurrence Info
+                recurrenceSummary?.let { summary ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(top = if (showSpacer) 4.dp else 2.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Repeat,
+                            contentDescription = "Recurrence",
+                            modifier = Modifier.size(16.dp), // Smaller icon
+                            tint = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = summary,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    showSpacer = true // Ensure spacer is shown if recurrence is present
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = if (showSpacer) 4.dp else 2.dp)) {
                     task.dueDateTime?.let {
                         val dateText = when (it.toLocalDate()) {
                             today -> "Today"

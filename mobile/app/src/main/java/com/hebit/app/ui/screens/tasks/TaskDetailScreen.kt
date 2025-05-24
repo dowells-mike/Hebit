@@ -47,6 +47,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.ui.text.style.TextAlign
 import com.hebit.app.domain.model.RecurrenceType
+import com.hebit.app.util.parseRRuleStringToPattern
+import com.hebit.app.util.formatRecurrencePattern
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -924,6 +926,25 @@ fun TaskDetailContent(
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
+                }
+            }
+        }
+
+        // Recurrence Info Section
+        if (!task.recurrenceRuleString.isNullOrBlank()) {
+            item {
+                val pattern = parseRRuleStringToPattern(task.recurrenceRuleString)
+                if (pattern.type != RecurrenceType.NONE) {
+                    ListItem(
+                        headlineContent = { Text("Repeats") },
+                        leadingContent = {
+                            Icon(
+                                Icons.Default.Repeat,
+                                contentDescription = "Recurrence"
+                            )
+                        },
+                        supportingContent = { Text(formatRecurrencePattern(pattern)) }
+                    )
                 }
             }
         }
