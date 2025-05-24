@@ -30,6 +30,7 @@ import androidx.compose.foundation.border
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Archive
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.rememberSwipeToDismissBoxState
@@ -321,7 +322,8 @@ fun TaskListScreen(
                                         task = task,
                                         onTaskClick = { onTaskClick(task.id) },
                                         onTaskToggle = { viewModel.toggleTaskCompletion(task.id) },
-                                        recurrenceSummary = if (recurrencePattern.type != com.hebit.app.domain.model.RecurrenceType.NONE) recurrenceSummary else null
+                                        recurrenceSummary = if (recurrencePattern.type != com.hebit.app.domain.model.RecurrenceType.NONE) recurrenceSummary else null,
+                                        hasReminders = task.reminders.isNotEmpty()
                                     )
                                 }
                             }
@@ -374,7 +376,8 @@ fun TaskItem(
     task: Task,
     onTaskClick: () -> Unit,
     onTaskToggle: () -> Unit,
-    recurrenceSummary: String? = null
+    recurrenceSummary: String? = null,
+    hasReminders: Boolean
 ) {
     val today = java.time.LocalDate.now()
     val isOverdue = task.dueDateTime?.toLocalDate()?.isBefore(today) ?: false
@@ -479,6 +482,19 @@ fun TaskItem(
                             style = MaterialTheme.typography.bodySmall,
                             color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1
+                        )
+                    }
+
+                    // ADDED: Display Reminder Icon if reminders are set
+                    if (hasReminders) {
+                        if (displayDate != null || !recurrenceSummary.isNullOrEmpty()) { // Add spacer if other icons/text are present in this row
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Icon(
+                            imageVector = Icons.Outlined.Notifications, // Using Outlined version for subtle presence
+                            contentDescription = "Has reminders",
+                            modifier = Modifier.size(16.dp),
+                            tint = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }

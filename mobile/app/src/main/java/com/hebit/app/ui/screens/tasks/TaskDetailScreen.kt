@@ -49,6 +49,8 @@ import androidx.compose.ui.text.style.TextAlign
 import com.hebit.app.domain.model.RecurrenceType
 import com.hebit.app.util.parseRRuleStringToPattern
 import com.hebit.app.util.formatRecurrencePattern
+import com.hebit.app.domain.model.Reminder
+import com.hebit.app.domain.model.ReminderType
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -297,7 +299,7 @@ fun TaskDetailScreen(
                         task = task,
                         subtasks = subtasks,
                         recurrencePattern = recurrenceFromMetadata,
-                        reminderSettings = reminder,
+                        reminders = task.reminders,
                         expandedDescription = expandedDescription,
                         selectedCategory = selectedCategoryObject,
                         onCategoryClick = { showCategoryPicker = true },
@@ -515,7 +517,7 @@ fun TaskDetailContent(
     task: Task,
     subtasks: List<SubTask>,
     recurrencePattern: RecurrenceType? = null,
-    reminderSettings: String? = null,
+    reminders: List<Reminder>,
     expandedDescription: Boolean,
     selectedCategory: Category?,
     onCategoryClick: () -> Unit,
@@ -701,31 +703,33 @@ fun TaskDetailContent(
             }
         }
         
-        if (reminderSettings != null) {
+        // New Reminders Section
+        if (reminders.isNotEmpty()) {
             item {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Notifications,
-                        contentDescription = "Reminder",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
+                Column(modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)) {
+                    Text(
+                        text = "Reminders",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(start = 0.dp, bottom = 8.dp) // Align with other titles if needed
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Surface(
-                        shape = MaterialTheme.shapes.small,
-                        color = MaterialTheme.colorScheme.primaryContainer
-                    ) {
+                }
+            }
+            items(reminders) { reminder ->
+                ListItem(
+                    headlineContent = {
                         Text(
-                            text = reminderSettings,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            formatReminderForDisplay(reminder, task.dueDateTime?.toLocalDate()),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    },
+                    leadingContent = {
+                        Icon(
+                            Icons.Default.NotificationsActive, // Using a different icon perhaps
+                            contentDescription = "Reminder"
                         )
                     }
-                }
+                )
+                HorizontalDivider()
             }
         }
         
@@ -962,6 +966,29 @@ fun TaskDetailContent(
             }
             item { Spacer(modifier = Modifier.height(16.dp)) } // Add some space at the end
         }
+    }
+}
+
+// Helper function to format a single reminder for display
+fun formatReminderForDisplay(reminder: Reminder, taskDueDate: LocalDate?): String {
+    return when (reminder.type) {
+        ReminderType.RELATIVE -> {
+            val offset = reminder.offsetMinutes?.let { Math.abs(it) } ?: 0
+            when {
+                offset == 0 -> {
+                    if (taskDueDate != null) "At time of due date (${taskDueDate.format(DateTimeFormatter.ofPattern("MMM d"))})"
+                    else "At time of event"
+                }
+                offset < 60 -> "$offset minutes before"
+                offset == 60 -> "1 hour before"
+                offset % 60 == 0 -> "${offset / 60} hours before"
+                else -> "$offset minutes before" // e.g. 75 minutes, could be formatted better
+            }
+        }
+        ReminderType.ABSOLUTE -> {
+            reminder.absoluteDateTime?.format(DateTimeFormatter.ofPattern("MMM d, yyyy 'at' h:mm a")) ?: "On a specific date/time"
+        }
+        // else -> "Unknown reminder type" // Should not happen with current enum
     }
 }
 

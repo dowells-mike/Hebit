@@ -739,19 +739,41 @@ fun TaskCreationScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { showReminderDialog = true },
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .padding(vertical = 16.dp)
+                    .clickable {
+                        // Request notification permission if needed before showing reminder options
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotificationPermission) {
+                            requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            showReminderDialog = true
+                        }
+                    },
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Reminders", style = MaterialTheme.typography.bodyLarge)
+                Icon(
+                    imageVector = Icons.Outlined.Notifications,
+                    contentDescription = "Reminders",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Reminders", 
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Spacer(modifier = Modifier.weight(1f))
                 val remindersSummary = formatRemindersSummary(reminders, selectedDate) 
                 Text(
                     text = remindersSummary,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = if (reminders.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary
                 )
+                Spacer(modifier = Modifier.width(8.dp))
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = "Select Reminders"
+                )
             }
-            HorizontalDivider(modifier = Modifier.padding(top = 12.dp, bottom = 8.dp))
+            Divider()
             
             // Subtasks section
             Text(
