@@ -71,6 +71,29 @@ export const getTasks = catchAsync(async (req: AuthRequest, res: Response) => {
   // Execute the query with filters and sort
   const tasksMongo: HydratedDocument<TaskDocument>[] = await Task.find(filter).sort(sort);
 
+  // Ensure all tasks have a category, and fix if not
+  for (const task of tasksMongo) {
+    if (!task.category) {
+      let generalCategory = await Category.findOne({ user: userId, name: 'General', type: { $in: ['task', 'all'] } });
+      if (!generalCategory) {
+        const highestOrderCategory = await Category.findOne({ user: userId })
+          .sort({ order: -1 })
+          .select('order');
+        const order = highestOrderCategory ? highestOrderCategory.order + 1 : 0;
+        generalCategory = await Category.create({
+          user: userId,
+          name: 'General',
+          color: '#808080', // Default grey
+          type: 'task',
+          isDefault: true,
+          order: order
+        });
+      }
+      task.category = generalCategory._id.toString();
+      await task.save(); // Save the updated task to the database
+    }
+  }
+
   // For each recurring task, calculate upcoming occurrences
   const tasksWithOccurrences = await Promise.all(
     tasksMongo.map(async (taskDoc: HydratedDocument<TaskDocument>) => {
@@ -461,6 +484,29 @@ export const getPriorityTasks = catchAsync(async (req: AuthRequest, res: Respons
   .sort({ dueDate: 1 }) // Sort by due date ascending (soonest first)
   .limit(limit);
   
+  // Ensure all tasks have a category, and fix if not
+  for (const task of priorityTasks) {
+    if (!task.category) {
+      let generalCategory = await Category.findOne({ user: userId, name: 'General', type: { $in: ['task', 'all'] } });
+      if (!generalCategory) {
+        const highestOrderCategory = await Category.findOne({ user: userId })
+          .sort({ order: -1 })
+          .select('order');
+        const order = highestOrderCategory ? highestOrderCategory.order + 1 : 0;
+        generalCategory = await Category.create({
+          user: userId,
+          name: 'General',
+          color: '#808080', // Default grey
+          type: 'task',
+          isDefault: true,
+          order: order
+        });
+      }
+      task.category = generalCategory._id.toString();
+      await (task as HydratedDocument<TaskDocument>).save(); // Save the updated task to the database
+    }
+  }
+
   // If not enough high priority tasks, get medium priority ones
   if (priorityTasks.length < limit) {
     const mediumPriorityTasks = await Task.find({
@@ -472,6 +518,29 @@ export const getPriorityTasks = catchAsync(async (req: AuthRequest, res: Respons
     .sort({ dueDate: 1 })
     .limit(limit - priorityTasks.length);
     
+    // Ensure all medium priority tasks also have a category
+    for (const task of mediumPriorityTasks) {
+      if (!task.category) {
+        let generalCategory = await Category.findOne({ user: userId, name: 'General', type: { $in: ['task', 'all'] } });
+        if (!generalCategory) {
+          const highestOrderCategory = await Category.findOne({ user: userId })
+            .sort({ order: -1 })
+            .select('order');
+          const order = highestOrderCategory ? highestOrderCategory.order + 1 : 0;
+          generalCategory = await Category.create({
+            user: userId,
+            name: 'General',
+            color: '#808080', // Default grey
+            type: 'task',
+            isDefault: true,
+            order: order
+          });
+        }
+        task.category = generalCategory._id.toString();
+        await (task as HydratedDocument<TaskDocument>).save(); // Save the updated task to the database
+      }
+    }
+
     priorityTasks.push(...mediumPriorityTasks);
   }
   
