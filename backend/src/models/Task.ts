@@ -45,7 +45,8 @@ const taskSchema = new Schema<TaskDocument>(
     },
     category: {
       type: String,
-      ref: 'Category'
+      ref: 'Category',
+      required: true
     },
     parentTaskId: {
       type: String,

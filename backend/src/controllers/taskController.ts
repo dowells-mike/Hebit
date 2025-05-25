@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { catchAsync, AppError } from '../middleware/errorHandler';
-import { Task, ProductivityMetrics, User } from '../models';
+import { Task, ProductivityMetrics, User, Category } from '../models';
 import { AuthRequest, TaskDocument } from '../types';
 import * as mlService from '../services/mlService';
 import { calculateUpcomingOccurrences } from '../utils/recurrenceUtils';
@@ -132,11 +132,34 @@ export const createTask = catchAsync(async (req: AuthRequest, res: Response) => 
   if (!req.body.title) {
     throw new AppError('Title is required', 400);
   }
+
+  let categoryId = req.body.category;
+  if (!categoryId) {
+    let generalCategory = await Category.findOne({ user: userId, name: 'General', type: { $in: ['task', 'all'] } });
+    if (!generalCategory) {
+      // Find the highest order value for the user's categories to ensure new one is last
+      const highestOrderCategory = await Category.findOne({ user: userId })
+        .sort({ order: -1 })
+        .select('order');
+      const order = highestOrderCategory ? highestOrderCategory.order + 1 : 0;
+
+      generalCategory = await Category.create({
+        user: userId,
+        name: 'General',
+        color: '#808080', // Grey color for General
+        type: 'task', 
+        isDefault: true,
+        order: order
+      });
+    }
+    categoryId = generalCategory._id.toString();
+  }
   
   // Default values for enhanced fields
   const taskData = {
     ...req.body,
     user: userId,
+    category: categoryId, // Use the determined categoryId
     status: req.body.status || 'todo',
     effort: req.body.effort || 3, // Medium effort by default
     complexity: req.body.complexity || 3 // Medium complexity by default
