@@ -220,28 +220,65 @@ export const updateTask = catchAsync(async (req: AuthRequest, res: Response) => 
     throw new AppError('Task not found', 404);
   }
   
-  const { metadata: requestMetadata, ...otherUpdates } = req.body;
+  // Explicitly destructure all relevant fields from req.body
+  const { 
+    metadata: requestMetadata, 
+    recurrenceRuleRequest,
+    recurrenceStartDateRequest,
+    recurrenceExceptionsRequest,
+    remindersRequest,
+    due_date, // from legacy or specific client needs
+    // title, description, category, priority, progress, completed, etc. will be in otherUpdates
+    ...otherUpdates 
+  } = req.body;
+
   const updates: any = { ...otherUpdates }; 
 
-  // Explicitly map due_date from request to dueDate for the update
-  if (req.body.due_date) {
-    updates.dueDate = req.body.due_date;
-    delete updates.due_date; // Remove the snake_case version if it was spread
+  // Handle due_date (if client sends 'due_date' instead of 'dueDate')
+  if (due_date) {
+    updates.dueDate = due_date;
+  }
+  // Ensure we don't have both due_date and dueDate if client sends both somehow
+  if (updates.hasOwnProperty('due_date') && updates.due_date !== updates.dueDate) {
+      delete updates.due_date; 
   }
 
+
   // Process remindersRequest
-  if (req.body.remindersRequest && Array.isArray(req.body.remindersRequest)) {
-    updates.reminders = req.body.remindersRequest.map((r: any) => {
+  if (remindersRequest && Array.isArray(remindersRequest)) {
+    updates.reminders = remindersRequest.map((r: any) => {
       const reminder: any = { type: r.type };
-      if (r.type === 'absolute' && r.absolute_time) {
-        reminder.absoluteTime = new Date(r.absolute_time);
-      } else if (r.type === 'relative' && r.offset_minutes !== undefined) {
-        reminder.offsetMinutes = r.offset_minutes;
+      // Ensure correct mapping from DTO field names if they differ (e.g. absolute_time vs absoluteTime)
+      if (r.type === 'absolute' && r.absoluteDateTime) { // Assuming DTO uses absoluteDateTime
+        reminder.absoluteTime = new Date(r.absoluteDateTime);
+      } else if (r.type === 'relative' && r.offsetMinutes !== undefined) { // Assuming DTO uses offsetMinutes
+        reminder.offsetMinutes = r.offsetMinutes;
       }
       return reminder;
     });
-    delete updates.remindersRequest; // Remove the original snake_case version
   }
+  // Ensure original remindersRequest isn't carried over if it was in otherUpdates
+  if (updates.hasOwnProperty('remindersRequest')) {
+      delete updates.remindersRequest;
+  }
+
+  // Explicitly handle recurrence fields to allow clearing them with null
+  if (req.body.hasOwnProperty('recurrenceRuleRequest')) {
+    updates.recurrenceRule = recurrenceRuleRequest; 
+  }
+  if (req.body.hasOwnProperty('recurrenceStartDateRequest')) {
+    updates.recurrenceStartDate = recurrenceStartDateRequest ? new Date(recurrenceStartDateRequest) : null;
+  }
+  if (req.body.hasOwnProperty('recurrenceExceptionsRequest')) {
+    updates.recurrenceExceptions = recurrenceExceptionsRequest 
+      ? recurrenceExceptionsRequest.map((exDate: string) => new Date(exDate)) 
+      : []; // Set to empty array to clear, or null if schema allows/prefers
+  }
+   // Ensure original recurrence fields (if named differently like recurrenceRuleRequest) aren't carried over from otherUpdates
+  if (updates.hasOwnProperty('recurrenceRuleRequest')) delete updates.recurrenceRuleRequest;
+  if (updates.hasOwnProperty('recurrenceStartDateRequest')) delete updates.recurrenceStartDateRequest;
+  if (updates.hasOwnProperty('recurrenceExceptionsRequest')) delete updates.recurrenceExceptionsRequest;
+
 
   // Initialize taskMetadata safely, using existing task.metadata or an empty object
   let taskMetadata: any = task.metadata ? { ...task.metadata } : {};
@@ -255,14 +292,19 @@ export const updateTask = catchAsync(async (req: AuthRequest, res: Response) => 
   delete updates.user;
   
   const changedFields = Object.keys(updates);
-  if (changedFields.length > 0 && changedFields[0] !== 'metadata' && 
-      !['recurrenceRule', 'recurrenceStartDate', 'recurrenceExceptions', 'reminders'].includes(changedFields[0])) {
-    taskMetadata.lastModifiedField = changedFields[0];
+  // Avoid logging metadata itself if it's the only change or if other fields are also changing.
+  // Focus on primary field changes for lastModifiedField.
+  const firstNonRecurrenceOrReminderChange = changedFields.find(field => 
+    !['metadata', 'recurrenceRule', 'recurrenceStartDate', 'recurrenceExceptions', 'reminders'].includes(field)
+  );
+
+  if (firstNonRecurrenceOrReminderChange) {
+    taskMetadata.lastModifiedField = firstNonRecurrenceOrReminderChange;
   }
   
-  if (updates.completed && !task.completed) {
+  if (updates.completed === true && !task.completed) { // Check for true explicitly
     updates.completedAt = new Date();
-    updates.status = 'completed';
+    updates.status = 'completed'; // Ensure status aligns
     
     try {
       if (userId) {
@@ -280,52 +322,67 @@ export const updateTask = catchAsync(async (req: AuthRequest, res: Response) => 
       { $inc: { tasksCompleted: 1 } },
       { upsert: true, new: true }
     );
+  } else if (updates.completed === false && task.completed) { // Task marked as incomplete
+      updates.completedAt = null; // Clear completion date
+      updates.status = 'todo'; // Reset status or to 'in_progress' if applicable
   }
   
   // Assign the consolidated metadata to updates
   // only if it's not empty or if original metadata existed, to avoid sending empty object if not needed
   if (Object.keys(taskMetadata).length > 0 || task.metadata) {
     updates.metadata = taskMetadata;
+  } else {
+    // If taskMetadata is empty and task had no metadata, ensure it's not sent as an empty object
+    // unless specifically intended. If schema has default for metadata, this might not be needed.
+    // Or, explicitly set updates.metadata = undefined; if Mongoose handles unsetting fields that way.
+    // For now, if taskMetadata is empty, we won't assign it unless original metadata existed.
   }
 
-  // Recurrence is handled directly if present in req.body as updates.recurrence
+  console.log("Constructed updates object before Mongoose call:", JSON.stringify(updates, null, 2));
 
-  const updatedTask = await Task.findByIdAndUpdate(
+  const updatedTaskDoc = await Task.findByIdAndUpdate(
     taskId,
-    updates, // updates contains otherUpdates, and potentially updates.metadata
+    updates, 
     { new: true, runValidators: true }
   );
   
-  // Send specific fields to ensure progress is included if available on updatedTask
-  if (updatedTask) {
-    res.status(200).json({
-      _id: updatedTask._id,
-      title: updatedTask.title,
-      description: updatedTask.description,
-      completed: updatedTask.completed,
-      completedAt: updatedTask.completedAt,
-      priority: updatedTask.priority,
-      progress: updatedTask.progress, // Explicitly include progress
-      dueDate: updatedTask.dueDate,
-      status: updatedTask.status,
-      category: updatedTask.category,
-      parentTaskId: updatedTask.parentTaskId,
-      tags: updatedTask.tags,
-      recurrenceRule: updatedTask.recurrenceRule,
-      recurrenceStartDate: updatedTask.recurrenceStartDate,
-      recurrenceExceptions: updatedTask.recurrenceExceptions,
-      reminders: updatedTask.reminders,
-      effort: updatedTask.effort,
-      complexity: updatedTask.complexity,
-      attachments: updatedTask.attachments,
-      metadata: updatedTask.metadata,
-      createdAt: updatedTask.createdAt,
-      updatedAt: updatedTask.updatedAt,
-      user: updatedTask.user // Ensure user is also sent if needed by client DTO mapping
-    });
+  if (updatedTaskDoc) {
+    let upcomingOccurrencesData: Date[] = [];
+    if (updatedTaskDoc.recurrenceRule && updatedTaskDoc.recurrenceStartDate) {
+        upcomingOccurrencesData = calculateUpcomingOccurrences(updatedTaskDoc.toObject(), 5, new Date());
+    }
+    
+    // Ensure the response object matches what the client expects (e.g., TaskDto structure)
+    // This might involve renaming fields or ensuring all expected fields are present.
+    const taskResponse = {
+      _id: updatedTaskDoc._id,
+      title: updatedTaskDoc.title,
+      description: updatedTaskDoc.description,
+      completed: updatedTaskDoc.completed,
+      completedAt: updatedTaskDoc.completedAt,
+      priority: updatedTaskDoc.priority,
+      progress: updatedTaskDoc.progress, 
+      dueDate: updatedTaskDoc.dueDate,
+      status: updatedTaskDoc.status,
+      category: updatedTaskDoc.category, // Assuming category is an ID string or populated object
+      parentTaskId: updatedTaskDoc.parentTaskId,
+      tags: updatedTaskDoc.tags,
+      recurrenceRule: updatedTaskDoc.recurrenceRule,
+      recurrenceStartDate: updatedTaskDoc.recurrenceStartDate,
+      recurrenceExceptions: updatedTaskDoc.recurrenceExceptions,
+      reminders: updatedTaskDoc.reminders, // Ensure this matches ReminderDto structure if mapped
+      effort: updatedTaskDoc.effort,
+      complexity: updatedTaskDoc.complexity,
+      attachments: updatedTaskDoc.attachments,
+      metadata: updatedTaskDoc.metadata,
+      createdAt: updatedTaskDoc.createdAt,
+      updatedAt: updatedTaskDoc.updatedAt, // Mongoose automatically updates this
+      user: updatedTaskDoc.user, 
+      upcomingOccurrences: upcomingOccurrencesData // Add the newly calculated occurrences
+    };
+    res.status(200).json(taskResponse);
   } else {
-    // Should not happen if findByIdAndUpdate was successful with an existing task
-    throw new AppError('Failed to retrieve updated task details', 500);
+    throw new AppError('Failed to retrieve updated task details after update', 500);
   }
 });
 
