@@ -331,7 +331,7 @@ class TaskViewModel @Inject constructor(
                                 }
                                 if (it.isCompleted) {
                                     notificationScheduler.cancelNotification(it)
-                                } else {
+                            } else {
                                     notificationScheduler.scheduleNotification(it)
                                 }
                             }
@@ -375,7 +375,7 @@ class TaskViewModel @Inject constructor(
                     when (result) {
                         is Resource.Success -> {
                             Log.d("TaskViewModel", "Task deleted successfully: $taskId")
-                            loadTasks()
+                    loadTasks()
                             if (_selectedTaskState.value.data?.id == taskId) {
                                 _selectedTaskState.value = Resource.Success(null)
                             }
@@ -409,20 +409,20 @@ class TaskViewModel @Inject constructor(
                 notificationScheduler.cancelNotification(existingTask)
             }
                     
-            val dueDateTime = if (taskData.dueDate != null) {
+                    val dueDateTime = if (taskData.dueDate != null) {
                 taskData.dueDate.atTime(taskData.dueTime ?: existingTask.dueDateTime?.toLocalTime() ?: java.time.LocalTime.MIDNIGHT)
-            } else null
-            
-            val priority = when (taskData.priority) {
-                com.hebit.app.domain.model.TaskPriority.HIGH -> 3
-                com.hebit.app.domain.model.TaskPriority.MEDIUM -> 2
-                com.hebit.app.domain.model.TaskPriority.LOW -> 1
-            }
-            
-            val subtasksData = if (taskData.subtasks.isNotEmpty()) {
-                taskData.subtasks.joinToString(",") { "${it.id}:${it.title}:${it.isCompleted}" }
-            } else null
-            
+                    } else null
+                    
+                    val priority = when (taskData.priority) {
+                        com.hebit.app.domain.model.TaskPriority.HIGH -> 3
+                        com.hebit.app.domain.model.TaskPriority.MEDIUM -> 2
+                        com.hebit.app.domain.model.TaskPriority.LOW -> 1
+                    }
+                    
+                    val subtasksData = if (taskData.subtasks.isNotEmpty()) {
+                        taskData.subtasks.joinToString(",") { "${it.id}:${it.title}:${it.isCompleted}" }
+                    } else null
+                    
             val updatedTaskDomainObject = Task(
                 id = taskId, 
                 title = taskData.title,
@@ -503,8 +503,8 @@ class TaskViewModel @Inject constructor(
                         is Resource.Loading -> {
                             Log.d("TaskViewModel", "Archiving task $taskId in progress...")
                         }
-                    }
                 }
+            }
         }
     }
 } 

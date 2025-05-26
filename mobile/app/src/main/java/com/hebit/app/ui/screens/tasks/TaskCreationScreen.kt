@@ -1007,7 +1007,7 @@ fun TaskCreationScreen(
                                         )
                                     }
                                 }
-                            }
+                    }
                 }
             },
             confirmButton = {
