@@ -37,6 +37,7 @@ import com.hebit.app.ui.screens.tasks.TaskCreationScreen
 import com.hebit.app.ui.screens.categories.CategoryEditScreen
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.hebit.app.ui.screens.categories.CategoryListScreen
+import com.hebit.app.ui.screens.stats.StatsScreen
 
 /**
  * Main navigation routes for the app
@@ -75,6 +76,7 @@ object Routes {
     const val ACHIEVEMENTS = "achievements"
     const val CATEGORY_EDIT = "category_edit"
     const val CATEGORY_LIST = "category_list"
+    const val STATS_SCREEN = "stats_screen"
 }
 
 /**
@@ -145,7 +147,7 @@ fun HebitNavigation(
                 onGoalsClick = { navController.navigate(Routes.GOALS) },
                 onSettingsClick = { navController.navigate(Routes.SETTINGS) },
                 onQuickActionsClick = { navController.navigate(Routes.QUICK_ACTIONS) },
-                onProgressStatsClick = { navController.navigate(Routes.PROGRESS_STATS) },
+                onProgressStatsClick = { navController.navigate(Routes.STATS_SCREEN) },
                 onProductivityClick = { navController.navigate(Routes.PRODUCTIVITY) },
                 onAchievementsClick = { navController.navigate(Routes.ACHIEVEMENTS) },
                 onTaskDetailClick = { taskId -> navController.navigate("${Routes.TASK_DETAIL}/$taskId") },
@@ -371,17 +373,7 @@ fun HebitNavigation(
         }
         
         composable(Routes.PROGRESS_STATS) {
-            ProgressStatsScreen(
-                onHomeClick = { 
-                    navController.navigate(Routes.DASHBOARD) {
-                        popUpTo(Routes.DASHBOARD) { inclusive = true }
-                    }
-                },
-                onTasksClick = { navController.navigate(Routes.TASKS) },
-                onHabitsClick = { navController.navigate(Routes.HABITS) },
-                onGoalsClick = { navController.navigate(Routes.GOALS) },
-                onProfileClick = { navController.navigate(Routes.PROFILE) }
-            )
+            StatsScreen()
         }
         
         // Profile and Settings Screens
@@ -471,6 +463,10 @@ fun HebitNavigation(
 
         composable(Routes.CATEGORY_LIST) {
             CategoryListScreen(navController = navController)
+        }
+
+        composable(Routes.STATS_SCREEN) {
+            StatsScreen()
         }
     }
 }
