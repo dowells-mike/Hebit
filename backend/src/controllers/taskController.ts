@@ -237,14 +237,19 @@ export const updateTask = catchAsync(async (req: AuthRequest, res: Response) => 
   }
 
   // Process reminders using the potentially updated due date
-  if (req.body.reminders) { // Check if reminders are being sent for update
-    updates.reminders = processReminders(req.body.reminders, taskDueDate);
+  const remindersInput = req.body.reminders || req.body.remindersRequest;
+  if (remindersInput) {
+    updates.reminders = processReminders(remindersInput, taskDueDate);
   } else if (req.body.hasOwnProperty('reminders') && req.body.reminders === null) {
-    // If explicitly sending null, clear reminders
+    // If explicitly sending null for 'reminders', clear reminders
+    updates.reminders = [];
+  } else if (req.body.hasOwnProperty('remindersRequest') && req.body.remindersRequest === null) {
+    // If explicitly sending null for 'remindersRequest', also clear reminders
     updates.reminders = [];
   }
-  // Remove remindersRequest if it was part of req.body from previous logic, as it's now handled
-  if (updates.remindersRequest) delete updates.remindersRequest;
+  // Clean up both possible input fields from the main updates object if they existed directly on req.body
+  delete updates.remindersRequest; 
+  // `updates.reminders` is now the authoritative source, so if `req.body.reminders` was used, it's fine.
 
   // Initialize taskMetadata safely, using existing task.metadata or an empty object
   let taskMetadata: any = task.metadata ? { ...task.metadata } : {};
