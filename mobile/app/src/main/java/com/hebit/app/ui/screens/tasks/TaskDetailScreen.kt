@@ -383,23 +383,12 @@ fun TaskDetailScreen(
                     if (showReminderDialog) {
                         ReminderDialog(
                             onDismiss = { showReminderDialog = false },
-                            onSetReminder = { minutes, timeString ->
-                                val reminderStr = if (timeString.isNotBlank()) {
-                                    "$minutes,$timeString"
-                                } else {
-                                    "$minutes,"
-                                }
-                                
-                                val updatedMetadata = task.metadata.toMutableMap()
-                                updatedMetadata["reminder"] = reminderStr
-                                
-                                val updatedTask = task.copy(metadata = updatedMetadata)
+                            onSetReminder = { reminder ->
+                                val updatedTask = task.copy(reminders = listOf(reminder))
                                 viewModel.updateTask(updatedTask)
-                                
                                 showReminderDialog = false
                             },
-                            initialMinutes = (task.metadata["reminder"] as? String)?.split(",")?.get(0)?.toIntOrNull() ?: 15,
-                            initialTimeString = (task.metadata["reminder"] as? String)?.split(",")?.getOrNull(1) ?: ""
+                            initialReminder = task.reminders.firstOrNull()
                         )
                     }
                 }
@@ -1033,34 +1022,44 @@ fun AddSubtaskDialog(
 @Composable
 fun ReminderDialog(
     onDismiss: () -> Unit,
-    onSetReminder: (Int, String) -> Unit,
-    initialMinutes: Int = 15,
-    initialTimeString: String = ""
+    onSetReminder: (Reminder) -> Unit,
+    initialReminder: Reminder? = null
 ) {
-    var minutes by remember { mutableStateOf(initialMinutes) }
-    var timeString by remember { mutableStateOf(initialTimeString) }
-    var useSpecificTime by remember { mutableStateOf(initialTimeString.isNotEmpty()) }
-    
+    var useSpecificTime by remember { mutableStateOf(initialReminder?.type == ReminderType.ABSOLUTE) }
+    var minutes by remember { mutableStateOf(initialReminder?.takeIf { it.type == ReminderType.RELATIVE }?.offsetMinutes ?: -15) }
+    var specificDateTime by remember { mutableStateOf(initialReminder?.takeIf { it.type == ReminderType.ABSOLUTE }?.absoluteDateTime) }
+
     val context = LocalContext.current
-    val currentTime = remember { Calendar.getInstance() }
-    val hour = currentTime.get(Calendar.HOUR_OF_DAY)
-    val minute = currentTime.get(Calendar.MINUTE)
-    
-    val showTimePicker = { 
-        val timePickerDialog = TimePickerDialog(
-            context,
-            { _, selectedHour, selectedMinute ->
-                val formattedHour = if (selectedHour > 12) selectedHour - 12 else if (selectedHour == 0) 12 else selectedHour
-                val amPm = if (selectedHour >= 12) "PM" else "AM"
-                timeString = String.format("%d:%02d %s", formattedHour, selectedMinute, amPm)
-            },
-            hour,
-            minute,
-            false
-        )
-        timePickerDialog.show()
+    val currentCalendar = Calendar.getInstance()
+    if (specificDateTime != null) {
+        currentCalendar.set(specificDateTime!!.year, specificDateTime!!.monthValue -1, specificDateTime!!.dayOfMonth, specificDateTime!!.hour, specificDateTime!!.minute)
     }
-    
+
+    val timePickerDialog = TimePickerDialog(
+        context,
+        { _, selectedHour, selectedMinute ->
+            val currentSpecificDate = specificDateTime?.toLocalDate() ?: LocalDate.now()
+            specificDateTime = LocalDateTime.of(currentSpecificDate, LocalTime.of(selectedHour, selectedMinute))
+            useSpecificTime = true
+        },
+        currentCalendar.get(Calendar.HOUR_OF_DAY),
+        currentCalendar.get(Calendar.MINUTE),
+        false
+    )
+
+    val datePickerDialog = android.app.DatePickerDialog(
+        context,
+        { _, selectedYear, selectedMonth, selectedDayOfMonth ->
+            val currentSpecificTime = specificDateTime?.toLocalTime() ?: LocalTime.now()
+            specificDateTime = LocalDateTime.of(selectedYear, selectedMonth + 1, selectedDayOfMonth, currentSpecificTime.hour, currentSpecificTime.minute)
+            timePickerDialog.show()
+            useSpecificTime = true
+        },
+        currentCalendar.get(Calendar.YEAR),
+        currentCalendar.get(Calendar.MONTH),
+        currentCalendar.get(Calendar.DAY_OF_MONTH)
+    )
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Set Reminder") },
@@ -1073,11 +1072,11 @@ fun ReminderDialog(
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
-                
+
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
                         .clickable { useSpecificTime = false }
                         .padding(vertical = 8.dp)
                 ) {
@@ -1085,50 +1084,32 @@ fun ReminderDialog(
                         selected = !useSpecificTime,
                         onClick = { useSpecificTime = false }
                     )
-                    
                     Text(
-                        text = "Minutes before due time",
+                        text = "Relative to due time",
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(start = 8.dp)
                     )
                 }
-                
+
                 if (!useSpecificTime) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
                             .padding(start = 32.dp, top = 8.dp, bottom = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                        val minutesOptions = listOf(5, 15, 30, 60, 120, 1440)
-                        minutesOptions.chunked(3).forEach { rowOptions ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                rowOptions.forEach { option ->
-                                    FilterChip(
-                                        selected = minutes == option,
-                                        onClick = { minutes = option },
-                                        label = { 
-                                            Text(
-                                                text = when(option) {
-                                                    1440 -> "1 day"
-                                                    60 -> "1 hour"
-                                                    120 -> "2 hours"
-                                                    else -> "$option min"
-                                                }
-                                            ) 
-                                        },
-                                        modifier = Modifier
-                                            .padding(end = 8.dp)
-                                            .weight(1f)
-                                    )
-                                }
-                            }
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val minutesOptions = listOf(-5, -15, -30, -60)
+                        minutesOptions.forEach { option ->
+                            FilterChip(
+                                selected = minutes == option,
+                                onClick = { minutes = option },
+                                label = { Text("${-option} min before") },
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
                         }
                     }
                 }
-                
+
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -1139,33 +1120,32 @@ fun ReminderDialog(
                     RadioButton(
                         selected = useSpecificTime,
                         onClick = { useSpecificTime = true }
-                            )
-                            
-                            Text(
-                        text = "At specific time",
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.padding(start = 8.dp)
-                            )
-                        }
-                        
+                    )
+                    Text(
+                        text = "At specific date and time",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
+
                 if (useSpecificTime) {
                     Row(
-                                modifier = Modifier
+                        modifier = Modifier
                             .fillMaxWidth()
                             .padding(start = 32.dp, top = 8.dp, bottom = 16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         OutlinedButton(
-                            onClick = { showTimePicker() },
+                            onClick = { datePickerDialog.show() },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Schedule,
-                                contentDescription = "Select time",
+                                contentDescription = "Select date and time",
                                 modifier = Modifier.padding(end = 8.dp)
                             )
                             Text(
-                                text = if (timeString.isNotEmpty()) timeString else "Select time"
+                                text = specificDateTime?.format(DateTimeFormatter.ofPattern("MMM d, yyyy 'at' h:mm a")) ?: "Select date & time"
                             )
                         }
                     }
@@ -1174,14 +1154,15 @@ fun ReminderDialog(
         },
         confirmButton = {
             Button(
-                onClick = { 
-                    if (useSpecificTime) {
-                        onSetReminder(0, timeString)
+                onClick = {
+                    val reminder = if (useSpecificTime) {
+                        specificDateTime?.let { Reminder(ReminderType.ABSOLUTE, absoluteDateTime = it) }
                     } else {
-                        onSetReminder(minutes, "")
+                        Reminder(ReminderType.RELATIVE, offsetMinutes = minutes)
                     }
+                    reminder?.let { onSetReminder(it) }
                 },
-                enabled = !useSpecificTime || timeString.isNotEmpty()
+                enabled = (useSpecificTime && specificDateTime != null) || !useSpecificTime 
             ) {
                 Text("Set Reminder")
             }
