@@ -241,6 +241,73 @@ export const getTaskStatistics = catchAsync(async (req: AuthRequest, res: Respon
     });
 });
 
+// Helper function to calculate productivity score for a given period
+async function calculateProductivityScoreForPeriod(userId: string, startDate: Date, endDate: Date): Promise<number> {
+    // --- Logic from getProductivityScore --- 
+    const tasksInPeriod = await Task.find({
+        user: userId,
+        status: { $ne: 'archived' },
+        $or: [
+            { createdAt: { $gte: startDate, $lte: endDate } }, 
+            { completedAt: { $gte: startDate, $lte: endDate } },
+            { dueDate: { $gte: startDate, $lte: endDate } } // Consider tasks due in period as well
+        ]
+    }).select('+priority +effort +complexity'); // Ensure these are selected if not by default
+
+    let score = 0;
+    let completedTasks = 0;
+    const tasksConsideredForConsistency = new Set<string>();
+
+    for (const task of tasksInPeriod) {
+        if (task.completed && task.completedAt && task.completedAt >= startDate && task.completedAt <= endDate) {
+            completedTasks++;
+            tasksConsideredForConsistency.add(task._id.toString());
+
+            // Base points for completion
+            switch (task.priority) {
+                case 'high': score += 15; break;
+                case 'medium': score += 10; break;
+                case 'low': score += 5; break;
+                default: score += 7; // Default for tasks with no/other priority
+            }
+
+            // Bonus for on-time completion
+            if (task.dueDate && task.completedAt <= task.dueDate) {
+                score += 5; // On-time bonus
+            }
+
+            // Bonus for effort/complexity (if defined)
+            score += (task.effort || 0) * 0.5; // Example: 0.5 point per effort point
+            score += (task.complexity || 0) * 0.5; // Example: 0.5 point per complexity point
+
+        } else if (task.dueDate && task.dueDate <= endDate && !task.completed) {
+            // Penalty for overdue tasks within the period (if not completed by endDate)
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            // Only penalize if due date is in the past relative to 'today' or period's end if historical
+            const referenceDateForOverdue = endDate < today ? endDate : today;
+            if (task.dueDate < referenceDateForOverdue) {
+                 score -= 5; 
+            }
+        }
+
+        // Penalty for late completion (if completed in period but after due date)
+        if (task.completed && task.completedAt && task.completedAt >= startDate && task.completedAt <= endDate && task.dueDate && task.completedAt > task.dueDate) {
+            score -= 3; // Penalty for being late
+        }
+    }
+    
+    // Basic consistency: more than 2 tasks completed in the period
+    if (tasksConsideredForConsistency.size > 2) {
+        score += 5;
+    }
+     // Proactiveness: (Placeholder - e.g. tasks completed well before due date)
+
+    // Normalization / Scaling (Example: cap score or scale to a 0-100 range if needed)
+    // For now, raw score. Max score can be high if many high priority tasks.
+    return Math.max(0, Math.round(score)); // Ensure score is not negative and is an integer
+}
+
 /**
  * @desc    Get productivity score
  * @route   GET /api/stats/productivity-score
@@ -248,132 +315,81 @@ export const getTaskStatistics = catchAsync(async (req: AuthRequest, res: Respon
  */
 export const getProductivityScore = catchAsync(async (req: AuthRequest, res: Response) => {
     const userId = req.user?._id;
+    if (!userId) {
+        throw new AppError('User not found', 401);
+    }
     const { startDate, endDate } = parseDateRange(req.query);
-    let score = 0;
-    const pointsLog: string[] = []; // For debugging score calculation
 
-    // 1. Volume of Work (Completion)
-    const completedTasks = await Task.find({
-        user: userId,
-        completed: true,
-        completedAt: { $gte: startDate, $lte: endDate },
-        status: { $ne: 'archived' }
-    }).select('priority dueDate completedAt effort complexity'); // Select necessary fields
-
-    completedTasks.forEach(task => {
-        let taskScore = 0;
-        let reason = "";
-        switch (task.priority) {
-            case 'high': taskScore += 3; reason += "High Priority (+3)"; break;
-            case 'medium': taskScore += 2; reason += "Medium Priority (+2)"; break;
-            case 'low': taskScore += 1; reason += "Low Priority (+1)"; break;
-            default: taskScore += 1; reason += "Default Priority (+1)";
-        }
-        
-        // Add points for effort/complexity if available
-        if (task.effort) { taskScore += (task.effort * 0.2); reason += `, Effort (${task.effort}*0.2 = +${task.effort*0.2})`; }
-        if (task.complexity) { taskScore += (task.complexity * 0.2); reason += `, Complexity (${task.complexity}*0.2 = +${task.complexity*0.2})`;}
-
-        // Add points for timeliness
-        if (task.dueDate) {
-            if (task.completedAt && task.completedAt <= task.dueDate) {
-                taskScore += 1; reason += ", On-time (+1)";
-            } else {
-                taskScore -= 0.5; reason += ", Late (-0.5)"; // Minor penalty for lateness
-            }
-        } else {
-            taskScore += 0.5; reason += ", No Due Date Bonus (+0.5)";
-        }
-        pointsLog.push(`Task ${task._id}: ${reason} = ${taskScore.toFixed(1)} points`);
-        score += taskScore;
-    });
-
-    // 3. Consistency (Streak) - Placeholder for MVP
-    // This would query a ProductivityMetrics collection for daily completions.
-    // For now, we can add a small bonus if tasks were completed on multiple days within the period.
-    const completionDays = new Set(completedTasks.map(t => t.completedAt?.toISOString().split('T')[0]));
-    if (completionDays.size >= 3 && (endDate.getTime() - startDate.getTime()) >= (2 * 24 * 60 * 60 * 1000)) { // Min 3 days in a period of at least 3 days
-        score += 5;
-        pointsLog.push("Consistency Bonus: Completed tasks on >= 3 days in period (+5)");
-    }
-
-    // 4. Proactiveness (Reducing Overdue)
-    // This requires knowing if a task *was* overdue and then completed.
-    // Simpler: Penalty for tasks that are currently overdue at the end of the period or became overdue.
-    const overdueReferenceDate = (endDate < new Date(new Date().setHours(0,0,0,0))) ? endDate : new Date();
-    const currentOverdueTasksCount = await Task.countDocuments({
-        user: userId,
-        completed: false,
-        dueDate: { $lt: overdueReferenceDate, $ne: null },
-        status: { $nin: ['completed', 'archived'] }
-    });
-    if (currentOverdueTasksCount > 0) {
-        score -= (currentOverdueTasksCount * 0.5);
-        pointsLog.push(`Overdue Penalty: ${currentOverdueTasksCount} tasks overdue (-${currentOverdueTasksCount * 0.5})`);
-    }
-    
-    // Score should not be negative
-    score = Math.max(0, score);
-
-    // Normalize/Scale Score (Example: to 0-100 if a max is known or desired)
-    // For now, let's cap at 100 for simplicity, though a dynamic scale or no cap might be better.
-    // const normalizedScore = Math.min(100, Math.round(score)); 
-    const finalScore = Math.round(score);
+    const score = await calculateProductivityScoreForPeriod(userId.toString(), startDate, endDate);
 
     res.status(200).json({
-        period: { 
-            startDate: startDate.toISOString(), 
+        period: {
+            startDate: startDate.toISOString(),
             endDate: endDate.toISOString(),
-            query: req.query 
+            queryUsed: req.query
         },
-        productivityScore: finalScore,
-        // pointsLog // Uncomment for debugging how score was calculated
+        productivityScore: score,
     });
 });
 
 /**
- * @desc    Get historical scores for trends
+ * @desc    Get historical productivity scores
  * @route   GET /api/stats/score-history
  * @access  Private
  */
 export const getScoreHistory = catchAsync(async (req: AuthRequest, res: Response) => {
     const userId = req.user?._id;
-    const { periodType = 'daily', count = 7 } = req.query; // Default to daily for last 7 days
-    const limit = parseInt(count as string, 10);
-
     if (!userId) {
         throw new AppError('User not found', 401);
     }
-    if (isNaN(limit) || limit <= 0 || limit > 100) { // Basic validation for count
-        throw new AppError('Invalid count parameter for history. Must be between 1 and 100.', 400);
+
+    const periodType = (req.query.periodType as string)?.toLowerCase() || 'daily'; // daily, weekly
+    const count = parseInt(req.query.count as string) || 7; // Number of periods to fetch
+
+    if (count > 30 && periodType === 'daily') {
+        throw new AppError('For daily history, count cannot exceed 30. For longer histories, use weekly.', 400);
+    }
+    if (count > 52 && periodType === 'weekly') {
+        throw new AppError('For weekly history, count cannot exceed 52.', 400);
     }
 
-    // This endpoint relies on the `ProductivityMetrics` model being populated regularly (e.g., daily)
-    // with a field like `dailyProductivityScore` or `weeklyProductivityScore`.
-    // For now, this is a placeholder as that population mechanism isn't built yet.
-    
-    // Example assuming ProductivityMetrics has 'date' and 'dailyProductivityScore'
-    // and we want to fetch them in descending order of date.
-    /*
-    const metrics = await ProductivityMetrics.find({
-        user: userId,
-        // Add filter for periodType if storing weekly scores separately, e.g., metricType: periodType
-    })
-    .sort({ date: -1 })
-    .limit(limit)
-    .select('date dailyProductivityScore'); // Adjust field based on actual model structure
+    const history: { date: string; score: number }[] = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize today to the start of the day
 
-    const history = metrics.map(m => ({
-        date: m.date.toISOString().split('T')[0],
-        score: m.dailyProductivityScore
-    })).reverse(); // Reverse to have oldest first for charting
-    */
+    for (let i = 0; i < count; i++) {
+        let periodStartDate: Date;
+        let periodEndDate: Date;
 
-    // Placeholder response until ProductivityMetrics is fully integrated for historical scores
-    res.status(200).json({ 
-        message: "Score history endpoint placeholder. Daily/Weekly score aggregation in ProductivityMetrics model needed.",
-        query: req.query,
-        history: [] 
-        // history: history // once implemented
+        if (periodType === 'daily') {
+            periodStartDate = new Date(today);
+            periodStartDate.setDate(today.getDate() - i);
+            periodEndDate = new Date(periodStartDate);
+            periodEndDate.setHours(23, 59, 59, 999);
+        } else if (periodType === 'weekly') {
+            // Calculate start of the week (Monday) for i weeks ago
+            periodStartDate = new Date(today);
+            periodStartDate.setDate(today.getDate() - (today.getDay() === 0 ? 6 : today.getDay() -1) - (i * 7) ); // Go to Monday of current week, then i weeks back
+            periodEndDate = new Date(periodStartDate);
+            periodEndDate.setDate(periodStartDate.getDate() + 6);
+            periodEndDate.setHours(23, 59, 59, 999); // Sunday of that week
+        } else {
+            throw new AppError('Invalid periodType. Use "daily" or "weekly".', 400);
+        }
+
+        const score = await calculateProductivityScoreForPeriod(userId.toString(), periodStartDate, periodEndDate);
+        history.push({
+            date: periodStartDate.toISOString().split('T')[0], // Store date as YYYY-MM-DD
+            score: score,
+        });
+    }
+
+    res.status(200).json({
+        periodType,
+        count,
+        history: history.reverse(), // Return in chronological order (oldest to newest)
     });
-}); 
+});
+
+// Ensure this is at the end of the file or where appropriate
+// module.exports = { getTaskStatistics, getProductivityScore, getScoreHistory }; // If using CommonJS (not typical for TS) 
