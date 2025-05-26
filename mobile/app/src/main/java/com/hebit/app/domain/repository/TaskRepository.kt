@@ -5,6 +5,9 @@ import com.hebit.app.domain.model.Task
 import kotlinx.coroutines.flow.Flow
 import com.hebit.app.domain.model.Category
 import com.hebit.app.domain.model.TaskStatus
+import com.hebit.app.data.remote.dto.TaskStatisticsResponseDto
+import com.hebit.app.data.remote.dto.ProductivityScoreResponseDto
+import com.hebit.app.data.remote.dto.ScoreHistoryResponseDto
 
 interface TaskRepository {
     suspend fun getTasks(): Flow<Resource<List<Task>>>
@@ -23,4 +26,22 @@ interface TaskRepository {
     suspend fun createCategory(name: String, color: String, icon: String?): Flow<Resource<Category>>
     suspend fun updateCategory(id: String, name: String?, color: String?, icon: String?): Flow<Resource<Category>>
     suspend fun deleteCategory(id: String): Flow<Resource<Boolean>>
+
+    // Stats
+    suspend fun getTaskStatistics(
+        period: String? = null,
+        startDate: String? = null,
+        endDate: String? = null
+    ): Flow<Resource<TaskStatisticsResponseDto>>
+
+    suspend fun getProductivityScore(
+        period: String? = null,
+        startDate: String? = null,
+        endDate: String? = null
+    ): Flow<Resource<ProductivityScoreResponseDto>>
+
+    suspend fun getScoreHistory(
+        periodType: String? = null,
+        count: Int? = null
+    ): Flow<Resource<ScoreHistoryResponseDto>>
 } 

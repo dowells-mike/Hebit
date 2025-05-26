@@ -25,6 +25,9 @@ import com.hebit.app.domain.model.TaskStatus
 import com.hebit.app.domain.model.Reminder
 import com.hebit.app.domain.model.ReminderType
 import com.hebit.app.data.remote.dto.ReminderDto
+import com.hebit.app.data.remote.dto.TaskStatisticsResponseDto
+import com.hebit.app.data.remote.dto.ProductivityScoreResponseDto
+import com.hebit.app.data.remote.dto.ScoreHistoryResponseDto
 
 @Singleton
 class TaskRepositoryImpl @Inject constructor(
@@ -496,5 +499,87 @@ class TaskRepositoryImpl @Inject constructor(
             offsetMinutes = domain.offsetMinutes,
             absoluteTime = domain.absoluteDateTime?.format(dateFormatter)
         )
+    }
+
+    // --- Stats Methods --- //
+
+    override suspend fun getTaskStatistics(
+        period: String?,
+        startDate: String?,
+        endDate: String?
+    ): Flow<Resource<TaskStatisticsResponseDto>> = flow {
+        emit(Resource.Loading())
+        try {
+            val response = apiService.getTaskStatistics(period, startDate, endDate)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                val errorMessage = response.errorBody()?.string() ?: "Error fetching task statistics"
+                Log.e("TaskRepositoryImpl", "getTaskStatistics error: $errorMessage, Code: ${response.code()}")
+                emit(Resource.Error(errorMessage))
+            }
+        } catch (e: HttpException) {
+            Log.e("TaskRepositoryImpl", "getTaskStatistics HttpException: ${e.message()}", e)
+            emit(Resource.Error("Server error: ${e.message()}"))
+        } catch (e: IOException) {
+            Log.e("TaskRepositoryImpl", "getTaskStatistics IOException: ${e.localizedMessage}", e)
+            emit(Resource.Error("Network error: ${e.localizedMessage ?: "Check connection"}"))
+        } catch (e: Exception) {
+            Log.e("TaskRepositoryImpl", "getTaskStatistics Exception: ${e.localizedMessage}", e)
+            emit(Resource.Error("Unexpected error: ${e.localizedMessage ?: "An error occurred"}"))
+        }
+    }
+
+    override suspend fun getProductivityScore(
+        period: String?,
+        startDate: String?,
+        endDate: String?
+    ): Flow<Resource<ProductivityScoreResponseDto>> = flow {
+        emit(Resource.Loading())
+        try {
+            val response = apiService.getProductivityScore(period, startDate, endDate)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                val errorMessage = response.errorBody()?.string() ?: "Error fetching productivity score"
+                Log.e("TaskRepositoryImpl", "getProductivityScore error: $errorMessage, Code: ${response.code()}")
+                emit(Resource.Error(errorMessage))
+            }
+        } catch (e: HttpException) {
+            Log.e("TaskRepositoryImpl", "getProductivityScore HttpException: ${e.message()}", e)
+            emit(Resource.Error("Server error: ${e.message()}"))
+        } catch (e: IOException) {
+            Log.e("TaskRepositoryImpl", "getProductivityScore IOException: ${e.localizedMessage}", e)
+            emit(Resource.Error("Network error: ${e.localizedMessage ?: "Check connection"}"))
+        } catch (e: Exception) {
+            Log.e("TaskRepositoryImpl", "getProductivityScore Exception: ${e.localizedMessage}", e)
+            emit(Resource.Error("Unexpected error: ${e.localizedMessage ?: "An error occurred"}"))
+        }
+    }
+
+    override suspend fun getScoreHistory(
+        periodType: String?,
+        count: Int?
+    ): Flow<Resource<ScoreHistoryResponseDto>> = flow {
+        emit(Resource.Loading())
+        try {
+            val response = apiService.getScoreHistory(periodType, count)
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                val errorMessage = response.errorBody()?.string() ?: "Error fetching score history"
+                Log.e("TaskRepositoryImpl", "getScoreHistory error: $errorMessage, Code: ${response.code()}")
+                emit(Resource.Error(errorMessage))
+            }
+        } catch (e: HttpException) {
+            Log.e("TaskRepositoryImpl", "getScoreHistory HttpException: ${e.message()}", e)
+            emit(Resource.Error("Server error: ${e.message()}"))
+        } catch (e: IOException) {
+            Log.e("TaskRepositoryImpl", "getScoreHistory IOException: ${e.localizedMessage}", e)
+            emit(Resource.Error("Network error: ${e.localizedMessage ?: "Check connection"}"))
+        } catch (e: Exception) {
+            Log.e("TaskRepositoryImpl", "getScoreHistory Exception: ${e.localizedMessage}", e)
+            emit(Resource.Error("Unexpected error: ${e.localizedMessage ?: "An error occurred"}"))
+        }
     }
 } 

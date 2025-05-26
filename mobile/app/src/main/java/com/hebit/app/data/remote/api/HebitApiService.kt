@@ -181,6 +181,27 @@ interface HebitApiService {
     @DELETE("categories/{id}")
     suspend fun deleteCategory(@Path("id") id: String): Response<Void>
 
+    // Stats Endpoints
+    @GET("stats/tasks")
+    suspend fun getTaskStatistics(
+        @Query("period") period: String? = null, // e.g., "today", "week", "month", "all"
+        @Query("startDate") startDate: String? = null, // ISO_DATE e.g., "2023-10-26"
+        @Query("endDate") endDate: String? = null // ISO_DATE e.g., "2023-11-25"
+    ): Response<TaskStatisticsResponseDto>
+
+    @GET("stats/productivity-score")
+    suspend fun getProductivityScore(
+        @Query("period") period: String? = null,
+        @Query("startDate") startDate: String? = null,
+        @Query("endDate") endDate: String? = null
+    ): Response<ProductivityScoreResponseDto>
+
+    @GET("stats/score-history")
+    suspend fun getScoreHistory(
+        @Query("periodType") periodType: String? = null, // e.g., "daily", "weekly"
+        @Query("count") count: Int? = null // Number of periods
+    ): Response<ScoreHistoryResponseDto>
+
     // Define internal data classes for specific responses if not already defined
     // Ensure TaskListResponse is defined if used by getPriorityTasks/getTasksDueToday
     data class TaskListResponse(val tasks: List<TaskDto>) // Example if not defined in dto package
