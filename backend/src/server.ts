@@ -13,6 +13,7 @@ import categoryRoutes from './routes/categories';
 import productivityRoutes from './routes/productivity';
 import achievementRoutes from './routes/achievements';
 import userRoutes from './routes/users';
+import statsRoutes from './routes/statsRoutes';
 
 dotenv.config();
 
@@ -31,6 +32,7 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/productivity', productivityRoutes);
 app.use('/api/achievements', achievementRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/stats', statsRoutes);
 
 // Health check route
 app.get('/health', (req, res) => {

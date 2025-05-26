@@ -24,6 +24,22 @@ const productivityMetricsSchema = new Schema<ProductivityMetricsDocument>(
       type: Number,
       default: 0
     },
+    tasksCompletedOnTime: {
+      type: Number,
+      default: 0
+    },
+    tasksCompletedLate: {
+      type: Number,
+      default: 0
+    },
+    tasksOverdueSnapshot: {
+      type: Number,
+      default: 0
+    },
+    totalEffortCompleted: {
+      type: Number,
+      default: 0
+    },
     habitCompletionRate: {
       type: Number,
       min: 0,
@@ -53,7 +69,6 @@ const productivityMetricsSchema = new Schema<ProductivityMetricsDocument>(
     productivityScore: {
       type: Number,
       min: 0,
-      max: 100,
       default: 0
     },
     dayRating: {

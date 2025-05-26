@@ -227,13 +227,17 @@ export interface ProductivityMetricsDocument {
   date: Date;
   tasksCompleted: number;
   tasksCreated: number;
+  tasksCompletedOnTime?: number;    // New field
+  tasksCompletedLate?: number;      // New field
+  tasksOverdueSnapshot?: number;  // New field: Snapshot of overdue tasks at the end of the day/period
+  totalEffortCompleted?: number;  // New field: Sum of effort from completed tasks
   habitCompletionRate: number;
   goalProgress: {
     goalId: string;
     progress: number;
   }[];
   focusTime: number;             // Minutes of focus time
-  productivityScore: number;     // 0-100 calculated score
+  productivityScore: number;     // Score calculation is now open-ended, removed max: 100 from schema too
   dayRating?: number;            // 1-5 user-provided rating
   createdAt: Date;
   updatedAt: Date;
