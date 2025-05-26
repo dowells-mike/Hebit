@@ -269,11 +269,3 @@ export interface UserAchievementDocument {
 export interface AuthRequest extends Request {
   user?: UserDocument;
 }
-
-// Reminder type based on TaskDocument.reminders
-export type Reminder = {
-  type: 'relative' | 'absolute';
-  offsetMinutes?: number;      // For relative reminders
-  absoluteTime?: Date;         // For absolute reminders
-  _id?: any; // Mongoose might add this, so optional
-};

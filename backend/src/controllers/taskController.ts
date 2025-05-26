@@ -4,7 +4,6 @@ import { Task, ProductivityMetrics, User, Category } from '../models';
 import { AuthRequest, TaskDocument } from '../types';
 import * as mlService from '../services/mlService';
 import { calculateUpcomingOccurrences } from '../utils/recurrenceUtils';
-import { processReminders } from '../utils/reminderUtils';
 import { HydratedDocument } from 'mongoose';
 
 /**
@@ -161,14 +160,16 @@ export const createTask = catchAsync(async (req: AuthRequest, res: Response) => 
   if (!categoryId) {
     let generalCategory = await Category.findOne({ user: userId, name: 'General', type: { $in: ['task', 'all'] } });
     if (!generalCategory) {
+      // Find the highest order value for the user's categories to ensure new one is last
       const highestOrderCategory = await Category.findOne({ user: userId })
         .sort({ order: -1 })
         .select('order');
       const order = highestOrderCategory ? highestOrderCategory.order + 1 : 0;
+
       generalCategory = await Category.create({
         user: userId,
         name: 'General',
-        color: '#808080',
+        color: '#808080', // Grey color for General
         type: 'task', 
         isDefault: true,
         order: order
@@ -176,20 +177,18 @@ export const createTask = catchAsync(async (req: AuthRequest, res: Response) => 
     }
     categoryId = generalCategory._id.toString();
   }
-
-  // Process reminders
-  const reminders = processReminders(req.body.reminders, req.body.dueDate);
   
+  // Default values for enhanced fields
   const taskData = {
     ...req.body,
     user: userId,
-    category: categoryId,
+    category: categoryId, // Use the determined categoryId
     status: req.body.status || 'todo',
-    effort: req.body.effort || 3,
-    complexity: req.body.complexity || 3,
-    reminders: reminders // Use processed reminders
+    effort: req.body.effort || 3, // Medium effort by default
+    complexity: req.body.complexity || 3 // Medium complexity by default
   };
   
+  // Create the task
   const task = await Task.create(taskData);
   
   // Update daily metrics for task creation count
@@ -225,31 +224,24 @@ export const updateTask = catchAsync(async (req: AuthRequest, res: Response) => 
   const updates: any = { ...otherUpdates }; 
 
   // Explicitly map due_date from request to dueDate for the update
-  // And ensure dueDate is a Date object for reminder processing
-  let taskDueDate = task.dueDate; // Start with existing due date
   if (req.body.due_date) {
-    updates.dueDate = new Date(req.body.due_date);
-    taskDueDate = updates.dueDate;
-    delete updates.due_date; 
-  } else if (req.body.dueDate) { // if dueDate is sent directly (already a Date or valid string)
-    updates.dueDate = new Date(req.body.dueDate);
-    taskDueDate = updates.dueDate;
+    updates.dueDate = req.body.due_date;
+    delete updates.due_date; // Remove the snake_case version if it was spread
   }
 
-  // Process reminders using the potentially updated due date
-  const remindersInput = req.body.reminders || req.body.remindersRequest;
-  if (remindersInput) {
-    updates.reminders = processReminders(remindersInput, taskDueDate);
-  } else if (req.body.hasOwnProperty('reminders') && req.body.reminders === null) {
-    // If explicitly sending null for 'reminders', clear reminders
-    updates.reminders = [];
-  } else if (req.body.hasOwnProperty('remindersRequest') && req.body.remindersRequest === null) {
-    // If explicitly sending null for 'remindersRequest', also clear reminders
-    updates.reminders = [];
+  // Process remindersRequest
+  if (req.body.remindersRequest && Array.isArray(req.body.remindersRequest)) {
+    updates.reminders = req.body.remindersRequest.map((r: any) => {
+      const reminder: any = { type: r.type };
+      if (r.type === 'absolute' && r.absolute_time) {
+        reminder.absoluteTime = new Date(r.absolute_time);
+      } else if (r.type === 'relative' && r.offset_minutes !== undefined) {
+        reminder.offsetMinutes = r.offset_minutes;
+      }
+      return reminder;
+    });
+    delete updates.remindersRequest; // Remove the original snake_case version
   }
-  // Clean up both possible input fields from the main updates object if they existed directly on req.body
-  delete updates.remindersRequest; 
-  // `updates.reminders` is now the authoritative source, so if `req.body.reminders` was used, it's fine.
 
   // Initialize taskMetadata safely, using existing task.metadata or an empty object
   let taskMetadata: any = task.metadata ? { ...task.metadata } : {};
@@ -514,7 +506,7 @@ export const getPriorityTasks = catchAsync(async (req: AuthRequest, res: Respons
       await (task as HydratedDocument<TaskDocument>).save(); // Save the updated task to the database
     }
   }
-
+  
   // If not enough high priority tasks, get medium priority ones
   if (priorityTasks.length < limit) {
     const mediumPriorityTasks = await Task.find({
@@ -548,7 +540,7 @@ export const getPriorityTasks = catchAsync(async (req: AuthRequest, res: Respons
         await (task as HydratedDocument<TaskDocument>).save(); // Save the updated task to the database
       }
     }
-
+    
     priorityTasks.push(...mediumPriorityTasks);
   }
   
