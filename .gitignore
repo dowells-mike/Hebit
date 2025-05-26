@@ -10,6 +10,7 @@
 .cxx
 
 # Documentation files to ignore
+docs/
 docs/app-idea.txt
 docs/backend-architecture.md
 docs/backend-setup-part2.md
