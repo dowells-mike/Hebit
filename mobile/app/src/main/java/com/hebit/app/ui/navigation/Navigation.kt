@@ -52,7 +52,7 @@ object Routes {
     // Main app screens
     const val DASHBOARD = "dashboard"
     const val QUICK_ACTIONS = "quick_actions"
-    const val PROGRESS_STATS = "progress_stats"
+    const val STATS_MAIN = "stats_main"
     const val TASKS = "tasks"
     const val TASK_DETAIL = "task_detail"
     const val TASK_CATEGORIES = "task_categories"
@@ -147,7 +147,7 @@ fun HebitNavigation(
                 onGoalsClick = { navController.navigate(Routes.GOALS) },
                 onSettingsClick = { navController.navigate(Routes.SETTINGS) },
                 onQuickActionsClick = { navController.navigate(Routes.QUICK_ACTIONS) },
-                onProgressStatsClick = { navController.navigate(Routes.STATS_SCREEN) },
+                onProgressStatsClick = { navController.navigate(Routes.STATS_MAIN) },
                 onProductivityClick = { navController.navigate(Routes.PRODUCTIVITY) },
                 onAchievementsClick = { navController.navigate(Routes.ACHIEVEMENTS) },
                 onTaskDetailClick = { taskId -> navController.navigate("${Routes.TASK_DETAIL}/$taskId") },
@@ -372,7 +372,7 @@ fun HebitNavigation(
             )
         }
         
-        composable(Routes.PROGRESS_STATS) {
+        composable(Routes.STATS_MAIN) {
             StatsScreen()
         }
         

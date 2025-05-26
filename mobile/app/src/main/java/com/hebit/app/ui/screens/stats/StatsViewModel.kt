@@ -28,41 +28,43 @@ class StatsViewModel @Inject constructor(
     private val _scoreHistoryState = MutableStateFlow<Resource<ScoreHistoryResponseDto>>(Resource.Loading())
     val scoreHistoryState: StateFlow<Resource<ScoreHistoryResponseDto>> = _scoreHistoryState.asStateFlow()
 
-    // Default to fetching weekly stats for now
     init {
-        fetchTaskStatistics(period = "week")
-        fetchProductivityScore(period = "week")
-        // fetchScoreHistory(periodType = "daily", count = 7) // History is placeholder for now
+        refreshStats("week") // Initial load with weekly stats
     }
 
-    fun fetchTaskStatistics(period: String? = null, startDate: String? = null, endDate: String? = null) {
+    fun refreshStats(period: String? = null, startDate: String? = null, endDate: String? = null) {
+        fetchTaskStatistics(period, startDate, endDate)
+        fetchProductivityScore(period, startDate, endDate)
+        // Fetch default history (e.g., last 7 days) or based on current period selection
+        // For simplicity, let's fetch last 7 days daily history initially or when period is 'week' or 'today'
+        // More complex logic can be added later if a separate history period selector is introduced.
+        fetchScoreHistory("daily", 7)
+    }
+
+    private fun fetchTaskStatistics(period: String?, startDate: String?, endDate: String?) {
         viewModelScope.launch {
+            _taskStatisticsState.value = Resource.Loading()
             taskRepository.getTaskStatistics(period, startDate, endDate).collect {
                 _taskStatisticsState.value = it
             }
         }
     }
 
-    fun fetchProductivityScore(period: String? = null, startDate: String? = null, endDate: String? = null) {
+    private fun fetchProductivityScore(period: String?, startDate: String?, endDate: String?) {
         viewModelScope.launch {
+            _productivityScoreState.value = Resource.Loading()
             taskRepository.getProductivityScore(period, startDate, endDate).collect {
                 _productivityScoreState.value = it
             }
         }
     }
 
-    fun fetchScoreHistory(periodType: String? = null, count: Int? = null) {
+    fun fetchScoreHistory(periodType: String, count: Int) {
         viewModelScope.launch {
+            _scoreHistoryState.value = Resource.Loading()
             taskRepository.getScoreHistory(periodType, count).collect {
                 _scoreHistoryState.value = it
             }
         }
-    }
-
-    fun refreshStats(period: String? = "week", startDate: String? = null, endDate: String? = null) {
-        fetchTaskStatistics(period, startDate, endDate)
-        fetchProductivityScore(period, startDate, endDate)
-        // Optionally fetch score history if it becomes non-placeholder
-        // fetchScoreHistory(periodType = if (period == "week") "daily" else period, count = 7)
     }
 } 
