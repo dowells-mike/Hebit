@@ -36,7 +36,7 @@ class ReminderBroadcastReceiver : BroadcastReceiver() {
         val pendingIntent = PendingIntent.getActivity(context, 0, launchIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_check_circle) // Placeholder icon
+            .setSmallIcon(R.drawable.ic_notification_icon) // Corrected icon
             .setContentTitle(taskTitle)
             .setContentText("Your task is due soon or at the specified time.")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
