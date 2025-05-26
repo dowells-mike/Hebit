@@ -4,6 +4,7 @@ import { Task, ProductivityMetrics, User, Category } from '../models';
 import { AuthRequest, TaskDocument } from '../types';
 import * as mlService from '../services/mlService';
 import { calculateUpcomingOccurrences } from '../utils/recurrenceUtils';
+import { processReminders } from '../utils/reminderUtils';
 import { HydratedDocument } from 'mongoose';
 
 /**
@@ -160,16 +161,14 @@ export const createTask = catchAsync(async (req: AuthRequest, res: Response) => 
   if (!categoryId) {
     let generalCategory = await Category.findOne({ user: userId, name: 'General', type: { $in: ['task', 'all'] } });
     if (!generalCategory) {
-      // Find the highest order value for the user's categories to ensure new one is last
       const highestOrderCategory = await Category.findOne({ user: userId })
         .sort({ order: -1 })
         .select('order');
       const order = highestOrderCategory ? highestOrderCategory.order + 1 : 0;
-
       generalCategory = await Category.create({
         user: userId,
         name: 'General',
-        color: '#808080', // Grey color for General
+        color: '#808080',
         type: 'task', 
         isDefault: true,
         order: order
@@ -177,18 +176,20 @@ export const createTask = catchAsync(async (req: AuthRequest, res: Response) => 
     }
     categoryId = generalCategory._id.toString();
   }
+
+  // Process reminders
+  const reminders = processReminders(req.body.reminders, req.body.dueDate);
   
-  // Default values for enhanced fields
   const taskData = {
     ...req.body,
     user: userId,
-    category: categoryId, // Use the determined categoryId
+    category: categoryId,
     status: req.body.status || 'todo',
-    effort: req.body.effort || 3, // Medium effort by default
-    complexity: req.body.complexity || 3 // Medium complexity by default
+    effort: req.body.effort || 3,
+    complexity: req.body.complexity || 3,
+    reminders: reminders // Use processed reminders
   };
   
-  // Create the task
   const task = await Task.create(taskData);
   
   // Update daily metrics for task creation count
@@ -224,24 +225,26 @@ export const updateTask = catchAsync(async (req: AuthRequest, res: Response) => 
   const updates: any = { ...otherUpdates }; 
 
   // Explicitly map due_date from request to dueDate for the update
+  // And ensure dueDate is a Date object for reminder processing
+  let taskDueDate = task.dueDate; // Start with existing due date
   if (req.body.due_date) {
-    updates.dueDate = req.body.due_date;
-    delete updates.due_date; // Remove the snake_case version if it was spread
+    updates.dueDate = new Date(req.body.due_date);
+    taskDueDate = updates.dueDate;
+    delete updates.due_date; 
+  } else if (req.body.dueDate) { // if dueDate is sent directly (already a Date or valid string)
+    updates.dueDate = new Date(req.body.dueDate);
+    taskDueDate = updates.dueDate;
   }
 
-  // Process remindersRequest
-  if (req.body.remindersRequest && Array.isArray(req.body.remindersRequest)) {
-    updates.reminders = req.body.remindersRequest.map((r: any) => {
-      const reminder: any = { type: r.type };
-      if (r.type === 'absolute' && r.absolute_time) {
-        reminder.absoluteTime = new Date(r.absolute_time);
-      } else if (r.type === 'relative' && r.offset_minutes !== undefined) {
-        reminder.offsetMinutes = r.offset_minutes;
-      }
-      return reminder;
-    });
-    delete updates.remindersRequest; // Remove the original snake_case version
+  // Process reminders using the potentially updated due date
+  if (req.body.reminders) { // Check if reminders are being sent for update
+    updates.reminders = processReminders(req.body.reminders, taskDueDate);
+  } else if (req.body.hasOwnProperty('reminders') && req.body.reminders === null) {
+    // If explicitly sending null, clear reminders
+    updates.reminders = [];
   }
+  // Remove remindersRequest if it was part of req.body from previous logic, as it's now handled
+  if (updates.remindersRequest) delete updates.remindersRequest;
 
   // Initialize taskMetadata safely, using existing task.metadata or an empty object
   let taskMetadata: any = task.metadata ? { ...task.metadata } : {};
