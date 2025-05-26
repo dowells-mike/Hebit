@@ -973,22 +973,25 @@ fun TaskDetailContent(
 fun formatReminderForDisplay(reminder: Reminder, taskDueDate: LocalDate?): String {
     return when (reminder.type) {
         ReminderType.RELATIVE -> {
-            val offset = reminder.offsetMinutes?.let { Math.abs(it) } ?: 0
-            when {
-                offset == 0 -> {
-                    if (taskDueDate != null) "At time of due date (${taskDueDate.format(DateTimeFormatter.ofPattern("MMM d"))})"
-                    else "At time of event"
+            val offsetMinutes = reminder.offsetMinutes
+            if (offsetMinutes != null) {
+                val absOffset = Math.abs(offsetMinutes)
+                val unit = if (absOffset == 1) "minute" else "minutes"
+                when {
+                    offsetMinutes == 0 -> "At time of due date"
+                    offsetMinutes < 0 -> "$absOffset $unit before due date"
+                    offsetMinutes > 0 -> "$absOffset $unit after due date" // Though typically reminders are before or at
+                    else -> "Relative to due date" // Should not be reached if offsetMinutes is not null
                 }
-                offset < 60 -> "$offset minutes before"
-                offset == 60 -> "1 hour before"
-                offset % 60 == 0 -> "${offset / 60} hours before"
-                else -> "$offset minutes before" // e.g. 75 minutes, could be formatted better
+            } else if (taskDueDate != null) { // Fallback if offset is somehow null for a relative reminder
+                "At time of due date (${taskDueDate.format(DateTimeFormatter.ofPattern("MMM d"))})"
+            } else {
+                "Relative to due date"
             }
         }
         ReminderType.ABSOLUTE -> {
             reminder.absoluteDateTime?.format(DateTimeFormatter.ofPattern("MMM d, yyyy 'at' h:mm a")) ?: "On a specific date/time"
         }
-        // else -> "Unknown reminder type" // Should not happen with current enum
     }
 }
 
