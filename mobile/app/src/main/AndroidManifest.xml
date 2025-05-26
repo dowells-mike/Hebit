@@ -35,12 +35,10 @@
 
         <!-- Reminder BroadcastReceiver -->
         <receiver
-            android:name=".util.ReminderBroadcastReceiver"
+            android:name=".notification.ReminderBroadcastReceiver" 
             android:enabled="true"
             android:exported="false">
-            <intent-filter>
-                <action android:name="com.hebit.app.ACTION_SHOW_REMINDER" />
-            </intent-filter>
+            <!-- Removed intent-filter as it's not strictly needed for direct PendingIntent calls via AlarmManager -->
         </receiver>
 
     </application>
