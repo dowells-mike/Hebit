@@ -1,87 +1,327 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import mongoose from 'mongoose';
 import { Achievement, UserAchievement } from '../../../src/models';
-import { authenticatedRequest } from '../../helpers/testServer';
+import { authenticatedRequest, request } from '../../helpers/testServer';
+import { createTestAchievement, createTestUserAchievement, createTestUser } from '../../helpers/testData';
 
 describe('Achievement Controller Integration Tests', () => {
   let auth: any;
+  let testUser: any;
   
   beforeEach(async () => {
     // Create authenticated request for each test
-    auth = await authenticatedRequest();
+    const authResult = await authenticatedRequest();
+    auth = authResult; // This contains the request methods with token
+    testUser = authResult.user; // This is the user object
   });
   
-  // Helper function to create a test achievement
-  const createTestAchievement = async (customData = {}) => {
-    const achievementData = {
-      name: 'Test Achievement',
-      description: 'This is a test achievement',
-      category: 'tasks',
-      points: 100,
-      icon: 'trophy',
-      criteria: 'Complete 10 tasks',
-      ...customData
-    };
-    
-    const achievement = await Achievement.create(achievementData);
-    return achievement;
-  };
-  
-  // Helper function to create user achievement progress
-  const createUserAchievementProgress = async (userId: mongoose.Types.ObjectId, achievementId: mongoose.Types.ObjectId, customData = {}) => {
-    const progressData = {
-      user: userId,
-      achievement: achievementId,
-      progress: 0,
-      earned: false,
-      ...customData
-    };
-    
-    const userAchievement = await UserAchievement.create(progressData);
-    return userAchievement;
-  };
-  
+  // GET /api/achievements - Get all public achievements
   describe('GET /api/achievements', () => {
-    it('should return all achievements with user progress', async () => {
-      // Create test achievements
-      const achievement1 = await createTestAchievement({ name: 'Achievement 1', category: 'tasks' });
-      const achievement2 = await createTestAchievement({ name: 'Achievement 2', category: 'habits' });
-      const achievement3 = await createTestAchievement({ name: 'Achievement 3', category: 'goals' });
+    it('should return an empty array if no achievements exist', async () => {
+      const response = await request.get('/api/achievements'); // Use non-authenticated request
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual([]);
+    });
+
+    it('should return all non-secret achievements', async () => {
+      await createTestAchievement({ name: 'Public Achievement 1', secret: false });
+      await createTestAchievement({ name: 'Public Achievement 2', secret: false });
+      await createTestAchievement({ name: 'Secret Achievement 1', secret: true });
+
+      const response = await request.get('/api/achievements');
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(2);
+      expect(response.body.some((ach: any) => ach.name === 'Public Achievement 1')).toBe(true);
+      expect(response.body.some((ach: any) => ach.name === 'Public Achievement 2')).toBe(true);
+      expect(response.body.some((ach: any) => ach.name === 'Secret Achievement 1')).toBe(false);
+    });
+
+    it('should not return secret achievements', async () => {
+      await createTestAchievement({ name: 'Super Secret Achievement', secret: true });
+      await createTestAchievement({ name: 'Another Secret', secret: true });
+
+      const response = await request.get('/api/achievements');
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual([]);
+    });
+    
+    it('should return achievements with correct structure', async () => {
+      const achData = {
+        name: 'Well Structured Achievement',
+        description: 'A very descriptive text.',
+        category: 'goals',
+        points: 25,
+        icon: 'goal_icon.svg',
+        criteria: { type: 'event_based', source: 'user_activity', targetValue: 1, conditionDetails: { eventName: 'USER_SIGNUP' } },
+        rarity: 'epic',
+        secret: false,
+      };
+      const createdAch = await createTestAchievement(achData);
+
+      const response = await request.get('/api/achievements');
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(1);
+      const returnedAch = response.body[0];
+
+      expect(returnedAch._id).toBe(createdAch._id.toString());
+      expect(returnedAch.name).toBe(achData.name);
+      expect(returnedAch.description).toBe(achData.description);
+      expect(returnedAch.category).toBe(achData.category);
+      expect(returnedAch.points).toBe(achData.points);
+      expect(returnedAch.icon).toBe(achData.icon);
+      expect(returnedAch.criteria.type).toBe(achData.criteria.type);
+      expect(returnedAch.criteria.source).toBe(achData.criteria.source);
+      expect(returnedAch.criteria.targetValue).toBe(achData.criteria.targetValue);
+      expect(returnedAch.criteria.conditionDetails.eventName).toBe(achData.criteria.conditionDetails.eventName);
+      expect(returnedAch.rarity).toBe(achData.rarity);
+      expect(returnedAch.secret).toBe(false);
+    });
+  });
+  
+  // GET /api/achievements/my - Get my achievements (protected)
+  describe('GET /api/achievements/my', () => {
+    it('should return 401 if not authenticated', async () => {
+      const response = await request.get('/api/achievements/my'); // Use non-authenticated request
+      expect(response.status).toBe(401);
+    });
+
+    it('should return an empty array if no achievements exist in the system', async () => {
+      const response = await auth.get('/api/achievements/my');
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual([]);
+    });
+
+    it('should return all achievements with user-specific progress (even if no UserAchievement record exists yet)', async () => {
+      const ach1 = await createTestAchievement({ name: 'Public Ach 1', secret: false, points: 10 });
+      await createTestAchievement({ name: 'Secret Ach 1 (Unearned)', secret: true, points: 20 });
+      const ach3 = await createTestAchievement({ name: 'Public Ach 2', secret: false, points: 30 });
+
+      await createTestUserAchievement(testUser._id, ach3._id, { progress: 50, earned: false });
+
+      const response = await auth.get('/api/achievements/my');
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(2);
+
+      const returnedAch1 = response.body.find((a: any) => a.name === 'Public Ach 1');
+      expect(returnedAch1).toBeDefined();
+      expect(returnedAch1.name).toBe(ach1.name);
+      expect(returnedAch1.progress).toBe(0);
+      expect(returnedAch1.earned).toBe(false);
+      expect(returnedAch1.seenByUser).toBe(false);
+
+      const returnedAch3 = response.body.find((a: any) => a.name === 'Public Ach 2');
+      expect(returnedAch3).toBeDefined();
+      expect(returnedAch3.name).toBe(ach3.name);
+      expect(returnedAch3.progress).toBe(50);
+      expect(returnedAch3.earned).toBe(false);
+    });
+
+    it('should include earned secret achievements', async () => {
+      const secretAch = await createTestAchievement({ name: 'Top Secret Achievement', secret: true });
+      await createTestUserAchievement(testUser._id, secretAch._id, { progress: 100, earned: true, earnedAt: new Date() });
+
+      const response = await auth.get('/api/achievements/my');
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(1);
+      const returnedSecretAch = response.body[0];
+      expect(returnedSecretAch.name).toBe(secretAch.name);
+      expect(returnedSecretAch.earned).toBe(true);
+      expect(returnedSecretAch.secret).toBe(true);
+    });
+
+    it('should filter out unearned secret achievements', async () => {
+      await createTestAchievement({ name: 'Visible Public', secret: false });
+      await createTestAchievement({ name: 'Hidden Secret Unearned', secret: true });
+
+      const response = await auth.get('/api/achievements/my');
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(1);
+      expect(response.body.some((a: any) => a.name === 'Visible Public')).toBe(true);
+      expect(response.body.some((a: any) => a.name === 'Hidden Secret Unearned')).toBe(false);
+    });
+
+    it('should correctly reflect seenByUser status', async () => {
+      const ach = await createTestAchievement({ name: 'Seen Test Ach', secret: false });
+      await createTestUserAchievement(testUser._id, ach._id, { progress: 100, earned: true, seenByUser: true, earnedAt: new Date() });
+
+      const response = await auth.get('/api/achievements/my');
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(1);
+      expect(response.body[0].name).toBe(ach.name);
+      expect(response.body[0].earned).toBe(true);
+      expect(response.body[0].seenByUser).toBe(true);
+    });
+
+     it('should return multiple achievements with varied progress and secret status correctly', async () => {
+      await createTestAchievement({ name: 'Public Unearned', secret: false });
+      const publicAchEarnedUnseen = await createTestAchievement({ name: 'Public Earned Unseen', secret: false });
+      const publicAchEarnedSeen = await createTestAchievement({ name: 'Public Earned Seen', secret: false });
+      await createTestAchievement({ name: 'Secret Unearned', secret: true });
+      const secretAchEarnedUnseen = await createTestAchievement({ name: 'Secret Earned Unseen', secret: true });
+      const secretAchEarnedSeen = await createTestAchievement({ name: 'Secret Earned Seen', secret: true });
+
+      await createTestUserAchievement(testUser._id, publicAchEarnedUnseen._id, { progress: 100, earned: true, earnedAt: new Date(), seenByUser: false });
+      await createTestUserAchievement(testUser._id, publicAchEarnedSeen._id, { progress: 100, earned: true, earnedAt: new Date(), seenByUser: true });
+      await createTestUserAchievement(testUser._id, secretAchEarnedUnseen._id, { progress: 100, earned: true, earnedAt: new Date(), seenByUser: false });
+      await createTestUserAchievement(testUser._id, secretAchEarnedSeen._id, { progress: 100, earned: true, earnedAt: new Date(), seenByUser: true });
+
+      const response = await auth.get('/api/achievements/my');
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(5);
+
+      const findByName = (name: string) => response.body.find((a: any) => a.name === name);
+
+      expect(findByName('Public Unearned').earned).toBe(false);
+      expect(findByName('Public Earned Unseen').earned).toBe(true);
+      expect(findByName('Public Earned Unseen').seenByUser).toBe(false);
+      expect(findByName('Public Earned Seen').earned).toBe(true);
+      expect(findByName('Public Earned Seen').seenByUser).toBe(true);
+      expect(findByName('Secret Unearned')).toBeUndefined();
+      expect(findByName('Secret Earned Unseen').earned).toBe(true);
+      expect(findByName('Secret Earned Unseen').secret).toBe(true);
+      expect(findByName('Secret Earned Unseen').seenByUser).toBe(false);
+      expect(findByName('Secret Earned Seen').earned).toBe(true);
+      expect(findByName('Secret Earned Seen').secret).toBe(true);
+      expect(findByName('Secret Earned Seen').seenByUser).toBe(true);
+    });
+  });
+  
+  // GET /api/achievements/earned - Get my earned achievements (protected)
+  describe('GET /api/achievements/earned', () => {
+    it('should return 401 if not authenticated', async () => {
+      const response = await request.get('/api/achievements/earned');
+      expect(response.status).toBe(401);
+    });
+
+    it('should return an empty array if the user has no earned achievements', async () => {
+      await createTestAchievement({ name: 'Unearned Public 1' });
+      const secretUnearned = await createTestAchievement({ name: 'Unearned Secret 1', secret: true });
+      await createTestUserAchievement(testUser._id, secretUnearned._id, { progress: 50, earned: false });
+
+      const response = await auth.get('/api/achievements/earned');
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual([]);
+    });
+
+    it('should return only earned achievements (public and secret)', async () => {
+      const publicAchUnearned = await createTestAchievement({ name: 'Public Unearned', secret: false });
+      const publicAchEarned = await createTestAchievement({ name: 'Public Earned', secret: false });
+      const secretAchUnearned = await createTestAchievement({ name: 'Secret Unearned', secret: true });
+      const secretAchEarned = await createTestAchievement({ name: 'Secret Earned', secret: true });
+
+      await createTestUserAchievement(testUser._id, publicAchUnearned._id, { progress: 50, earned: false });
+      await createTestUserAchievement(testUser._id, publicAchEarned._id, { progress: 100, earned: true, earnedAt: new Date(Date.now() - 10000) });
+      await createTestUserAchievement(testUser._id, secretAchEarned._id, { progress: 100, earned: true, earnedAt: new Date() });
+
+      const response = await auth.get('/api/achievements/earned');
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(2);
+      expect(response.body.some((a: any) => a.achievement.name === 'Public Earned')).toBe(true);
+      expect(response.body.some((a: any) => a.achievement.name === 'Secret Earned')).toBe(true);
+      expect(response.body.every((a: any) => a.earned === true)).toBe(true);
+    });
+
+    it('should return full UserAchievement details and sort by earnedAt descending', async () => {
+      const ach1 = await createTestAchievement({ name: 'Older Earned', points: 5 });
+      const ach2 = await createTestAchievement({ name: 'Newer Earned', points: 10, secret: true });
+      const ach3 = await createTestAchievement({ name: 'Middle Earned', points: 15 });
+
+      const dateOlder = new Date('2023-01-01T10:00:00.000Z');
+      const dateMiddle = new Date('2023-01-01T12:00:00.000Z');
+      const dateNewer = new Date('2023-01-01T14:00:00.000Z');
+
+      await createTestUserAchievement(testUser._id, ach1._id, { progress: 100, earned: true, earnedAt: dateOlder, seenByUser: true });
+      await createTestUserAchievement(testUser._id, ach3._id, { progress: 100, earned: true, earnedAt: dateMiddle, seenByUser: false });
+      await createTestUserAchievement(testUser._id, ach2._id, { progress: 100, earned: true, earnedAt: dateNewer, seenByUser: false });
       
-      // Create progress for one achievement
-      await createUserAchievementProgress(auth.user._id, achievement1._id, { progress: 50 });
-      
-      // Complete one achievement
-      await createUserAchievementProgress(auth.user._id, achievement2._id, { 
-        progress: 100, 
-        earned: true,
-        earnedAt: new Date()
-      });
-      
-      const response = await auth.get('/api/achievements');
-      
+      const achUnearned = await createTestAchievement({ name: 'Never Earned' });
+      await createTestUserAchievement(testUser._id, achUnearned._id, { progress: 10, earned: false });
+
+      const response = await auth.get('/api/achievements/earned');
       expect(response.status).toBe(200);
       expect(response.body).toHaveLength(3);
-      
-      // Check that progress data is included
-      const achievementWithProgress = response.body.find((a: any) => a._id === achievement1._id.toString());
-      expect(achievementWithProgress).toBeDefined();
-      expect(achievementWithProgress.progress).toBe(50);
-      expect(achievementWithProgress.earned).toBe(false);
-      
-      // Check that earned achievement is marked correctly
-      const earnedAchievement = response.body.find((a: any) => a._id === achievement2._id.toString());
-      expect(earnedAchievement).toBeDefined();
-      expect(earnedAchievement.progress).toBe(100);
-      expect(earnedAchievement.earned).toBe(true);
-      expect(earnedAchievement.earnedAt).toBeDefined();
-      
-      // Check that achievement with no progress has default values
-      const noProgressAchievement = response.body.find((a: any) => a._id === achievement3._id.toString());
-      expect(noProgressAchievement).toBeDefined();
-      expect(noProgressAchievement.progress).toBe(0);
-      expect(noProgressAchievement.earned).toBe(false);
-      expect(noProgressAchievement.earnedAt).toBeNull();
+
+      expect(response.body[0].achievement.name).toBe('Newer Earned');
+      expect(new Date(response.body[0].earnedAt).toISOString()).toBe(dateNewer.toISOString());
+      expect(response.body[1].achievement.name).toBe('Middle Earned');
+      expect(new Date(response.body[1].earnedAt).toISOString()).toBe(dateMiddle.toISOString());
+      expect(response.body[2].achievement.name).toBe('Older Earned');
+      expect(new Date(response.body[2].earnedAt).toISOString()).toBe(dateOlder.toISOString());
+
+      const newestEarned = response.body[0];
+      expect(newestEarned.user).toBe(testUser._id.toString());
+      expect(newestEarned.achievement._id).toBe(ach2._id.toString());
+      expect(newestEarned.achievement.name).toBe(ach2.name);
+      expect(newestEarned.achievement.points).toBe(ach2.points);
+      expect(newestEarned.achievement.secret).toBe(true);
+      expect(newestEarned.progress).toBe(100);
+      expect(newestEarned.earned).toBe(true);
+      expect(newestEarned.seenByUser).toBe(false);
+    });
+  });
+  
+  // POST /api/achievements/my/:userAchievementId/seen - Mark achievement as seen (protected)
+  describe('POST /api/achievements/my/:userAchievementId/seen', () => {
+    it('should return 401 if not authenticated', async () => {
+      const response = await request.post('/api/achievements/my/someUserAchievementId/seen');
+      expect(response.status).toBe(401);
+    });
+
+    it('should return 404 if UserAchievement does not exist', async () => {
+      const nonExistentId = new mongoose.Types.ObjectId();
+      const response = await auth.post(`/api/achievements/my/${nonExistentId}/seen`);
+      expect(response.status).toBe(404);
+    });
+
+    it('should return 403 if UserAchievement belongs to another user', async () => {
+      const otherUser = await createTestUser({ email: 'other@example.com', name: 'Other User' });
+      const achievement = await createTestAchievement({ name: 'Shared Ach' });
+      const uaOtherUser = await createTestUserAchievement(otherUser._id, achievement._id, { earned: true, earnedAt: new Date() });
+
+      const response = await auth.post(`/api/achievements/my/${uaOtherUser._id}/seen`);
+      expect(response.status).toBe(403);
+    });
+
+    it('should return 400 if UserAchievement is not earned yet', async () => {
+      const achievement = await createTestAchievement({ name: 'Not Earned Ach' });
+      const uaNotEarned = await createTestUserAchievement(testUser._id, achievement._id, { earned: false, progress: 50 });
+
+      const response = await auth.post(`/api/achievements/my/${uaNotEarned._id}/seen`);
+      expect(response.status).toBe(400);
+      expect(response.body.message).toContain('Achievement not earned yet');
+    });
+
+    it('should mark an earned, unseen UserAchievement as seen and return it', async () => {
+      const achievement = await createTestAchievement({ name: 'To Be Seen Ach' });
+      const uaUnseen = await createTestUserAchievement(testUser._id, achievement._id, { earned: true, earnedAt: new Date(), seenByUser: false });
+
+      const response = await auth.post(`/api/achievements/my/${uaUnseen._id}/seen`);
+      expect(response.status).toBe(200);
+      expect(response.body.seenByUser).toBe(true);
+      expect(response.body._id).toBe(uaUnseen._id.toString());
+      expect(response.body.user).toBe(testUser._id.toString());
+
+      // Verify in DB
+      const uaInDb = await UserAchievement.findById(uaUnseen._id);
+      expect(uaInDb?.seenByUser).toBe(true);
+    });
+
+    it('should not change seenByUser if already true (idempotency)', async () => {
+      const achievement = await createTestAchievement({ name: 'Already Seen Ach' });
+      const uaSeen = await createTestUserAchievement(testUser._id, achievement._id, { earned: true, earnedAt: new Date(), seenByUser: true });
+
+      const response = await auth.post(`/api/achievements/my/${uaSeen._id}/seen`);
+      expect(response.status).toBe(200);
+      expect(response.body.seenByUser).toBe(true);
+
+      // Verify in DB (still true, and no other changes like timestamps if not intended)
+      const uaInDb = await UserAchievement.findById(uaSeen._id);
+      expect(uaInDb?.seenByUser).toBe(true);
+    });
+
+    it('should return 400 for invalid userAchievementId format', async () => {
+        const response = await auth.post('/api/achievements/my/invalidObjectId/seen');
+        expect(response.status).toBe(400); // Assuming controller or middleware handles invalid ObjectId
     });
   });
   
@@ -106,54 +346,6 @@ describe('Achievement Controller Integration Tests', () => {
       const response = await auth.get('/api/achievements/category/invalid');
       
       expect(response.status).toBe(400);
-    });
-  });
-  
-  describe('GET /api/achievements/earned', () => {
-    it('should return only earned achievements', async () => {
-      // Create test achievements
-      const achievement1 = await createTestAchievement({ name: 'Achievement 1' });
-      const achievement2 = await createTestAchievement({ name: 'Achievement 2' });
-      const achievement3 = await createTestAchievement({ name: 'Achievement 3' });
-      
-      // Create progress: one in progress, two completed
-      await createUserAchievementProgress(auth.user._id, achievement1._id, { progress: 50 });
-      
-      const earnedDate1 = new Date(Date.now() - 24 * 60 * 60 * 1000); // Yesterday
-      await createUserAchievementProgress(auth.user._id, achievement2._id, { 
-        progress: 100, 
-        earned: true,
-        earnedAt: earnedDate1
-      });
-      
-      const earnedDate2 = new Date(); // Today
-      await createUserAchievementProgress(auth.user._id, achievement3._id, { 
-        progress: 100, 
-        earned: true,
-        earnedAt: earnedDate2
-      });
-      
-      const response = await auth.get('/api/achievements/earned');
-      
-      expect(response.status).toBe(200);
-      expect(response.body).toHaveLength(2);
-      
-      // Check that only earned achievements are returned
-      response.body.forEach((achievement: any) => {
-        expect(achievement.earnedAt).toBeDefined();
-      });
-      
-      // Check that most recently earned achievement is first
-      expect(new Date(response.body[0].earnedAt).getTime()).toBeGreaterThan(
-        new Date(response.body[1].earnedAt).getTime()
-      );
-    });
-    
-    it('should return empty array when no achievements are earned', async () => {
-      const response = await auth.get('/api/achievements/earned');
-      
-      expect(response.status).toBe(200);
-      expect(response.body).toEqual([]);
     });
   });
   
@@ -188,7 +380,7 @@ describe('Achievement Controller Integration Tests', () => {
       const achievement = await createTestAchievement();
       
       // Create initial progress
-      await createUserAchievementProgress(auth.user._id, achievement._id, { progress: 50 });
+      await createTestUserAchievement(auth.user._id, achievement._id, { progress: 50 });
       
       // Update progress
       const response = await auth.post('/api/achievements/check', {
@@ -356,7 +548,7 @@ describe('Achievement Controller Integration Tests', () => {
       const achievement = await createTestAchievement();
       
       // Create some user progress for this achievement
-      await createUserAchievementProgress(auth.user._id, achievement._id, { progress: 50 });
+      await createTestUserAchievement(auth.user._id, achievement._id, { progress: 50 });
       
       // Delete the achievement
       const response = await auth.delete(`/api/achievements/${achievement._id}`);

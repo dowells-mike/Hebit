@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { User, Task, Habit, Goal, Category, ProductivityMetrics } from '../../src/models';
+import { User, Task, Habit, Goal, Category, ProductivityMetrics, Achievement, UserAchievement } from '../../src/models';
 import jwt from 'jsonwebtoken';
 
 // Helper to create test users
@@ -153,4 +153,48 @@ export const createTestProductivityMetrics = async (userId: mongoose.Types.Objec
 
   const metrics = await ProductivityMetrics.create(metricsData);
   return metrics;
+};
+
+// Helper to create a test achievement
+export const createTestAchievement = async (customData = {}) => {
+  const achievementData = {
+    name: `Test Achievement ${Date.now()}`,
+    description: 'Test Description',
+    category: 'tasks',
+    points: 10,
+    icon: 'test_icon.png',
+    criteria: {
+      type: 'count',
+      source: 'tasks',
+      targetValue: 5,
+      conditionDetails: {
+        entityType: 'task',
+      },
+    },
+    rarity: 'common',
+    secret: false,
+    ...customData,
+  };
+
+  const achievement = await Achievement.create(achievementData);
+  return achievement;
+};
+
+// Helper to create a test user achievement
+export const createTestUserAchievement = async (
+  userId: mongoose.Types.ObjectId | string,
+  achievementId: mongoose.Types.ObjectId | string,
+  customData = {}
+) => {
+  const userAchievementData = {
+    user: userId,
+    achievement: achievementId,
+    progress: 0,
+    earned: false,
+    seenByUser: false,
+    ...customData,
+  };
+
+  const userAchievement = await UserAchievement.create(userAchievementData);
+  return userAchievement;
 }; 
