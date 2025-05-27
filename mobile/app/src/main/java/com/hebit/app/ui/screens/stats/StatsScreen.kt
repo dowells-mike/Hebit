@@ -2,6 +2,7 @@ package com.hebit.app.ui.screens.stats
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -52,6 +53,11 @@ private enum class StatPeriod(val displayName: String, val queryParam: String) {
     // ALL_TIME("All Time", "all") // Can be added later
 }
 
+private enum class HistoryDisplayType(val displayName: String, val queryParam: String) {
+    DAILY("Daily", "daily"),
+    WEEKLY("Weekly", "weekly")
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StatsScreen(
@@ -59,13 +65,22 @@ fun StatsScreen(
 ) {
     val taskStatsState by viewModel.taskStatisticsState.collectAsState()
     val productivityScoreState by viewModel.productivityScoreState.collectAsState()
-    val scoreHistoryState by viewModel.scoreHistoryState.collectAsState() // Collect history state
+    val scoreHistoryState by viewModel.scoreHistoryState.collectAsState()
 
     var selectedPeriod by remember { mutableStateOf(StatPeriod.WEEK) }
 
-    // Fetch data when selectedPeriod changes
+    // States for score history chart controls
+    var selectedHistoryDisplayType by remember { mutableStateOf(HistoryDisplayType.DAILY) }
+    var selectedHistoryCount by remember { mutableStateOf(7) }
+
+    // Fetch main stats when selectedPeriod changes
     LaunchedEffect(selectedPeriod) {
         viewModel.refreshStats(period = selectedPeriod.queryParam)
+    }
+
+    // Fetch score history when its controls change
+    LaunchedEffect(selectedHistoryDisplayType, selectedHistoryCount) {
+        viewModel.fetchScoreHistory(selectedHistoryDisplayType.queryParam, selectedHistoryCount)
     }
 
     Scaffold(
@@ -75,28 +90,37 @@ fun StatsScreen(
             )
         }
     ) { paddingValues ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 16.dp), // Add some bottom padding
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(bottom = 16.dp)
         ) {
-            PeriodSelector(selectedPeriod = selectedPeriod) {
-                selectedPeriod = it
+            item {
+                PeriodSelector(selectedPeriod = selectedPeriod) {
+                    selectedPeriod = it
+                }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            item {
+                ProductivityScoreSection(productivityScoreState)
+            }
 
-            ProductivityScoreSection(productivityScoreState)
+            item {
+                TaskStatisticsSection(taskStatsState)
+            }
 
-            Spacer(modifier = Modifier.height(16.dp)) // Consistent spacing
-
-            TaskStatisticsSection(taskStatsState)
-
-            Spacer(modifier = Modifier.height(16.dp))
-            ScoreHistoryChartSection(scoreHistoryState) // Add history chart section
+            item {
+                ScoreHistoryChartSection(
+                    historyState = scoreHistoryState,
+                    selectedDisplayType = selectedHistoryDisplayType,
+                    selectedCount = selectedHistoryCount,
+                    onDisplayTypeSelected = { selectedHistoryDisplayType = it },
+                    onCountSelected = { selectedHistoryCount = it }
+                )
+            }
         }
     }
 }
@@ -110,15 +134,14 @@ private fun PeriodSelector(
     val periods = StatPeriod.values().toList()
     LazyRow(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp,
-        Alignment.CenterHorizontally)
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
     ) {
         items(periods) { period ->
             FilterChip(
                 selected = period == selectedPeriod,
                 onClick = { onPeriodSelected(period) },
                 label = { Text(period.displayName) },
-                modifier = Modifier.height(40.dp) // Ensure chips are a decent size
+                modifier = Modifier.height(40.dp)
             )
         }
     }
@@ -277,7 +300,7 @@ fun BreakdownItem(label: String, completed: Int, created: Int, rate: Int) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 8.dp, top = 2.dp, bottom = 2.dp), // Indent breakdown items slightly
+            .padding(start = 8.dp, top = 2.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text("$label:", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(0.4f))
@@ -286,9 +309,15 @@ fun BreakdownItem(label: String, completed: Int, created: Int, rate: Int) {
     }
 }
 
-@OptIn(ExperimentalTextApi::class)
+@OptIn(ExperimentalTextApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun ScoreHistoryChartSection(historyState: Resource<ScoreHistoryResponseDto>) {
+private fun ScoreHistoryChartSection(
+    historyState: Resource<ScoreHistoryResponseDto>,
+    selectedDisplayType: HistoryDisplayType,
+    selectedCount: Int,
+    onDisplayTypeSelected: (HistoryDisplayType) -> Unit,
+    onCountSelected: (Int) -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -299,39 +328,103 @@ fun ScoreHistoryChartSection(historyState: Resource<ScoreHistoryResponseDto>) {
                 .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            val unitName = if (selectedDisplayType == HistoryDisplayType.DAILY) "Day" else "Week"
             Text(
-                "Score History (Last 7 Days)", // Title can be dynamic later
+                "Score History (Last $selectedCount $unitName${if (selectedCount > 1) "s" else ""})",
                 style = MaterialTheme.typography.titleLarge
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+            HistoryPeriodSelector(
+                selectedDisplayType = selectedDisplayType,
+                selectedCount = selectedCount,
+                onDisplayTypeSelected = onDisplayTypeSelected,
+                onCountSelected = onCountSelected
+            )
+            Spacer(modifier = Modifier.height(24.dp))
 
             when (historyState) {
                 is Resource.Loading -> {
-                    CircularProgressIndicator(modifier = Modifier.padding(vertical = 24.dp))
+                    CircularProgressIndicator(modifier = Modifier.padding(vertical = 32.dp))
                 }
                 is Resource.Success -> {
                     historyState.data?.let {
                         if (it.history.isNotEmpty()) {
-                            SimpleBarChart(it.history)
+                            SimpleBarChart(it.history, displayType = selectedDisplayType)
                         } else {
-                            Text("No score history available.")
+                            Text("No score history available.", modifier = Modifier.padding(vertical = 32.dp))
                         }
-                    } ?: Text("No score history data.")
+                    } ?: Text("No score history data.", modifier = Modifier.padding(vertical = 32.dp))
                 }
                 is Resource.Error -> {
-                    Icon(Icons.Filled.ErrorOutline, contentDescription = "Error Icon", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(32.dp))
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "Error loading score history",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                    Text(
-                        historyState.message ?: "Unknown error",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = 32.dp)) {
+                        Icon(Icons.Filled.ErrorOutline, contentDescription = "Error Icon", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(32.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Error loading score history",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Text(
+                            historyState.message ?: "Unknown error",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HistoryPeriodSelector(
+    selectedDisplayType: HistoryDisplayType,
+    selectedCount: Int,
+    onDisplayTypeSelected: (HistoryDisplayType) -> Unit,
+    onCountSelected: (Int) -> Unit
+) {
+    val displayTypes = HistoryDisplayType.values().toList()
+    val countOptionsDaily = listOf(7, 14, 30)
+    val countOptionsWeekly = listOf(4, 8, 12, 26)
+    val currentCountOptions = if (selectedDisplayType == HistoryDisplayType.DAILY) countOptionsDaily else countOptionsWeekly
+    val unitName = if (selectedDisplayType == HistoryDisplayType.DAILY) "Day" else "Week"
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+        // Selector for Daily/Weekly
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
+        ) {
+            displayTypes.forEach { type ->
+                FilterChip(
+                    selected = type == selectedDisplayType,
+                    onClick = { 
+                        onDisplayTypeSelected(type)
+                        // Reset count to a default if it's not valid for the new type
+                        val newDefaultCount = if (type == HistoryDisplayType.DAILY) countOptionsDaily.first() else countOptionsWeekly.first()
+                        if (!currentCountOptions.contains(selectedCount) || (type == HistoryDisplayType.DAILY && !countOptionsDaily.contains(selectedCount)) || (type == HistoryDisplayType.WEEKLY && !countOptionsWeekly.contains(selectedCount))) {
+                             onCountSelected(newDefaultCount)
+                        }
+                    },
+                    label = { Text(type.displayName) }
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+        // Selector for Count
+        Text("Show last:", style = MaterialTheme.typography.labelMedium)
+        Spacer(modifier = Modifier.height(8.dp))
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
+        ) {
+            items(currentCountOptions) { count ->
+                FilterChip(
+                    selected = count == selectedCount,
+                    onClick = { onCountSelected(count) },
+                    label = { Text("$count $unitName${if (count > 1) "s" else ""}") }
+                )
             }
         }
     }
@@ -339,9 +432,10 @@ fun ScoreHistoryChartSection(historyState: Resource<ScoreHistoryResponseDto>) {
 
 @OptIn(ExperimentalTextApi::class)
 @Composable
-fun SimpleBarChart(
+private fun SimpleBarChart(
     historyItems: List<ScoreHistoryItemDto>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    displayType: HistoryDisplayType
 ) {
     val barColor = MaterialTheme.colorScheme.primary
     val axisLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -351,14 +445,13 @@ fun SimpleBarChart(
     val maxScore = historyItems.maxOfOrNull { it.score }?.toFloat() ?: 0f
     val minScore = 0f // Assuming score doesn't go below 0
 
-    // Define chart dimensions and padding
-    val chartHeight = 150.dp
+    // Define chart dimensions and padding - Much larger chart
+    val chartHeight = 300.dp // Increased significantly from 200.dp
     val barWidthRatio = 0.6f // Bar takes 60% of available space per item
-    val xAxisLabelHeight = 30.dp // Space for X-axis labels
-    val yAxisLabelWidth = 30.dp // Space for Y-axis labels
+    val xAxisLabelHeight = 40.dp // More space for X-axis labels
+    val yAxisLabelWidth = 40.dp // More space for Y-axis labels
 
     val yAxisLabelValues = if (maxScore > 0) listOf(0, (maxScore/2).toInt(), maxScore.toInt()) else listOf(0)
-
 
     Box(modifier = modifier.height(chartHeight + xAxisLabelHeight).fillMaxWidth()) {
         Canvas(modifier = Modifier.fillMaxSize()) { 
@@ -374,7 +467,7 @@ fun SimpleBarChart(
                     textMeasurer = textMeasurer,
                     text = value.toString(),
                     topLeft = Offset(0f, yPos - 8.sp.toPx()/2), // Center text vertically
-                    style = TextStyle(fontSize = 10.sp, color = axisLabelColor)
+                    style = TextStyle(fontSize = 12.sp, color = axisLabelColor)
                 )
                 // Optional: Draw horizontal grid lines
                 drawLine(
@@ -397,19 +490,30 @@ fun SimpleBarChart(
                     size = Size(actualBarWidth, barHeight)
                 )
 
-                // X-axis labels (e.g., day of month or short day name)
-                try {
-                    val date = LocalDate.parse(item.date)
-                    val dayLabel = date.dayOfMonth.toString()
-                    // val dayNameLabel = date.dayOfWeek.getDisplayName(JavaTextStyle.SHORT, Locale.getDefault())
-                     drawText(
-                        textMeasurer = textMeasurer,
-                        text = dayLabel,
-                        topLeft = Offset(xPosition + actualBarWidth / 2 - textMeasurer.measure(dayLabel).size.width/2 , chartAreaHeight + 4.dp.toPx()),
-                        style = TextStyle(fontSize = 10.sp, color = axisLabelColor)
-                    )
-                } catch (e: Exception) { // Catch parsing errors for date
-                    // Optionally draw a placeholder or skip
+                // Determine label step based on number of items
+                val labelStep = when {
+                    historyItems.size > 20 -> 3 // Show label every 3rd item for many items
+                    historyItems.size > 10 -> 2 // Show label every 2nd item for medium items
+                    else -> 1 // Show all labels for few items
+                }
+
+                if (index % labelStep == 0) {
+                    try {
+                        val date = LocalDate.parse(item.date)
+                        val dayLabel = if (displayType == HistoryDisplayType.WEEKLY) {
+                            date.format(DateTimeFormatter.ofPattern("M/d"))
+                        } else {
+                            date.dayOfMonth.toString()
+                        }
+                        
+                        val textLayoutResult = textMeasurer.measure(dayLabel, style = TextStyle(fontSize = 12.sp, color = axisLabelColor))
+                        drawText(
+                            textLayoutResult = textLayoutResult,
+                            topLeft = Offset(xPosition + actualBarWidth / 2 - textLayoutResult.size.width / 2 , chartAreaHeight + 8.dp.toPx())
+                        )
+                    } catch (e: Exception) { // Catch parsing errors for date
+                        // Optionally draw a placeholder or skip
+                    }
                 }
             }
         }
