@@ -40,6 +40,12 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.*
+import com.hebit.app.data.remote.dto.TaskSuggestionDto
+import androidx.compose.material.icons.outlined.Lightbulb
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
@@ -56,6 +62,7 @@ fun DashboardScreen(
     onTaskDetailClick: (String) -> Unit = {},
     onHabitDetailClick: (String) -> Unit = {},
     onGoalDetailClick: (String) -> Unit = {},
+    dashboardViewModel: DashboardViewModel = hiltViewModel(),
     taskViewModel: TaskViewModel = hiltViewModel(),
     habitViewModel: HabitViewModel = hiltViewModel(),
     goalListViewModel: GoalListViewModel = hiltViewModel()
@@ -78,6 +85,7 @@ fun DashboardScreen(
     val priorityTasksState by taskViewModel.priorityTasksState.collectAsState()
     val todayHabitsState by habitViewModel.todayHabitsState.collectAsState()
     val goalsState = goalListViewModel.state.value
+    val taskSuggestionsState by dashboardViewModel.taskSuggestionsState.collectAsState()
     
     Scaffold(
         topBar = {
@@ -214,6 +222,20 @@ fun DashboardScreen(
                     color = MaterialTheme.colorScheme.secondary
                 )
             }
+            
+            // Task Suggestions Section
+            TaskSuggestionsSection(
+                suggestionsState = taskSuggestionsState,
+                onAddTaskClick = { suggestion ->
+                    android.util.Log.d("DashboardScreen", "Add task from suggestion: ${suggestion.title}")
+                },
+                onDismissClick = { suggestion ->
+                    android.util.Log.d("DashboardScreen", "Dismiss suggestion: ${suggestion.title}")
+                },
+                onRefreshSuggestions = {
+                    dashboardViewModel.fetchTaskSuggestions()
+                }
+            )
             
             Divider(modifier = Modifier.padding(horizontal = 16.dp))
             
@@ -899,6 +921,131 @@ fun DashboardShortcutButton(
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Medium
             )
+        }
+    }
+}
+
+@Composable
+fun TaskSuggestionsSection(
+    suggestionsState: Resource<List<TaskSuggestionDto>>,
+    onAddTaskClick: (TaskSuggestionDto) -> Unit,
+    onDismissClick: (TaskSuggestionDto) -> Unit,
+    onRefreshSuggestions: () -> Unit
+) {
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Quick Suggestions",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+            IconButton(onClick = onRefreshSuggestions) {
+                Icon(Icons.Default.Refresh, contentDescription = "Refresh Suggestions")
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+
+        when (suggestionsState) {
+            is Resource.Loading -> {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+            }
+            is Resource.Success -> {
+                val suggestions = suggestionsState.data
+                if (suggestions.isNullOrEmpty()) {
+                    Text(
+                        text = "No suggestions at the moment. Check back later!",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        suggestions.take(3).forEach { suggestion ->
+                            TaskSuggestionCard(suggestion, onAddTaskClick, onDismissClick)
+                        }
+                    }
+                }
+            }
+            is Resource.Error -> {
+                Text(
+                    text = suggestionsState.message ?: "Error loading suggestions.",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+                Button(onClick = onRefreshSuggestions, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                    Text("Try Again")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TaskSuggestionCard(
+    suggestion: TaskSuggestionDto,
+    onAddTaskClick: (TaskSuggestionDto) -> Unit,
+    onDismissClick: (TaskSuggestionDto) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Outlined.Lightbulb,
+                    contentDescription = "Suggestion",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = suggestion.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            if (suggestion.description != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = suggestion.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            suggestion.defaultCategoryName?.let {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Category: $it",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = { onDismissClick(suggestion) }) {
+                    Text("Dismiss")
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(onClick = { onAddTaskClick(suggestion) }) {
+                    Icon(Icons.Default.Add, contentDescription = "Add Task", modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Add Task")
+                }
+            }
         }
     }
 }

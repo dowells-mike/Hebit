@@ -28,6 +28,7 @@ import com.hebit.app.data.remote.dto.ReminderDto
 import com.hebit.app.data.remote.dto.TaskStatisticsResponseDto
 import com.hebit.app.data.remote.dto.ProductivityScoreResponseDto
 import com.hebit.app.data.remote.dto.ScoreHistoryResponseDto
+import com.hebit.app.data.remote.dto.TaskSuggestionDto
 
 @Singleton
 class TaskRepositoryImpl @Inject constructor(
@@ -580,6 +581,30 @@ class TaskRepositoryImpl @Inject constructor(
         } catch (e: Exception) {
             Log.e("TaskRepositoryImpl", "getScoreHistory Exception: ${e.localizedMessage}", e)
             emit(Resource.Error("Unexpected error: ${e.localizedMessage ?: "An error occurred"}"))
+        }
+    }
+
+    // Task Suggestions
+    override suspend fun getTaskSuggestions(): Flow<Resource<List<TaskSuggestionDto>>> = flow {
+        emit(Resource.Loading())
+        try {
+            val response = apiService.getTaskSuggestions()
+            if (response.isSuccessful && response.body() != null) {
+                emit(Resource.Success(response.body()!!))
+            } else {
+                val errorMessage = response.errorBody()?.string() ?: "Unknown error fetching suggestions"
+                Log.e("TaskRepositoryImpl", "Error getTaskSuggestions: $errorMessage (Code: ${response.code()})")
+                emit(Resource.Error(errorMessage))
+            }
+        } catch (e: HttpException) {
+            Log.e("TaskRepositoryImpl", "HttpException getTaskSuggestions: ${e.message()}", e)
+            emit(Resource.Error("Server error fetching suggestions: ${e.message()}"))
+        } catch (e: IOException) {
+            Log.e("TaskRepositoryImpl", "IOException getTaskSuggestions: ${e.localizedMessage}", e)
+            emit(Resource.Error("Network error fetching suggestions: ${e.localizedMessage ?: "Check connection"}"))
+        } catch (e: Exception) {
+            Log.e("TaskRepositoryImpl", "Exception getTaskSuggestions: ${e.localizedMessage}", e)
+            emit(Resource.Error("Unexpected error fetching suggestions: ${e.localizedMessage ?: "Unknown error"}"))
         }
     }
 } 

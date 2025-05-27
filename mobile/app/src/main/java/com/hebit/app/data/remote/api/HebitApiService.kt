@@ -202,6 +202,10 @@ interface HebitApiService {
         @Query("count") count: Int? = null // Number of periods
     ): Response<ScoreHistoryResponseDto>
 
+    // Task Suggestion Endpoints
+    @GET("suggestions/tasks")
+    suspend fun getTaskSuggestions(): Response<List<TaskSuggestionDto>>
+
     // Define internal data classes for specific responses if not already defined
     // Ensure TaskListResponse is defined if used by getPriorityTasks/getTasksDueToday
     data class TaskListResponse(val tasks: List<TaskDto>) // Example if not defined in dto package

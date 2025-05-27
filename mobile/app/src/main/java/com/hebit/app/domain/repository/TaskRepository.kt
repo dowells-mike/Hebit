@@ -8,6 +8,7 @@ import com.hebit.app.domain.model.TaskStatus
 import com.hebit.app.data.remote.dto.TaskStatisticsResponseDto
 import com.hebit.app.data.remote.dto.ProductivityScoreResponseDto
 import com.hebit.app.data.remote.dto.ScoreHistoryResponseDto
+import com.hebit.app.data.remote.dto.TaskSuggestionDto
 
 interface TaskRepository {
     suspend fun getTasks(): Flow<Resource<List<Task>>>
@@ -44,4 +45,7 @@ interface TaskRepository {
         periodType: String? = null,
         count: Int? = null
     ): Flow<Resource<ScoreHistoryResponseDto>>
+
+    // Task Suggestions
+    suspend fun getTaskSuggestions(): Flow<Resource<List<TaskSuggestionDto>>>
 } 
