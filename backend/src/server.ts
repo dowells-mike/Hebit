@@ -4,6 +4,9 @@ import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import { errorHandler } from './middleware/errorHandler';
 
+// Import services that need to be initialized (e.g., for event listeners)
+import './services/achievementService'; // This will run the constructor and set up listeners
+
 // Routes
 import authRoutes from './routes/auth';
 import taskRoutes from './routes/tasks';

@@ -17,6 +17,16 @@ const habitSchema = new Schema<HabitDocument>(
       type: String,
       trim: true
     },
+    icon: {
+      type: String
+    },
+    color: {
+      type: String
+    },
+    goalLink: {
+      type: Schema.Types.ObjectId,
+      ref: 'Goal'
+    },
     frequency: {
       type: String,
       enum: ['daily', 'weekly', 'monthly'],

@@ -26,6 +26,10 @@ const userAchievementSchema = new Schema<UserAchievementDocument>(
     },
     earnedAt: {
       type: Date
+    },
+    seenByUser: {
+      type: Boolean,
+      default: false
     }
   },
   {

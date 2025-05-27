@@ -31,23 +31,40 @@ const achievementSchema = new Schema<AchievementDocument>(
     criteria: {
       type: {
         type: String,
-        enum: ['count', 'streak', 'time', 'complex'],
+        enum: ['count', 'streak', 'completion_time', 'multi_condition', 'event_based', 'complex'],
         required: true
       },
-      target: {
-        type: Number,
-        required: true,
-        min: 1
-      },
-      criteria: {
+      source: {
         type: String,
+        enum: ['tasks', 'habits', 'goals', 'user_activity', 'app_usage']
+      },
+      targetValue: {
+        type: Schema.Types.Mixed,
         required: true
+      },
+      conditionDetails: {
+        entityType: {
+          type: String,
+          enum: ['task', 'habit', 'goal']
+        },
+        entityName: String,
+        relatedEntityId: String,
+        timeOperator: {
+          type: String,
+          enum: ['before', 'after']
+        },
+        timeString: String,
+        eventName: String
       }
     },
     rarity: {
       type: String,
       enum: ['common', 'rare', 'epic', 'legendary'],
       default: 'common'
+    },
+    secret: {
+      type: Boolean,
+      default: false
     }
   },
   {

@@ -21,6 +21,7 @@ router.route('/:id')
   .delete(habitController.deleteHabit);
 
 router.put('/:id/track', habitController.trackHabit);
+router.post('/:id/skip', habitController.skipHabit);
 router.get('/:id/stats', habitController.getHabitStats);
 
 export default router;

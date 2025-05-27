@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { catchAsync, AppError } from '../middleware/errorHandler';
 import { Goal, ProductivityMetrics } from '../models';
 import { AuthRequest, GoalDocument } from '../types';
+import eventEmitter from '../services/eventEmitter';
 
 /**
  * @desc    Get all goals for a user
@@ -212,6 +213,7 @@ export const updateProgress = catchAsync(async (req: AuthRequest, res: Response)
     throw new AppError('Progress must be between 0 and 100', 400);
   }
   
+  // Fetch goal as a Mongoose document (type inference should handle it)
   const goal = await Goal.findOne({ _id: goalId, user: userId }).exec();
   
   if (!goal) {
@@ -239,37 +241,14 @@ export const updateProgress = catchAsync(async (req: AuthRequest, res: Response)
     goal.checkIns.push(checkIn);
   }
   
-  // Update status based on progress
-  if (progress === 100 && goal.status !== 'completed') {
-    goal.status = 'completed';
-    const completedAt = new Date();
-    
-    // Update productivity metrics for goal completion
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    await ProductivityMetrics.findOneAndUpdate(
-      { user: userId, date: today },
-      { $inc: { goalsCompleted: 1 } },
-      { upsert: true, new: true }
-    );
-    
-    // Record completion context for ML using the metadata object
-    if (!goal.metadata) {
-      goal.metadata = {};
-    }
-    
-    // Track completion times and patterns
-    goal.set('metadata.timeToComplete', completedAt.getTime() - goal.createdAt.getTime());
-    goal.set('metadata.completionHour', completedAt.getHours());
-    goal.set('metadata.completionDay', completedAt.getDay());
-    
-  } else if (progress > 0 && progress < 100) {
+  // Ensure status is updated if progress is < 100 and goal wasn't already completed
+  if (progress < 100 && goal.status !== 'in_progress' && goal.status !== 'completed') {
     goal.status = 'in_progress';
+  } else if (progress === 0 && goal.status !== 'not_started' && goal.status !== 'completed') {
+    goal.status = 'not_started';
   }
   
   await goal.save();
-  
   res.status(200).json(goal);
 });
 
@@ -329,6 +308,7 @@ export const updateMilestone = catchAsync(async (req: AuthRequest, res: Response
   
   const { title, description, dueDate, completed } = req.body;
   
+  // Fetch goal as a Mongoose document
   const goal = await Goal.findOne({ _id: goalId, user: userId }).exec();
   
   if (!goal) {
@@ -363,26 +343,31 @@ export const updateMilestone = catchAsync(async (req: AuthRequest, res: Response
     }
   }
   
-  await goal.save();
-  
-  // Recalculate goal progress based on milestones
+  await goal.save(); // Save after direct milestone updates first
+
   if (goal.milestones && goal.milestones.length > 0) {
     const completedMilestones = goal.milestones.filter(m => m.completed).length;
     const newProgress = Math.round((completedMilestones / goal.milestones.length) * 100);
     
-    // Only update if different from current progress
+    let progressOrStatusChanged = false;
+
     if (newProgress !== goal.progress) {
-      // Update progress directly rather than calling updateProgress again
       goal.progress = newProgress;
+      progressOrStatusChanged = true;
       
-      // Update status based on progress
-      if (newProgress === 100 && goal.status !== 'completed') {
-        goal.status = 'completed';
-      } else if (newProgress > 0 && newProgress < 100) {
+      // Simplified status update based on new progress, if not 100
+      if (newProgress < 100 && goal.status !== 'in_progress' && goal.status !== 'completed') {
         goal.status = 'in_progress';
+        progressOrStatusChanged = true;
+      } else if (newProgress === 0 && goal.status !== 'not_started' && goal.status !== 'completed') {
+        goal.status = 'not_started';
+        progressOrStatusChanged = true;
       }
-      
-      await goal.save();
+    }
+
+    // Save if progress or status changed
+    if (progressOrStatusChanged) { // Save if progress changed or status was updated
+        await goal.save();
     }
   }
   

@@ -5,6 +5,7 @@ import { AuthRequest, TaskDocument } from '../types';
 import * as mlService from '../services/mlService';
 import { calculateUpcomingOccurrences } from '../utils/recurrenceUtils';
 import { HydratedDocument } from 'mongoose';
+import eventEmitter from '../services/eventEmitter';
 
 /**
  * @desc    Get all tasks for a user
@@ -302,9 +303,11 @@ export const updateTask = catchAsync(async (req: AuthRequest, res: Response) => 
     taskMetadata.lastModifiedField = firstNonRecurrenceOrReminderChange;
   }
   
-  if (updates.completed === true && !task.completed) { // Check for true explicitly
+  let taskWasJustCompleted = false;
+  if (updates.completed === true && !task.completed) {
     updates.completedAt = new Date();
-    updates.status = 'completed'; // Ensure status aligns
+    updates.status = 'completed';
+    taskWasJustCompleted = true;
     
     try {
       if (userId) {
@@ -322,9 +325,9 @@ export const updateTask = catchAsync(async (req: AuthRequest, res: Response) => 
       { $inc: { tasksCompleted: 1 } },
       { upsert: true, new: true }
     );
-  } else if (updates.completed === false && task.completed) { // Task marked as incomplete
-      updates.completedAt = null; // Clear completion date
-      updates.status = 'todo'; // Reset status or to 'in_progress' if applicable
+  } else if (updates.completed === false && task.completed) {
+      updates.completedAt = null;
+      updates.status = 'todo';
   }
   
   // Assign the consolidated metadata to updates
@@ -336,6 +339,25 @@ export const updateTask = catchAsync(async (req: AuthRequest, res: Response) => 
     // unless specifically intended. If schema has default for metadata, this might not be needed.
     // Or, explicitly set updates.metadata = undefined; if Mongoose handles unsetting fields that way.
     // For now, if taskMetadata is empty, we won't assign it unless original metadata existed.
+  }
+
+  // Emit TASK_COMPLETED event if it was just completed
+  if (taskWasJustCompleted) {
+    // Construct a rich payload. The final task state isn't available until after save,
+    // so we use the current task object and apply confirmed updates like completedAt.
+    eventEmitter.emit('TASK_COMPLETED', {
+      userId: task.user.toString(),
+      taskId: task._id.toString(),
+      taskTitle: updates.title || task.title,
+      completedAt: updates.completedAt,
+      category: updates.category || task.category,
+      priority: updates.priority || task.priority,
+      tags: updates.tags || task.tags,
+      effort: updates.effort || task.effort,
+      complexity: updates.complexity || task.complexity,
+      description: updates.description || task.description,
+      dueDate: updates.dueDate || task.dueDate,
+    });
   }
 
   console.log("Constructed updates object before Mongoose call:", JSON.stringify(updates, null, 2));
@@ -446,7 +468,7 @@ export const toggleTaskCompletion = catchAsync(async (req: AuthRequest, res: Res
     status: newCompletionState ? 'completed' : 'todo'
   };
   
-  // If completing, add completion metadata
+  // If completing, add completion metadata and emit event
   if (newCompletionState) {
     // Mark as completed
     updates.completedAt = new Date();
@@ -460,6 +482,23 @@ export const toggleTaskCompletion = catchAsync(async (req: AuthRequest, res: Res
       }
     };
     
+    // Emit TASK_COMPLETED event
+    eventEmitter.emit('TASK_COMPLETED', {
+        userId: task.user.toString(),
+        taskId: task._id.toString(),
+        taskTitle: task.title,
+        completedAt: updates.completedAt, // Use the just-set completedAt
+        category: task.category,
+        priority: task.priority,
+        tags: task.tags,
+        effort: task.effort,
+        complexity: task.complexity,
+        description: task.description,
+        dueDate: task.dueDate,
+        // parentTaskId: task.parentTaskId, // if needed
+    });
+    // console.log(`Event TASK_COMPLETED emitted for task ${task._id} via toggle`);
+
     // Update productivity metrics
     const today = new Date();
     today.setHours(0, 0, 0, 0);

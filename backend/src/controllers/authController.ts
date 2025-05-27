@@ -5,6 +5,7 @@ import { catchAsync, AppError } from '../middleware/errorHandler';
 import { User } from '../models';
 import { AuthRequest } from '../types';
 import config from '../config/config';
+import eventEmitter from '../services/eventEmitter';
 
 // Generate access token
 const generateAccessToken = (userId: string): string => {
@@ -71,6 +72,16 @@ export const register = catchAsync(async (req: Request, res: Response) => {
     },
     lastLogin: new Date()
   });
+
+  // Emit USER_SIGNUP event
+  if (user) {
+    eventEmitter.emit('USER_SIGNUP', {
+      userId: user._id.toString(),
+      username: user.username, 
+      email: user.email
+    });
+    // console.log(`Event USER_SIGNUP emitted for user ${user._id}`);
+  }
 
   // Generate tokens
   const accessToken = generateAccessToken(user._id.toString());

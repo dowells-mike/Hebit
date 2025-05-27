@@ -1,7 +1,57 @@
 import { Response } from 'express';
 import { catchAsync, AppError } from '../middleware/errorHandler';
 import { Achievement, UserAchievement } from '../models';
-import { AuthRequest } from '../types';
+import { AuthRequest, AchievementDocument, UserAchievementDocument } from '../types';
+
+/**
+ * @desc    Get all defined achievements (public view)
+ * @route   GET /api/achievements
+ * @access  Public (or Private if all achievements are sensitive)
+ */
+export const getAllPublicAchievements = catchAsync(async (req: AuthRequest, res: Response) => {
+  // For now, return non-secret achievements. 
+  // Or, if this is an admin endpoint, return all.
+  const achievements = await Achievement.find({ secret: { $ne: true } }).lean();
+  res.status(200).json(achievements);
+});
+
+/**
+ * @desc    Get all achievements for the authenticated user (earned and in-progress)
+ * @route   GET /api/achievements/my
+ * @access  Private
+ */
+export const getMyAchievements = catchAsync(async (req: AuthRequest, res: Response) => {
+  const userId = req.user?._id;
+  if (!userId) {
+    throw new AppError('User not authenticated', 401);
+  }
+
+  const allAchievements = await Achievement.find().lean() as AchievementDocument[];
+  const userAchievements = await UserAchievement.find({ user: userId }).lean() as UserAchievementDocument[];
+
+  const userAchievementsMap = new Map<string, UserAchievementDocument>();
+  userAchievements.forEach(ua => userAchievementsMap.set(ua.achievement.toString(), ua));
+
+  const myAchievementsData = allAchievements.map(ach => {
+    const userAchInstance = userAchievementsMap.get(ach._id.toString());
+
+    // If an achievement is secret and not yet earned (or no UserAchievement record exists), skip it.
+    if (ach.secret && (!userAchInstance || !userAchInstance.earned)) {
+      return null; 
+    }
+
+    return {
+      ...ach, // Spread all properties of AchievementDocument
+      userProgress: userAchInstance?.progress ?? 0,
+      earned: userAchInstance?.earned ?? false,
+      earnedAt: userAchInstance?.earnedAt ?? null,
+      seenByUser: userAchInstance?.seenByUser ?? false, // Default to false if no UserAchievement
+      userAchievementId: userAchInstance?._id?.toString() ?? null // ID of the UserAchievement document
+    };
+  }).filter(ach => ach !== null); // Filter out nulls (skipped secret achievements)
+
+  res.status(200).json(myAchievementsData);
+});
 
 /**
  * @desc    Get all achievements
@@ -225,4 +275,48 @@ export const deleteAchievement = catchAsync(async (req: AuthRequest, res: Respon
   await UserAchievement.deleteMany({ achievement: achievementId });
   
   res.status(200).json({ success: true });
+});
+
+/**
+ * @desc    Mark a user achievement as seen
+ * @route   POST /api/achievements/my/:userAchievementId/seen
+ * @access  Private
+ */
+export const markUserAchievementAsSeen = catchAsync(async (req: AuthRequest, res: Response) => {
+  const userId = req.user?._id;
+  const { userAchievementId } = req.params;
+
+  if (!userId) {
+    throw new AppError('User not authenticated', 401);
+  }
+
+  if (!userAchievementId) {
+    throw new AppError('UserAchievement ID is required', 400);
+  }
+
+  const userAchievement = await UserAchievement.findById(userAchievementId);
+
+  if (!userAchievement) {
+    throw new AppError('User achievement record not found', 404);
+  }
+
+  // Ensure the achievement record belongs to the authenticated user
+  if (userAchievement.user.toString() !== userId.toString()) {
+    throw new AppError('Not authorized to update this achievement record', 403);
+  }
+
+  if (userAchievement.seenByUser) {
+    // Optionally, return the record as is if already seen, or a specific message
+    return res.status(200).json(userAchievement); // Already seen, no change
+  }
+
+  userAchievement.seenByUser = true;
+  userAchievement.updatedAt = new Date(); // Manually update timestamp if not automatically handled by Mongoose on this specific field update path
+  
+  await userAchievement.save();
+
+  // Optionally, populate the achievement details before sending back
+  // For consistency, could return the same structure as getMyAchievements for a single item
+  // However, for a simple POST to mark as seen, returning the updated UserAchievement is often sufficient.
+  res.status(200).json(userAchievement);
 }); 

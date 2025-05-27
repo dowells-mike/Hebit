@@ -118,6 +118,10 @@ const userSchema = new Schema<UserDocument>(
     lastLogin: {
       type: Date,
       default: Date.now
+    },
+    experiencePoints: {
+      type: Number,
+      default: 0
     }
   },
   {

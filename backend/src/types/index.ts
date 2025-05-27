@@ -44,6 +44,7 @@ export interface UserDocument {
   };
   isAdmin: boolean;
   lastLogin: Date;
+  experiencePoints?: number; // Added for gamification
   comparePassword(enteredPassword: string): Promise<boolean>;
   createdAt: Date;
   updatedAt: Date;
@@ -101,12 +102,11 @@ export interface HabitDocument {
   user: string;
   title: string;
   description?: string;
-  frequency: 'daily' | 'weekly' | 'monthly';
-  frequencyConfig?: {              // More detailed frequency
-    daysOfWeek?: number[];         // 0-6 for weekly
-    datesOfMonth?: number[];       // 1-31 for monthly
-    timesPerPeriod?: number;       // How many times in period
-  };
+  icon?: string;
+  color?: string;
+  goalLink?: string;
+  frequency: 'daily' | 'weekly' | 'monthly' | 'specific_dates';
+  frequencyConfig?: HabitFrequencyConfig;
   timeOfDay?: string;              // Kept for backward compatibility
   daysOfWeek?: number[];           // Kept for backward compatibility
   timePreference?: {               // When to do habit
@@ -153,6 +153,13 @@ export interface HabitDocument {
   };
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface HabitFrequencyConfig {
+  daysOfWeek?: number[];         // 0-6 for weekly
+  datesOfMonth?: number[];       // 1-31 for monthly, -1 for last day
+  timesPerPeriod?: number;       // How many times in period
+  specificDates?: (string | Date)[]; // For 'specific_dates' frequency
 }
 
 export interface GoalDocument {
@@ -251,21 +258,33 @@ export interface AchievementDocument {
   points: number;
   icon: string;
   criteria: {
-    type: 'count' | 'streak' | 'time' | 'complex';
-    target: number;
-    criteria: string;           // JSON or string criteria definition
+    type: 'count' | 'streak' | 'completion_time' | 'multi_condition' | 'event_based' | 'complex';
+    source?: 'tasks' | 'habits' | 'goals' | 'user_activity' | 'app_usage';
+    targetValue: number | string;
+    conditionDetails?: {
+      entityType?: 'task' | 'habit' | 'goal';
+      entityName?: string;
+      relatedEntityId?: string;
+      timeOperator?: 'before' | 'after';
+      timeString?: string;
+      eventName?: string;
+      [key: string]: any;
+    };
   };
   rarity: 'common' | 'rare' | 'epic' | 'legendary';
+  secret?: boolean;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface UserAchievementDocument {
   _id: string;
   user: string;
-  achievement: string;          // Reference to achievement ID
-  progress: number;             // Progress towards achievement (0-100)
+  achievement: string;
+  progress: number;
   earned: boolean;
   earnedAt?: Date;
+  seenByUser?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
