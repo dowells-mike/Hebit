@@ -129,23 +129,32 @@ fun TaskCreationScreen(
     onSaveTask: (TaskCreationData) -> Unit = {},
     viewModel: TaskViewModel = hiltViewModel(),
     categoryViewModel: CategoryViewModel = hiltViewModel(),
-    onNavigateToCreateCategory: () -> Unit
+    onNavigateToCreateCategory: () -> Unit,
+    initialTitle: String? = null,
+    initialDescription: String? = null,
+    initialCategoryName: String? = null
 ) {
     val context = LocalContext.current
     
-    var taskTitle by remember { mutableStateOf("") }
-    var taskDescription by remember { mutableStateOf("") }
+    var taskTitle by remember { 
+        mutableStateOf(if (!isEditMode && initialTitle != null) initialTitle else "") 
+    }
+    var taskDescription by remember { 
+        mutableStateOf(if (!isEditMode && initialDescription != null) initialDescription else "") 
+    }
     var selectedDate by remember { mutableStateOf<LocalDate?>(LocalDate.now()) }
     var selectedTime by remember { mutableStateOf<LocalTime?>(LocalTime.of(14, 0)) }
     var selectedPriority by remember { mutableStateOf(TaskPriority.MEDIUM) }
     
-    // State for categories
     val categoriesResource by categoryViewModel.categoriesState.collectAsState()
     var availableCategories by remember { mutableStateOf<List<Category>>(emptyList()) }
-    // Initialize selectedCategoryName from existing task if in edit mode, else a default.
-    // selectedCategoryObject will be derived.
+    
     var selectedCategoryName by remember { 
-        mutableStateOf(if (isEditMode) "" else "Uncategorized") // Default to Uncategorized for new tasks
+        mutableStateOf(
+            if (!isEditMode && initialCategoryName != null) initialCategoryName 
+            else if (isEditMode) "" // Will be populated by LaunchedEffect for edit mode
+            else "Uncategorized" // Default for new tasks without initial value
+        )
     }
     var selectedCategoryObject by remember { mutableStateOf<Category?>(null) }
 
@@ -153,21 +162,17 @@ fun TaskCreationScreen(
     var showTimePicker by remember { mutableStateOf(false) }
     var showCategoryPicker by remember { mutableStateOf(false) }
     
-    // Define these state variables before they're used
     var showRecurrenceOptions by remember { mutableStateOf(false) }
     var recurrencePattern by remember { mutableStateOf(RecurrencePattern()) }
     
-    // Subtasks - using the existing mutableStateListOf
     val currentSubtasks = remember { mutableStateListOf<SubTask>() }
     var newSubtaskTitle by remember { mutableStateOf("") }
     
-    // Reminder states
     var showReminderDialog by remember { mutableStateOf(false) }
     var reminders by remember { mutableStateOf<List<Reminder>>(emptyList()) }
-    var showAddEditReminderDialog by remember { mutableStateOf(false) } // New state for Add/Edit dialog
-    var editingReminder by remember { mutableStateOf<Reminder?>(null) } // To hold reminder being edited, or null for new
+    var showAddEditReminderDialog by remember { mutableStateOf(false) }
+    var editingReminder by remember { mutableStateOf<Reminder?>(null) }
     
-    // Permission states
     var hasNotificationPermission by remember { 
         mutableStateOf(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -181,23 +186,20 @@ fun TaskCreationScreen(
         ) 
     }
     
-    // Load task data if in edit mode
     LaunchedEffect(taskId) {
         if (isEditMode && taskId.isNotBlank()) {
             viewModel.getTaskById(taskId)
         }
     }
     
-    // Observe task data
     val taskState by viewModel.selectedTaskState.collectAsState()
     
-    // Update UI with task data if in edit mode
     LaunchedEffect(taskState) {
         if (isEditMode && taskState is Resource.Success) {
             val task = (taskState as? Resource.Success)?.data
             if (task != null) {
                 taskTitle = task.title
-                taskDescription = task.description ?: "" // Ensure not null
+                taskDescription = task.description ?: ""
                 selectedDate = task.dueDateTime?.toLocalDate()
                 selectedTime = task.dueDateTime?.toLocalTime()
                 selectedPriority = when (task.priority) {
@@ -207,22 +209,19 @@ fun TaskCreationScreen(
                     else -> TaskPriority.MEDIUM
                 }
                 selectedCategoryName = task.category ?: "Uncategorized"
-                // selectedCategoryObject will be updated by another LaunchedEffect based on availableCategories
-                
                 recurrencePattern = parseRRuleStringToPattern(task.recurrenceRuleString)
-                
-                // Load reminders from the new field
                 reminders = task.reminders ?: emptyList()
-
-                // Load subtasks from metadata
                 val subtasksString = task.metadata["subtasks"] as? String
                 currentSubtasks.clear()
-                currentSubtasks.addAll(parseSubtasks(subtasksString)) // parseSubtasks is expected to handle null input gracefully
+                currentSubtasks.addAll(parseSubtasks(subtasksString))
             }
+        } else if (!isEditMode) {
+            // If NOT in edit mode, ensure initial values (already set in remember) are respected.
+            // Additional logic can go here if needed when not in edit mode but after taskState might change (e.g. after a failed save attempt etc.)
+            // For now, the remember blocks handle initial population for non-edit mode.
         }
     }
     
-    // Permission launcher
     val requestPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
         onResult = { isGranted ->
@@ -230,14 +229,12 @@ fun TaskCreationScreen(
         }
     )
     
-    // Text formatting options
     var isBold by remember { mutableStateOf(false) }
     var isItalic by remember { mutableStateOf(false) }
     var isBulletList by remember { mutableStateOf(false) }
     var isNumberedList by remember { mutableStateOf(false) }
     
-    // Update availableCategories and selectedCategoryObject when categoriesResource changes
-    LaunchedEffect(categoriesResource, selectedCategoryName, isEditMode) { // Added isEditMode to dependencies
+    LaunchedEffect(categoriesResource, selectedCategoryName, isEditMode) {
         Log.d("TaskCreationScreen", "Categories LaunchedEffect triggered. categoriesResource: $categoriesResource")
         if (categoriesResource is Resource.Success) {
             val cats = (categoriesResource as Resource.Success<List<Category>>).data
@@ -245,23 +242,20 @@ fun TaskCreationScreen(
             availableCategories = cats ?: emptyList()
 
             if (isEditMode) {
-                if (selectedCategoryName.isNotEmpty()) { // Task data has a category name
+                if (selectedCategoryName.isNotEmpty()) {
                     val foundCat = availableCategories.find { it.name == selectedCategoryName }
                     if (foundCat != null) {
                         selectedCategoryObject = foundCat
                     } else {
-                        // Category name from task not found in available list (e.g., deleted)
                         selectedCategoryObject = null
-                        selectedCategoryName = "Uncategorized" // Or keep the old name and show an error/warning
+                        selectedCategoryName = "Uncategorized"
                     }
                 } else {
-                    // Task data has no category name, treat as Uncategorized
                     selectedCategoryObject = null
                     selectedCategoryName = "Uncategorized"
                 }
-            } else { // Not in edit mode (new task)
+            } else {
                 if (selectedCategoryName != "Uncategorized" && selectedCategoryObject == null) {
-                    // User might have picked a category, then it got deleted before save - try to re-find
                     val foundCat = availableCategories.find { it.name == selectedCategoryName }
                     if (foundCat != null) {
                         selectedCategoryObject = foundCat
@@ -270,10 +264,8 @@ fun TaskCreationScreen(
                         selectedCategoryName = "Uncategorized"
                     }
                 } else if (selectedCategoryObject != null) {
-                    // User has picked a category, ensure name is consistent
                     selectedCategoryName = selectedCategoryObject!!.name
                 } else {
-                    // New task, no interaction yet, remains Uncategorized
                     selectedCategoryName = "Uncategorized"
                     selectedCategoryObject = null
                 }
@@ -282,25 +274,20 @@ fun TaskCreationScreen(
             Log.e("TaskCreationScreen", "Categories Resource.Error: ${(categoriesResource as Resource.Error).message}")
             availableCategories = emptyList()
             selectedCategoryObject = null
-            // selectedCategoryName will retain its current value (e.g., from edit mode, or "Uncategorized")
-            // Or, force to "Uncategorized" if an error occurs during new task creation:
             if (!isEditMode) {
                  selectedCategoryName = "Uncategorized"
             }
         } else if (categoriesResource is Resource.Loading) {
             Log.d("TaskCreationScreen", "Categories Resource.Loading")
-            // Potentially do nothing or set a loading state for availableCategories if needed elsewhere
         }
         Log.d("TaskCreationScreen", "End of Categories LaunchedEffect. availableCategories: ${availableCategories.size}")
     }
     
-    // For date picker
     val datePickerState = rememberDatePickerState(
         initialSelectedDateMillis = selectedDate?.toEpochDay()?.let { it * 24 * 60 * 60 * 1000 } 
             ?: (LocalDate.now().toEpochDay() * 24 * 60 * 60 * 1000)
     )
     
-    // Time picker handler
     fun showTimePickerDialog() {
         val currentTime = selectedTime ?: LocalTime.now()
         TimePickerDialog(
@@ -314,11 +301,9 @@ fun TaskCreationScreen(
         ).show()
     }
     
-    // Observe category suggestions from ViewModel
     val categorySuggestions by viewModel.categorySuggestions.collectAsState()
     var showSuggestions by remember { mutableStateOf(false) }
     
-    // Add this effect to reload categories when the category picker is opened
     LaunchedEffect(showCategoryPicker) {
         if (showCategoryPicker) {
             Log.d("TaskCreationScreen", "Category picker opened - explicitly reloading categories")
@@ -383,15 +368,13 @@ fun TaskCreationScreen(
         ) {
             Spacer(modifier = Modifier.height(8.dp))
             
-            // Task title input - required
             OutlinedTextField(
                 value = taskTitle,
                 onValueChange = { 
-                    if (it.length <= 255) { // Add character limit
+                    if (it.length <= 255) {
                     taskTitle = it
                     }
                     
-                    // Add this to trigger category suggestions when title changes
                     viewModel.suggestCategories(taskTitle, taskDescription)
                     if (taskTitle.length >= 3) {
                         showSuggestions = true
@@ -408,7 +391,6 @@ fun TaskCreationScreen(
             
             Divider()
             
-            // Text formatting options
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -462,7 +444,6 @@ fun TaskCreationScreen(
             
             Divider()
             
-            // Description input - optional
             OutlinedTextField(
                 value = taskDescription,
                 onValueChange = { taskDescription = it },
@@ -479,7 +460,6 @@ fun TaskCreationScreen(
             
             Divider()
             
-            // Date & Time pickers
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -526,7 +506,6 @@ fun TaskCreationScreen(
             
             Divider()
             
-            // Priority selection
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -540,7 +519,6 @@ fun TaskCreationScreen(
                 
                 Spacer(modifier = Modifier.width(16.dp))
                 
-                // Low priority button
                 FilterChip(
                     selected = selectedPriority == TaskPriority.LOW,
                     onClick = { selectedPriority = TaskPriority.LOW },
@@ -556,7 +534,6 @@ fun TaskCreationScreen(
                 
                 Spacer(modifier = Modifier.width(8.dp))
                 
-                // Medium priority button
                 FilterChip(
                     selected = selectedPriority == TaskPriority.MEDIUM,
                     onClick = { selectedPriority = TaskPriority.MEDIUM },
@@ -572,7 +549,6 @@ fun TaskCreationScreen(
                 
                 Spacer(modifier = Modifier.width(8.dp))
                 
-                // High priority button
                 FilterChip(
                     selected = selectedPriority == TaskPriority.HIGH,
                     onClick = { selectedPriority = TaskPriority.HIGH },
@@ -589,7 +565,6 @@ fun TaskCreationScreen(
             
             Divider()
             
-            // Category selection
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -616,7 +591,7 @@ fun TaskCreationScreen(
                 Spacer(modifier = Modifier.weight(1f))
                 
                 Text(
-                    text = selectedCategoryName, // Display selected category name
+                    text = selectedCategoryName,
                     style = MaterialTheme.typography.bodyMedium
                 )
                 
@@ -628,7 +603,6 @@ fun TaskCreationScreen(
                 )
             }
             
-            // Show category suggestions if available and title has enough characters
             if (showSuggestions && categorySuggestions.isNotEmpty()) {
                 Card(
                     modifier = Modifier
@@ -676,7 +650,6 @@ fun TaskCreationScreen(
                                 
                                 Spacer(modifier = Modifier.weight(1f))
                                 
-                                // Show confidence as percentage
                                 Text(
                                     text = "${(suggestion.confidence * 100).toInt()}%",
                                     style = MaterialTheme.typography.bodySmall,
@@ -697,7 +670,6 @@ fun TaskCreationScreen(
             
             Divider()
             
-            // Recurrence settings
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -721,7 +693,7 @@ fun TaskCreationScreen(
                 Spacer(modifier = Modifier.weight(1f))
                 
                 Text(
-                    text = formatRecurrencePattern(recurrencePattern), // Use the new formatter
+                    text = formatRecurrencePattern(recurrencePattern),
                     style = MaterialTheme.typography.bodyMedium
                 )
                 
@@ -735,13 +707,11 @@ fun TaskCreationScreen(
             
             Divider()
             
-            // Reminder section
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 16.dp)
                     .clickable {
-                        // Request notification permission if needed before showing reminder options
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotificationPermission) {
                             requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                         } else {
@@ -750,7 +720,7 @@ fun TaskCreationScreen(
                     },
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                            Icon(
+                Icon(
                     imageVector = Icons.Outlined.Notifications,
                     contentDescription = "Reminders",
                     tint = MaterialTheme.colorScheme.primary
@@ -775,14 +745,12 @@ fun TaskCreationScreen(
             }
             Divider()
             
-            // Subtasks section
             Text(
                 "Subtasks",
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
             )
             
-            // Display existing subtasks
             if (currentSubtasks.isNotEmpty()) {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     currentSubtasks.forEachIndexed { index, subtask ->
@@ -809,9 +777,9 @@ fun TaskCreationScreen(
                                 modifier = Modifier.size(24.dp)
                             ) {
                         Icon(
-                                    imageVector = Icons.Default.RemoveCircleOutline, // Changed icon
+                                    imageVector = Icons.Default.RemoveCircleOutline,
                                     contentDescription = "Remove Subtask",
-                                    modifier = Modifier.size(20.dp) // Adjusted size
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
                         }
@@ -822,7 +790,6 @@ fun TaskCreationScreen(
                 }
             }
 
-            // Input field to add new subtask
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -836,26 +803,23 @@ fun TaskCreationScreen(
                     label = { Text("New subtask...") },
                     modifier = Modifier.weight(1f),
                     singleLine = true,
-                    // leadingIcon = { Icon(Icons.Default.PlaylistAddCheck, contentDescription = null) }
                 )
                 Button(
                     onClick = {
                         if (newSubtaskTitle.isNotBlank()) {
                             currentSubtasks.add(SubTask(title = newSubtaskTitle))
-                            newSubtaskTitle = "" // Clear input field
+                            newSubtaskTitle = ""
                 }
                     },
                     enabled = newSubtaskTitle.isNotBlank(),
-                    modifier = Modifier.height(56.dp) // Match OutlinedTextField height
+                    modifier = Modifier.height(56.dp)
                 ) {
                     Icon(Icons.Default.Add, contentDescription = "Add Subtask")
                 }
             }
-            // End of Subtasks Section ---
             
             HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
             
-            // Recurrence Options Dialog
             if (showRecurrenceOptions) {
                 var tempRecurrenceType by remember { mutableStateOf(recurrencePattern.type) }
                 var tempInterval by remember { mutableStateOf(recurrencePattern.interval.toString()) }
@@ -863,24 +827,20 @@ fun TaskCreationScreen(
                 var showEndDatePicker by remember { mutableStateOf(false) }
                 var tempDaysOfWeek by remember { mutableStateOf(recurrencePattern.daysOfWeek.toMutableStateList()) }
 
-                // Date validator for the recurrence end date picker state
                 val recurrenceEndDateValidator = { utcDateMillis: Long ->
                     val selectedInstant = java.time.Instant.ofEpochMilli(utcDateMillis)
                     val selectedLocalDate = selectedInstant.atZone(ZoneId.systemDefault()).toLocalDate()
-                    // Use task's main selectedDate as the earliest possible start for recurrence end date
-                    // or today if selectedDate is null.
                     val taskStartDate = selectedDate ?: LocalDate.now() 
-                    selectedLocalDate.isAfter(taskStartDate.minusDays(1)) // Allow recurrence to end on the same day it starts
+                    selectedLocalDate.isAfter(taskStartDate.minusDays(1))
                 }
 
                 val recurrenceEndDatePickerState = rememberDatePickerState(
                     initialSelectedDateMillis = tempEndDate?.toEpochDay()?.let { it * 24 * 60 * 60 * 1000L },
-                    yearRange = IntRange(LocalDate.now().year, LocalDate.now().year + 100), // Optional: restrict year range
+                    yearRange = IntRange(LocalDate.now().year, LocalDate.now().year + 100),
                     selectableDates = object : SelectableDates {
                         override fun isSelectableDate(utcTimeMillis: Long): Boolean {
                             return recurrenceEndDateValidator(utcTimeMillis)
                         }
-                        // You might also want to override isSelectableYear if needed, though yearRange often suffices
                     }
                 )
         
@@ -891,7 +851,6 @@ fun TaskCreationScreen(
                 Column(
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    // Recurrence type options
                     Text("Repeat", style = MaterialTheme.typography.bodyLarge)
                     Spacer(modifier = Modifier.height(8.dp))
                     
@@ -929,7 +888,6 @@ fun TaskCreationScreen(
                         }
                     }
                     
-                    // Show interval settings if a recurrence type is selected
                     if (tempRecurrenceType != RecurrenceType.NONE) {
                         Spacer(modifier = Modifier.height(16.dp))
                         Text("Repeat every", style = MaterialTheme.typography.bodyLarge)
@@ -938,7 +896,6 @@ fun TaskCreationScreen(
                 OutlinedTextField(
                             value = tempInterval,
                             onValueChange = { 
-                                // Only allow numeric input
                                 if (it.isEmpty() || it.all { char -> char.isDigit() }) {
                                     tempInterval = it
                                 }
@@ -959,7 +916,6 @@ fun TaskCreationScreen(
                 )
                     }
 
-                            // End Date Picker
                             Spacer(modifier = Modifier.height(16.dp))
                             Text("Ends", style = MaterialTheme.typography.bodyLarge)
                             Spacer(modifier = Modifier.height(8.dp))
@@ -978,20 +934,18 @@ fun TaskCreationScreen(
                                 )
                             }
 
-                            // Days of Week Picker (only for Weekly recurrence)
                             if (tempRecurrenceType == RecurrenceType.WEEKLY) {
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Text("Repeat on", style = MaterialTheme.typography.bodyLarge)
                                 Spacer(modifier = Modifier.height(8.dp))
-                                // Changed from Row to LazyRow for horizontal scrolling
                                 LazyRow(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp) // Adds a small space between chips
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     val days = listOf("Mo", "Tu", "We", "Th", "Fr", "Sa", "Su")
-                                    items(days.size) { index -> // Use items(count) for LazyRow
+                                    items(days.size) { index ->
                                         val dayLabel = days[index]
-                                        val dayNumber = index + 1 // 1 for Monday, ..., 7 for Sunday
+                                        val dayNumber = index + 1
                                         val isSelected = tempDaysOfWeek.contains(dayNumber)
                                         FilterChip(
                                             selected = isSelected,
@@ -1013,19 +967,14 @@ fun TaskCreationScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                                // Validate that at least one day is selected for weekly recurrence
                                 if (tempRecurrenceType == RecurrenceType.WEEKLY && tempDaysOfWeek.isEmpty()) {
-                                    // Optionally show a toast or error message to the user
-                                    // For now, just defaulting to not saving or reverting type to NONE
-                                    // This behavior might need refinement (e.g. prevent dialog close)
                                     Log.w("TaskCreationScreen", "Weekly recurrence selected but no days chosen.")
-                                    // Potentially set tempRecurrenceType = RecurrenceType.NONE here or handle error
                                 }
                         recurrencePattern = RecurrencePattern(
                             type = tempRecurrenceType,
                                     interval = tempInterval.toIntOrNull() ?: 1,
                                     endDate = tempEndDate,
-                                    daysOfWeek = tempDaysOfWeek.toList().sorted() // Save sorted list
+                                    daysOfWeek = tempDaysOfWeek.toList().sorted()
                         )
                         showRecurrenceOptions = false
                     }
@@ -1039,7 +988,6 @@ fun TaskCreationScreen(
                 }
             }
         )
-                // Moved Date Picker Dialog for Recurrence End Date INSIDE the if (showRecurrenceOptions) block
                 if (showEndDatePicker) {
                     DatePickerDialog(
                         onDismissRequest = { showEndDatePicker = false },
@@ -1047,7 +995,7 @@ fun TaskCreationScreen(
                             Button(
                                 onClick = {
                                     recurrenceEndDatePickerState.selectedDateMillis?.let { millis ->
-                                        tempEndDate = LocalDate.ofEpochDay(millis / (24 * 60 * 60 * 1000L)) // Added L for Long
+                                        tempEndDate = LocalDate.ofEpochDay(millis / (24 * 60 * 60 * 1000L))
                                     }
                                     showEndDatePicker = false
                                 }
@@ -1059,7 +1007,7 @@ fun TaskCreationScreen(
                             Row {
                                 TextButton(
                                     onClick = { 
-                                        tempEndDate = null // Clear the end date
+                                        tempEndDate = null
                                         showEndDatePicker = false 
                                     }
                                 ) {
@@ -1081,10 +1029,9 @@ fun TaskCreationScreen(
                 }
             }
 
-            // Bottom buttons
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
                     .padding(vertical = 16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -1121,7 +1068,7 @@ fun TaskCreationScreen(
                             Log.d("TaskCreationScreen", "Creating new task with data: Title - ${taskData.title}, RRULE - ${taskData.rruleString}, Reminders: ${taskData.reminders?.size}")
                             onSaveTask(taskData)
                         }
-                        onDismiss() // Close the dialog/screen
+                        onDismiss()
                     },
                     enabled = taskTitle.isNotBlank(),
                             modifier = Modifier
@@ -1134,7 +1081,6 @@ fun TaskCreationScreen(
         }
     }
     
-    // Handle time picker dialog
     LaunchedEffect(showTimePicker) {
         if (showTimePicker) {
             showTimePickerDialog()
@@ -1142,14 +1088,12 @@ fun TaskCreationScreen(
         }
     }
     
-    // Date Picker Dialog
     if (showDatePicker) {
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = { 
                 Button(
                     onClick = { 
-                        // Extract the selected date from state
                         datePickerState.selectedDateMillis?.let { millis ->
                             selectedDate = LocalDate.ofEpochDay(millis / (24 * 60 * 60 * 1000))
                         }
@@ -1163,8 +1107,8 @@ fun TaskCreationScreen(
                 Row {
                     TextButton(
                         onClick = { 
-                            selectedDate = null // Clear the date
-                            selectedTime = null // Also clear the time
+                            selectedDate = null
+                            selectedTime = null
                             showDatePicker = false 
                         }
                     ) {
@@ -1191,7 +1135,6 @@ fun TaskCreationScreen(
         }
     }
     
-    // Category Picker Dialog/Dropdown
     if (showCategoryPicker) {
         AlertDialog(
             onDismissRequest = { showCategoryPicker = false },
@@ -1200,7 +1143,7 @@ fun TaskCreationScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) { 
                     if (categoriesResource is Resource.Loading) {
                         CircularProgressIndicator(modifier = Modifier.padding(16.dp))
-                    } else { // Handles both empty and non-empty states for categories
+                    } else {
                         LazyColumn {
                             items(availableCategories) { category ->
                                 ListItem(
@@ -1218,7 +1161,7 @@ fun TaskCreationScreen(
                                                     color = try {
                                                         Color(android.graphics.Color.parseColor(category.color))
                                                     } catch (e: IllegalArgumentException) {
-                                                        MaterialTheme.colorScheme.primary // Fallback color
+                                                        MaterialTheme.colorScheme.primary
                                                     },
                                                     shape = CircleShape
                                                 )
@@ -1231,7 +1174,6 @@ fun TaskCreationScreen(
                                     }
                                 )
                             }
-                            // Always show "Create New Category" at the end of the list
                             item {
                                 Divider(modifier = Modifier.padding(vertical = 8.dp))
                                 ListItem(
@@ -1262,8 +1204,6 @@ fun TaskCreationScreen(
                 }
             },
             dismissButton = {
-                // Optional: Only show cancel if you want a different action from "Done" when no selection is made.
-                // Otherwise, "Done" can also act as dismiss.
                 TextButton(onClick = { showCategoryPicker = false }) {
                     Text("Cancel")
                 }
@@ -1277,7 +1217,6 @@ fun TaskCreationScreen(
             onAddReminder = {
                 editingReminder = null 
                 showAddEditReminderDialog = true
-                // showReminderDialog = false // Keep ReminderListDialog open in the background for now
             },
             onDeleteReminder = { reminderToDelete ->
                 reminders = reminders.filterNot { it == reminderToDelete }
@@ -1288,26 +1227,25 @@ fun TaskCreationScreen(
 
     if (showAddEditReminderDialog) {
         AddEditReminderDialog(
-            initialReminder = editingReminder, // Pass current reminder for editing, or null for new
-            taskDueDate = selectedDate, // Pass the task's due date for context
+            initialReminder = editingReminder,
+            taskDueDate = selectedDate,
             onSave = { reminder ->
-                if (editingReminder == null) { // Adding new reminder
+                if (editingReminder == null) {
                     reminders = reminders + reminder
-                } else { // Updating existing reminder
+                } else {
                     reminders = reminders.map { if (it == editingReminder) reminder else it }
                 }
                 showAddEditReminderDialog = false
-                editingReminder = null // Reset editing state
+                editingReminder = null
             },
             onDismiss = {
                 showAddEditReminderDialog = false
-                editingReminder = null // Reset editing state
+                editingReminder = null
             }
         )
     }
 }
 
-// Simple FlowRow implementation
 @Composable
 fun FlowRow(
     modifier: Modifier = Modifier,
@@ -1329,10 +1267,8 @@ fun FlowRow(
         val rowHeights = mutableListOf<Int>()
         val itemPositions = mutableListOf<Pair<Int, Int>>()
         
-        // Calculate positions
         placeables.forEach { placeable ->
             if (xPosition + placeable.width > constraints.maxWidth) {
-                // Move to next row
                 rowWidths.add(xPosition)
                 rowHeights.add(rowHeight)
                 yPosition += rowHeight
@@ -1341,21 +1277,18 @@ fun FlowRow(
             }
             
             itemPositions.add(Pair(xPosition, yPosition))
-            xPosition += placeable.width + 8  // 8dp spacing
+            xPosition += placeable.width + 8
             rowHeight = maxOf(rowHeight, placeable.height)
         }
         
-        // Add the last row
         if (xPosition > 0) {
             rowWidths.add(xPosition)
             rowHeights.add(rowHeight)
         }
         
-        // Set the size of the layout
         val width = rowWidths.maxOfOrNull { it } ?: 0
         val height = yPosition + rowHeight
         
-        // Position elements
         layout(width, height) {
             placeables.forEachIndexed { index, placeable ->
                 val (x, y) = itemPositions[index]
@@ -1364,8 +1297,6 @@ fun FlowRow(
         }
     }
 }
-
-// Utility functions have been moved to TaskUtils.kt to avoid duplicates
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1389,7 +1320,6 @@ fun ReminderListDialog(
                 } else {
                     LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
                         items(reminders) { reminder ->
-                            // TODO: Create formatReminderItem(reminder: Reminder) for better display
                             val reminderText = when (reminder.type) {
                                 ReminderType.RELATIVE -> "${reminder.offsetMinutes?.let { Math.abs(it) }} minutes before"
                                 ReminderType.ABSOLUTE -> reminder.absoluteDateTime?.format(DateTimeFormatter.ofPattern("MMM d, h:mm a")) ?: "Specific time"
@@ -1424,19 +1354,17 @@ fun ReminderListDialog(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEditReminderDialog(
-    initialReminder: Reminder? = null, // Pass existing reminder for editing, null for new
-    taskDueDate: LocalDate?, // Needed for context if setting absolute reminder relative to due date initially
+    initialReminder: Reminder? = null,
+    taskDueDate: LocalDate?,
     onSave: (Reminder) -> Unit,
     onDismiss: () -> Unit
 ) {
     var selectedType by remember { mutableStateOf(initialReminder?.type ?: ReminderType.RELATIVE) }
     
-    // For RELATIVE type
     var offsetMinutesString by remember { 
         mutableStateOf(initialReminder?.offsetMinutes?.let { Math.abs(it) }?.toString() ?: "15") 
     }
 
-    // For ABSOLUTE type
     val initialAbsoluteDateTime = initialReminder?.absoluteDateTime ?: taskDueDate?.atTime(LocalTime.now().hour, LocalTime.now().minute)
     var absoluteDate by remember { mutableStateOf(initialAbsoluteDateTime?.toLocalDate()) }
     var absoluteTime by remember { mutableStateOf(initialAbsoluteDateTime?.toLocalTime()) }
@@ -1445,7 +1373,6 @@ fun AddEditReminderDialog(
     var showTimePicker by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
-    // DatePickerState for the ABSOLUTE reminder date
     val absoluteDatePickerState = rememberDatePickerState(
         initialSelectedDateMillis = absoluteDate?.atStartOfDay(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
     )
@@ -1455,7 +1382,6 @@ fun AddEditReminderDialog(
         title = { Text(if (initialReminder == null) "Add Reminder" else "Edit Reminder") },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                // Type Selector (Relative vs Absolute)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     listOf(ReminderType.RELATIVE, ReminderType.ABSOLUTE).forEach { type ->
                         Row(
@@ -1490,7 +1416,6 @@ fun AddEditReminderDialog(
                         )
                     }
                     ReminderType.ABSOLUTE -> {
-                        // Date Picker
                         Text("Specific Date & Time", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom=8.dp))
                         Button(
                             onClick = { showDatePicker = true }, 
@@ -1518,7 +1443,6 @@ fun AddEditReminderDialog(
                             }
                         }
                         Spacer(Modifier.height(8.dp))
-                        // Time Picker
                         Button(
                             onClick = { showTimePicker = true }, 
                             modifier = Modifier.fillMaxWidth(),
@@ -1545,18 +1469,17 @@ fun AddEditReminderDialog(
                     val reminder = when (selectedType) {
                         ReminderType.RELATIVE -> {
                             val offset = offsetMinutesString.toIntOrNull() ?: 15
-                            Reminder(type = ReminderType.RELATIVE, offsetMinutes = -offset) // Negative for "before"
+                            Reminder(type = ReminderType.RELATIVE, offsetMinutes = -offset)
                         }
                         ReminderType.ABSOLUTE -> {
                             if (absoluteDate != null && absoluteTime != null) {
                                 Reminder(type = ReminderType.ABSOLUTE, absoluteDateTime = LocalDateTime.of(absoluteDate, absoluteTime))
-                            } else null // Invalid absolute reminder if date or time is missing
+                            } else null
                         }
                     }
                     reminder?.let { onSave(it) }
                     onDismiss()
                 },
-                // Enable save only if data is valid
                 enabled = when(selectedType) {
                     ReminderType.RELATIVE -> offsetMinutesString.isNotBlank() && offsetMinutesString.toIntOrNull() != null
                     ReminderType.ABSOLUTE -> absoluteDate != null && absoluteTime != null
@@ -1588,21 +1511,13 @@ fun TimePickerDialog(
         },
         calendar.get(Calendar.HOUR_OF_DAY),
         calendar.get(Calendar.MINUTE),
-        false // Use 24-hour format or not, false for AM/PM
+        false
     )
     
     timePickerDialog.setOnDismissListener { 
         onDismiss()
     }
-    // Ensure the dialog is shown. 
-    // We need to manage its visibility from where it's called (using showTimePicker state).
-    // This composable's role is to configure and provide the dialog instance.
-    // A LaunchedEffect in the caller can show it.
-    // However, for simplicity in this direct usage, we might just show it directly if this composable is invoked.
-    // Let's reconsider: the AddEditReminderDialog already has `if (showTimePicker ...)`
-    // So this composable should just be the dialog itself.
-    // We need to make sure it's shown when this composable enters the composition.
-    LaunchedEffect(Unit) { // Show when composable enters the composition
+    LaunchedEffect(Unit) {
         timePickerDialog.show()
     }
 }

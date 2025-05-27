@@ -46,6 +46,10 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.navigation.NavController
+import com.hebit.app.ui.navigation.Routes
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
@@ -55,13 +59,13 @@ fun DashboardScreen(
     onHabitsClick: () -> Unit,
     onGoalsClick: () -> Unit,
     onSettingsClick: () -> Unit,
-    onQuickActionsClick: () -> Unit = {},
     onProgressStatsClick: () -> Unit = {},
     onProductivityClick: () -> Unit = {},
     onAchievementsClick: () -> Unit = {},
     onTaskDetailClick: (String) -> Unit = {},
     onHabitDetailClick: (String) -> Unit = {},
     onGoalDetailClick: (String) -> Unit = {},
+    navController: NavController,
     dashboardViewModel: DashboardViewModel = hiltViewModel(),
     taskViewModel: TaskViewModel = hiltViewModel(),
     habitViewModel: HabitViewModel = hiltViewModel(),
@@ -85,7 +89,7 @@ fun DashboardScreen(
     val priorityTasksState by taskViewModel.priorityTasksState.collectAsState()
     val todayHabitsState by habitViewModel.todayHabitsState.collectAsState()
     val goalsState = goalListViewModel.state.value
-    val taskSuggestionsState by dashboardViewModel.taskSuggestionsState.collectAsState()
+    val displayedTaskSuggestionsState by dashboardViewModel.displayedTaskSuggestionsState.collectAsState()
     
     Scaffold(
         topBar = {
@@ -94,10 +98,6 @@ fun DashboardScreen(
                 actions = {
                     IconButton(onClick = { onProgressStatsClick() }) {
                         Icon(Icons.Default.BarChart, contentDescription = "Stats")
-                    }
-                    
-                    IconButton(onClick = { onQuickActionsClick() }) {
-                        Icon(Icons.Default.Speed, contentDescription = "Quick Actions")
                     }
                     
                     IconButton(onClick = { onProductivityClick() }) {
@@ -170,12 +170,12 @@ fun DashboardScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Date and Weather Section
+            // Date Section (Weather Removed)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.Start, // Changed from SpaceBetween
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
@@ -184,19 +184,19 @@ fun DashboardScreen(
                     fontWeight = FontWeight.Bold
                 )
                 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Cloud,
-                        contentDescription = "Weather",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "23°",
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                // Row(verticalAlignment = Alignment.CenterVertically) { // Weather display removed
+                //     Icon(
+                //         imageVector = Icons.Default.Cloud,
+                //         contentDescription = "Weather",
+                //         tint = MaterialTheme.colorScheme.primary
+                //     )
+                //     Spacer(modifier = Modifier.width(4.dp))
+                //     Text(
+                //         text = "23°",
+                //         style = MaterialTheme.typography.bodyLarge,
+                //         fontWeight = FontWeight.Bold
+                //     )
+                // }
             }
             
             // New Productivity and Achievements shortcuts
@@ -225,12 +225,24 @@ fun DashboardScreen(
             
             // Task Suggestions Section
             TaskSuggestionsSection(
-                suggestionsState = taskSuggestionsState,
+                suggestionsState = displayedTaskSuggestionsState,
                 onAddTaskClick = { suggestion ->
                     android.util.Log.d("DashboardScreen", "Add task from suggestion: ${suggestion.title}")
+                    val encodedTitle = URLEncoder.encode(suggestion.title, StandardCharsets.UTF_8.name())
+                    var route = "${Routes.TASK_CREATE}?title=$encodedTitle"
+                    suggestion.description?.let {
+                        val encodedDescription = URLEncoder.encode(it, StandardCharsets.UTF_8.name())
+                        route += "&description=$encodedDescription"
+                    }
+                    suggestion.defaultCategoryName?.let {
+                        val encodedCategoryName = URLEncoder.encode(it, StandardCharsets.UTF_8.name())
+                        route += "&categoryName=$encodedCategoryName"
+                    }
+                    navController.navigate(route)
                 },
                 onDismissClick = { suggestion ->
-                    android.util.Log.d("DashboardScreen", "Dismiss suggestion: ${suggestion.title}")
+                    android.util.Log.d("DashboardScreen", "Dismiss suggestion: ${suggestion.title} (ID: ${suggestion.id})")
+                    dashboardViewModel.dismissSuggestion(suggestion.id)
                 },
                 onRefreshSuggestions = {
                     dashboardViewModel.fetchTaskSuggestions()
@@ -309,7 +321,7 @@ fun DashboardScreen(
                 )
             }
             
-            // Quick Links Section
+            // Quick Links Section (Modified to remove Quick Actions card)
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Text(
                     text = "Quick Links",
@@ -320,23 +332,23 @@ fun DashboardScreen(
                 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    horizontalArrangement = Arrangement.spacedBy(16.dp) // Will just be one item now
                 ) {
                     QuickLinkCard(
                         title = "Progress Stats",
                         icon = Icons.Default.BarChart,
                         description = "View your productivity metrics",
                         onClick = onProgressStatsClick,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f) // This will now take full width if it's the only one
                     )
                     
-                    QuickLinkCard(
-                        title = "Quick Actions",
-                        icon = Icons.Default.Speed,
-                        description = "Access common tasks faster",
-                        onClick = onQuickActionsClick,
-                        modifier = Modifier.weight(1f)
-                    )
+                    // QuickLinkCard( // Removed Quick Actions card
+                    //     title = "Quick Actions",
+                    //     icon = Icons.Default.Speed,
+                    //     description = "Access common tasks faster",
+                    //     onClick = onQuickActionsClick,
+                    //     modifier = Modifier.weight(1f)
+                    // )
                 }
             }
             

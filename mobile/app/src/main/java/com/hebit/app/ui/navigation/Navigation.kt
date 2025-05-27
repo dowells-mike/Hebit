@@ -14,11 +14,9 @@ import com.hebit.app.ui.screens.achievements.AchievementScreen
 import com.hebit.app.ui.screens.auth.ForgotPasswordScreen
 import com.hebit.app.ui.screens.auth.LoginScreen
 import com.hebit.app.ui.screens.auth.RegisterScreen
-import com.hebit.app.ui.screens.auth.RegistrationScreen
 import com.hebit.app.ui.screens.auth.SplashScreen
 import com.hebit.app.ui.screens.dashboard.DashboardScreen
 import com.hebit.app.ui.screens.dashboard.ProgressStatsScreen
-import com.hebit.app.ui.screens.dashboard.QuickActionsScreen
 import com.hebit.app.ui.screens.habits.HabitListScreen
 import com.hebit.app.ui.screens.habits.HabitDetailScreen
 import com.hebit.app.ui.screens.habits.HabitStreakScreen
@@ -38,6 +36,9 @@ import com.hebit.app.ui.screens.categories.CategoryEditScreen
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.hebit.app.ui.screens.categories.CategoryListScreen
 import com.hebit.app.ui.screens.stats.StatsScreen
+import java.net.URLDecoder
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 /**
  * Main navigation routes for the app
@@ -51,7 +52,6 @@ object Routes {
     
     // Main app screens
     const val DASHBOARD = "dashboard"
-    const val QUICK_ACTIONS = "quick_actions"
     const val STATS_MAIN = "stats_main"
     const val TASKS = "tasks"
     const val TASK_DETAIL = "task_detail"
@@ -142,11 +142,11 @@ fun HebitNavigation(
         // Main app screens
         composable(Routes.DASHBOARD) {
             DashboardScreen(
+                navController = navController,
                 onTasksClick = { navController.navigate(Routes.TASKS) },
                 onHabitsClick = { navController.navigate(Routes.HABITS) },
                 onGoalsClick = { navController.navigate(Routes.GOALS) },
                 onSettingsClick = { navController.navigate(Routes.SETTINGS) },
-                onQuickActionsClick = { navController.navigate(Routes.QUICK_ACTIONS) },
                 onProgressStatsClick = { navController.navigate(Routes.STATS_MAIN) },
                 onProductivityClick = { navController.navigate(Routes.PRODUCTIVITY) },
                 onAchievementsClick = { navController.navigate(Routes.ACHIEVEMENTS) },
@@ -216,24 +216,51 @@ fun HebitNavigation(
             )
         }
         
-        // New route for creating a task (without edit mode)
-        composable(Routes.TASK_CREATE) {
+        // Updated route for creating a task with optional pre-fill parameters
+        composable(
+            route = Routes.TASK_CREATE + 
+                    "?title={title}" +
+                    "&description={description}" +
+                    "&categoryName={categoryName}",
+            arguments = listOf(
+                navArgument("title") { 
+                    type = NavType.StringType
+                    nullable = true 
+                    defaultValue = null
+                },
+                navArgument("description") { 
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+                navArgument("categoryName") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
             val taskViewModel = hiltViewModel<TaskViewModel>()
+            val initialTitle = backStackEntry.arguments?.getString("title")?.let { URLDecoder.decode(it, StandardCharsets.UTF_8.name()) }
+            val initialDescription = backStackEntry.arguments?.getString("description")?.let { URLDecoder.decode(it, StandardCharsets.UTF_8.name()) }
+            val initialCategoryName = backStackEntry.arguments?.getString("categoryName")?.let { URLDecoder.decode(it, StandardCharsets.UTF_8.name()) }
+
             TaskCreationScreen(
                 isEditMode = false,
                 onSaveComplete = { navController.navigateUp() },
                 onCancel = { navController.navigateUp() },
                 onDismiss = { navController.navigateUp() },
                 onSaveTask = { taskData ->
-                    // Create the task using the ViewModel we obtained from the composable context
                     taskViewModel.createTask(taskData)
                     navController.navigateUp()
                 },
                 onNavigateToCreateCategory = { 
-                    // Save the current backstack entry ID to return to task creation after category creation
                     navController.currentBackStackEntry?.savedStateHandle?.set("return_to_task_create", true)
                     navController.navigate(Routes.CATEGORY_EDIT)
-                }
+                },
+                initialTitle = initialTitle,
+                initialDescription = initialDescription,
+                initialCategoryName = initialCategoryName
             )
         }
         
@@ -357,25 +384,6 @@ fun HebitNavigation(
             )
         }
 
-        composable(Routes.QUICK_ACTIONS) {
-            QuickActionsScreen(
-                onNavigateBack = { navController.navigateUp() },
-                onHomeClick = { 
-                    navController.navigate(Routes.DASHBOARD) {
-                        popUpTo(Routes.DASHBOARD) { inclusive = true }
-                    }
-                },
-                onTasksClick = { navController.navigate(Routes.TASKS) },
-                onHabitsClick = { navController.navigate(Routes.HABITS) },
-                onGoalsClick = { navController.navigate(Routes.GOALS) },
-                onProfileClick = { navController.navigate(Routes.PROFILE) }
-            )
-        }
-        
-        composable(Routes.STATS_MAIN) {
-            StatsScreen()
-        }
-        
         // Profile and Settings Screens
         composable(Routes.PROFILE) {
             ProfileScreen(
@@ -467,6 +475,11 @@ fun HebitNavigation(
 
         composable(Routes.STATS_SCREEN) {
             StatsScreen()
+        }
+
+        // Ensure STATS_MAIN composable is present
+        composable(Routes.STATS_MAIN) {
+            StatsScreen() // Assuming this is the correct screen for STATS_MAIN
         }
     }
 }
