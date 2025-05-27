@@ -1,0 +1,81 @@
+[
+  {
+    "id": "morning-plan-01",
+    "title": "Plan your day's top 3 priorities?",
+    "description": "Outline the most important tasks to tackle today.",
+    "defaultCategoryName": "Planning",
+    "triggerConditions": {
+      "timeOfDay": ["morning"]
+    }
+  },
+  {
+    "id": "evening-review-01",
+    "title": "Review today's progress & prepare for tomorrow?",
+    "description": "Jot down any unfinished tasks and quick notes for the next day.",
+    "defaultCategoryName": "Review",
+    "triggerConditions": {
+      "timeOfDay": ["evening"]
+    }
+  },
+  {
+    "id": "monday-weekly-plan-01",
+    "title": "Outline your main goals for this week?",
+    "description": "Set clear objectives for the week ahead.",
+    "defaultCategoryName": "Planning",
+    "triggerConditions": {
+      "dayOfWeek": [1] 
+    }
+  },
+  {
+    "id": "friday-weekly-review-01",
+    "title": "Review week's accomplishments & plan for next week?",
+    "description": "Reflect on what you've achieved and prepare for the upcoming week.",
+    "defaultCategoryName": "Review",
+    "triggerConditions": {
+      "dayOfWeek": [5]
+    }
+  },
+  {
+    "id": "general-hydrate-01",
+    "title": "Stay hydrated! Drink a glass of water.",
+    "description": "A quick hydration break can boost focus.",
+    "defaultCategoryName": "Health",
+    "triggerConditions": {}
+  },
+  {
+    "id": "general-stretch-break-01",
+    "title": "Take a 5-minute break to stretch.",
+    "description": "Refresh your body and mind.",
+    "defaultCategoryName": "Health",
+    "triggerConditions": {
+      "minTasksCompleted": 3 
+    }
+  },
+  {
+    "id": "goal-keyword-report-01",
+    "title": "Work on your report for '[GoalName]'?",
+    "description": "Make some progress on your reporting goal.",
+    "defaultCategoryName": "Work",
+    "triggerConditions": {
+      "requiresGoalKeywords": ["report", "summary", "analysis"]
+    }
+  },
+  {
+    "id": "goal-keyword-learn-01",
+    "title": "Dedicate some time to learning for '[GoalName]'?",
+    "description": "Continue your learning journey.",
+    "defaultCategoryName": "Learning",
+    "triggerConditions": {
+      "requiresGoalKeywords": ["learn", "study", "course", "skill"]
+    }
+  },
+  {
+    "id": "category-work-focus-01",
+    "title": "Schedule a focus block for important work tasks?",
+    "description": "Allocate dedicated time for deep work.",
+    "defaultCategoryName": "Work",
+    "triggerConditions": {
+      "requiresCategories": ["Work", "Project"]
+    }
+  }
+] 
