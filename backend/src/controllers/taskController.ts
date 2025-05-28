@@ -498,7 +498,7 @@ export const toggleTaskCompletion = catchAsync(async (req: AuthRequest, res: Res
         // parentTaskId: task.parentTaskId, // if needed
     });
     // console.log(`Event TASK_COMPLETED emitted for task ${task._id} via toggle`);
-
+    
     // Update productivity metrics
     const today = new Date();
     today.setHours(0, 0, 0, 0);

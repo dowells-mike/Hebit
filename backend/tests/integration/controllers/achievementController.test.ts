@@ -240,7 +240,7 @@ describe('Achievement Controller Integration Tests', () => {
       const response = await auth.get('/api/achievements/earned');
       expect(response.status).toBe(200);
       expect(response.body).toHaveLength(3);
-
+      
       expect(response.body[0].achievement.name).toBe('Newer Earned');
       expect(new Date(response.body[0].earnedAt).toISOString()).toBe(dateNewer.toISOString());
       expect(response.body[1].achievement.name).toBe('Middle Earned');
