@@ -1,15 +1,33 @@
-import mongoose from 'mongoose';
+import mongoose, { Document } from 'mongoose';
 import { Achievement, UserAchievement, User, Habit, Task, Goal } from '../models'; // Adjust if model paths are different
 import {
-  UserDocument,
+  UserDocument as IUserDocument, // Rename for local extension
   HabitDocument,
   TaskDocument,
   GoalDocument,
   AchievementDocument,
-  UserAchievementDocument,
+  UserAchievementDocument as IUserAchievementDocument, // Rename to avoid conflict
   HabitFrequencyConfig // Assuming this type might be useful if we pass full habit objects
 } from '../types';
 import eventEmitter from './eventEmitter';
+
+// Define minimal interfaces for Mongoose instance methods we rely on,
+// ensuring _id aligns with what's in ../types
+
+interface MinimalMongooseDocumentForUserAchievement {
+  _id: string; // Must align with IUserAchievementDocument._id
+  isModified: () => boolean;
+  save: () => Promise<this>; 
+  // createdAt and updatedAt are expected from IUserAchievementDocument
+}
+type ExtendedUserAchievementDocument = IUserAchievementDocument & MinimalMongooseDocumentForUserAchievement;
+
+interface MinimalMongooseDocumentForUser {
+  _id: string; // Must align with IUserDocument._id
+  save: () => Promise<this>;
+  // comparePassword, createdAt, updatedAt are expected from IUserDocument
+}
+type ExtendedUserDocument = IUserDocument & MinimalMongooseDocumentForUser;
 
 interface StreakEventData {
   userId: string;
@@ -274,19 +292,31 @@ export class AchievementService {
     achievement: AchievementDocument,
     eventPayload: GenericEventPayload
   ): Promise<void> {
-    let userAchievement = await UserAchievement.findOne({ user: userId, achievement: achievement._id });
-
-    if (userAchievement && userAchievement.earned) {
-      return; 
-    }
+    let userAchievement: ExtendedUserAchievementDocument | null = await UserAchievement.findOne({ user: userId, achievement: achievement._id }).exec() as ExtendedUserAchievementDocument | null;
+    let isNewAchievement = false;
 
     if (!userAchievement) {
-      userAchievement = new UserAchievement({
+      userAchievement = await UserAchievement.create({
         user: userId,
         achievement: achievement._id,
         progress: 0,
         earned: false,
-      });
+        earnedAt: undefined,
+        seenByUser: false,
+      }) as ExtendedUserAchievementDocument;
+      isNewAchievement = true;
+    }
+
+    if (!userAchievement) {
+      // This case should ideally not be reached if create always returns a document or throws
+      console.error('AchievementService: UserAchievement is null after findOne and create attempts.');
+      return;
+    }
+
+    // If already earned, do nothing further for this specific achievement-event pair.
+    // This check might seem redundant if findOne already filters, but create doesn't.
+    if (userAchievement.earned && !isNewAchievement) { // Only skip if it was pre-existing and earned
+      return; 
     }
 
     const oldProgress = userAchievement.progress || 0;
@@ -303,18 +333,29 @@ export class AchievementService {
           const targetStreak = achievement.criteria.targetValue as number;
           const specificHabitIdForAchievement = achievement.criteria.conditionDetails?.relatedEntityId;
           
-          if (specificHabitIdForAchievement) { // Achievement for a specific habit's streak
+          let applicableStreak = false;
+          if (specificHabitIdForAchievement) {
             if (entityId === specificHabitIdForAchievement) {
-              newProgress = currentStreak; // Progress is the current streak of that specific habit
-              if (currentStreak >= targetStreak) meetsCriteria = true;
+              applicableStreak = true;
             }
-          } else { // Achievement for any habit reaching a certain streak (generic streak)
+          } else { 
+            applicableStreak = true;
+          }
+
+          if (applicableStreak) {
             if (currentStreak >= targetStreak) {
-              // For generic streak achievements, progress likely means meeting the target.
-              // Or, it could be max(currentStreak, oldProgress) but capped at targetValue.
-              // Let's assume progress becomes targetValue once met.
-              newProgress = targetStreak; 
               meetsCriteria = true;
+              newProgress = 100; // Set to 100% on meeting criteria
+            } else {
+              // Update progress proportionally if desired, or keep as current streak value if progress means current_streak_value
+              // For now, if not met, progress could reflect the current streak value if targetValue represents the goal for 100%
+              // This part is tricky: if progress is 0-100, then it should be (currentStreak / targetStreak) * 100
+              // However, UserAchievement.progress is a single number. Let's assume it's 0-100.
+              // If not meeting criteria, it shouldn't unlock, so progress update is for 'PROGRESSED' event.
+              // Let's set newProgress to (currentStreak / targetStreak) * 100, capped at 100 if it's not yet earned.
+              if (!userAchievement.earned) { // Only update progress if not already earned
+                 newProgress = Math.min(Math.floor((currentStreak / targetStreak) * 100), 100);
+              }
             }
           }
         }
@@ -334,9 +375,15 @@ export class AchievementService {
           if (this.matchConditionDetails(achievement.criteria.conditionDetails, eventData)) {
             const specificEntityForCount = achievement.criteria.conditionDetails?.relatedEntityId;
             if (!specificEntityForCount || specificEntityForCount === entityId) { 
-                newProgress = (userAchievement.progress || 0) + 1;
-                if (newProgress >= (achievement.criteria.targetValue as number)) {
+                const currentProgressValue = userAchievement.progress || 0;
+                // Assuming progress for count types is the actual count, not percentage until earned
+                const incrementedCount = (isNewAchievement && currentProgressValue === 0) ? 1 : currentProgressValue + 1;
+
+                if (incrementedCount >= (achievement.criteria.targetValue as number)) {
                     meetsCriteria = true;
+                    newProgress = 100; // Set to 100% on meeting criteria
+                } else {
+                    newProgress = incrementedCount; // Store the actual count as progress
                 }
             }
           }
@@ -344,61 +391,63 @@ export class AchievementService {
         break;
 
       case 'completion_time':
-        const { entityType: achEntityType, timeOperator, timeString, relatedEntityId: achRelatedEntityId, check: achCheck } = achievement.criteria.conditionDetails || {};
-        let eventSatisfiesCompletionTime = false;
+        const { entityType: achEntityTypeCT, timeOperator, timeString, relatedEntityId: achRelatedEntityIdCT, check: achCheckCT } = achievement.criteria.conditionDetails || {};
+        let eventSatisfiesCompletionTimeCT = false;
+        let timeConditionMetCT = false;
 
-        if (eventData?.completedAt && achEntityType) {
-            const completedAtTime = new Date(eventData.completedAt);
-            let timeConditionMet = false;
-
-            if (achEntityType === 'habit' && eventType === 'HABIT_COMPLETED_AT' && eventData.entityType === 'habit') {
-                eventSatisfiesCompletionTime = true;
-            } else if (achEntityType === 'task' && eventType === 'TASK_COMPLETED' && eventData.entityType === 'task') {
-                eventSatisfiesCompletionTime = true;
-            } else if (achEntityType === 'goal' && eventType === 'GOAL_COMPLETED' && eventData.entityType === 'goal') {
-                eventSatisfiesCompletionTime = true;
+        if (eventData?.completedAt && achEntityTypeCT) {
+            const completedAtTimeCT = new Date(eventData.completedAt);
+            // Determine if the event source matches the achievement's expected entity type
+            if ((achEntityTypeCT === 'habit' && eventType === 'HABIT_COMPLETED_AT' && eventData.entityType === 'habit') ||
+                (achEntityTypeCT === 'task' && eventType === 'TASK_COMPLETED' && eventData.entityType === 'task') ||
+                (achEntityTypeCT === 'goal' && eventType === 'GOAL_COMPLETED' && eventData.entityType === 'goal')) {
+                eventSatisfiesCompletionTimeCT = true;
             }
 
-            if (eventSatisfiesCompletionTime) {
-                if (achRelatedEntityId && achRelatedEntityId !== entityId) {
-                    eventSatisfiesCompletionTime = false; 
+            if (eventSatisfiesCompletionTimeCT) {
+                if (achRelatedEntityIdCT && achRelatedEntityIdCT !== entityId) {
+                    eventSatisfiesCompletionTimeCT = false; 
                 } else {
                     // Time logic for habits/tasks (specific time of day)
-                    if ((achEntityType === 'habit' || achEntityType === 'task') && timeOperator && timeString) {
+                    if ((achEntityTypeCT === 'habit' || achEntityTypeCT === 'task') && timeOperator && timeString) {
                         const [hours, minutes, seconds] = timeString.split(':').map(Number);
-                        const targetTimeToday = new Date(completedAtTime); 
-                        targetTimeToday.setHours(hours, minutes, seconds || 0, 0);
-                        if (timeOperator === 'before' && completedAtTime.getTime() < targetTimeToday.getTime()) {
-                            timeConditionMet = true;
-                        } else if (timeOperator === 'after' && completedAtTime.getTime() > targetTimeToday.getTime()) {
-                            // timeConditionMet = true; // Implement if needed
-                            console.warn(`AchievementService: 'completion_time' for ${achEntityType} with 'after' operator not fully implemented.`);
+                        const targetTimeTodayCT = new Date(completedAtTimeCT); 
+                        targetTimeTodayCT.setHours(hours, minutes, seconds || 0, 0);
+                        if (timeOperator === 'before' && completedAtTimeCT.getTime() < targetTimeTodayCT.getTime()) {
+                            timeConditionMetCT = true;
+                        } else if (timeOperator === 'after' && completedAtTimeCT.getTime() > targetTimeTodayCT.getTime()) {
+                            timeConditionMetCT = true; 
                         }
-                    // Time logic for goals (e.g., before targetDate)
-                    } else if (achEntityType === 'goal' && achCheck === 'beforeTargetDate' && eventData.targetDate) {
-                        const targetDate = new Date(eventData.targetDate);
-                        if (completedAtTime.getTime() < targetDate.getTime()) {
-                            timeConditionMet = true;
+                    } else if (achEntityTypeCT === 'goal' && achCheckCT === 'beforeTargetDate' && eventData.targetDate) {
+                        const targetDateCT = new Date(eventData.targetDate);
+                        if (completedAtTimeCT.getTime() < targetDateCT.getTime()) {
+                            timeConditionMetCT = true;
                         }
-                    } else if (achEntityType === 'goal' && !achCheck && timeOperator && timeString ){
-                         // Allow generic time string for goals too, like complete by EOD
+                    } else if (achEntityTypeCT === 'goal' && !achCheckCT && timeOperator && timeString ){
                         const [hours, minutes, seconds] = timeString.split(':').map(Number);
-                        const targetTimeToday = new Date(completedAtTime);
-                        targetTimeToday.setHours(hours, minutes, seconds || 0, 0);
-                        if (timeOperator === 'before' && completedAtTime.getTime() < targetTimeToday.getTime()) {
-                            timeConditionMet = true;
-                        } else if (timeOperator === 'after' && completedAtTime.getTime() > targetTimeToday.getTime()) {
-                            console.warn(`AchievementService: 'completion_time' for ${achEntityType} with 'after' operator not fully implemented.`);
+                        const targetTimeTodayCT = new Date(completedAtTimeCT);
+                        targetTimeTodayCT.setHours(hours, minutes, seconds || 0, 0);
+                        if (timeOperator === 'before' && completedAtTimeCT.getTime() < targetTimeTodayCT.getTime()) {
+                            timeConditionMetCT = true;
+                        } else if (timeOperator === 'after' && completedAtTimeCT.getTime() > targetTimeTodayCT.getTime()) {
+                           timeConditionMetCT = true;
                         }
                     }
 
-                    if (timeConditionMet) {
-                        newProgress = (userAchievement.progress || 0) + 1;
-                        if (newProgress >= (achievement.criteria.targetValue as number)) {
+                    if (timeConditionMetCT && this.matchConditionDetails(achievement.criteria.conditionDetails, eventData)) {
+                        // For completion_time, it's usually a one-shot event meeting the criteria.
+                        // Progress can go from 0 to 100 directly if targetValue is 1.
+                        const currentProgressValCT = (userAchievement.progress || 0);
+                        const incrementedProgressCT = currentProgressValCT + 1; // Assuming each valid completion increments
+
+                        if (incrementedProgressCT >= (achievement.criteria.targetValue as number)) {
                             meetsCriteria = true;
+                            newProgress = 100;
+                        } else {
+                            newProgress = incrementedProgressCT; // This might represent count of successful time-based completions
                         }
                     } else {
-                        eventSatisfiesCompletionTime = false;
+                        // eventSatisfiesCompletionTimeCT = false; // Not needed, condition just not met
                     }
                 }
             }
@@ -407,26 +456,28 @@ export class AchievementService {
 
       case 'event_based':
         if (achievement.criteria.conditionDetails?.eventName === eventPayload.eventType) {
-          // For GOAL_COMPLETED, eventName could be 'GOAL_COMPLETED' or a specific goal type if we add that
-          if (eventType === 'USER_SIGNUP' || (eventType === 'GOAL_COMPLETED' && achievement.criteria.source === 'goals')) {
-            // Further check if achievement.criteria.conditionDetails has other specifics to match with eventData
-            if (this.matchConditionDetails(achievement.criteria.conditionDetails, eventData)) {
+          if (this.matchConditionDetails(achievement.criteria.conditionDetails, eventData)) {
                  const specificEntityForEvent = achievement.criteria.conditionDetails?.relatedEntityId;
                  if (!specificEntityForEvent || specificEntityForEvent === entityId) {
-                    newProgress = (userAchievement.progress || 0) + 1;
-                    if (newProgress >= (achievement.criteria.targetValue as number)) {
+                    // For event_based, assume targetValue is 1 for a single event occurrence leading to unlock.
+                    // Progress directly goes to 100%.
+                    if ((achievement.criteria.targetValue as number) === 1) {
                         meetsCriteria = true;
+                        newProgress = 100;
+                    } else {
+                        // If targetValue > 1 for event_based, it acts like a counter for that specific event.
+                        const currentProgressValEB = userAchievement.progress || 0;
+                        const incrementedCountEB = (isNewAchievement && currentProgressValEB === 0 && !userAchievement.earned) ? 1 : currentProgressValEB + 1;
+                        if (incrementedCountEB >= (achievement.criteria.targetValue as number)) {
+                            meetsCriteria = true;
+                            newProgress = 100;
+                        } else {
+                            newProgress = incrementedCountEB;
+                        }
                     }
                  }
             }
-          } else if (eventType !== 'USER_SIGNUP' && eventType !== 'GOAL_COMPLETED') {
-             // Fallback for other generic event_based achievements not yet explicitly handled above
-             newProgress = (userAchievement.progress || 0) + 1;
-             if (newProgress >= (achievement.criteria.targetValue as number)) {
-                meetsCriteria = true;
-             }
           }
-        }
         break;
 
       case 'multi_condition':
@@ -461,20 +512,19 @@ export class AchievementService {
       userAchievement.earnedAt = new Date();
       
       // Add points to user
-      if (achievement.points > 0) {
-        const user = await User.findById(userId);
-        if (user) {
-          user.experiencePoints = (user.experiencePoints || 0) + achievement.points;
-          try {
-            await user.save();
-            console.log(`AchievementService: Awarded ${achievement.points} XP to user ${userId}. New total: ${user.experiencePoints}`);
-          } catch (err) {
-            console.error(`AchievementService: Failed to save user ${userId} after awarding points.`, err);
-            // Decide on error handling: should this roll back achievement earning? For now, it doesn't.
-          }
-        } else {
-          console.warn(`AchievementService: User ${userId} not found when trying to award points for achievement ${achievement.name}`);
+      const user = await User.findById(userId).exec() as ExtendedUserDocument | null;
+
+      if (user && achievement.points > 0) {
+        user.experiencePoints = (user.experiencePoints || 0) + achievement.points;
+        try {
+          await user.save();
+          console.log(`AchievementService: Awarded ${achievement.points} XP to user ${userId}. New total: ${user.experiencePoints}`);
+        } catch (err) {
+          console.error(`AchievementService: Failed to save user ${userId} after awarding points.`, err);
+          // Decide on error handling: should this roll back achievement earning? For now, it doesn't.
         }
+      } else {
+        console.warn(`AchievementService: User ${userId} not found when trying to award points for achievement ${achievement.name}`);
       }
 
       console.log(`AchievementService: User ${userId} UNLOCKED achievement '${achievement.name}'`);

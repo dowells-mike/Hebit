@@ -319,4 +319,83 @@ export const markUserAchievementAsSeen = catchAsync(async (req: AuthRequest, res
   // For consistency, could return the same structure as getMyAchievements for a single item
   // However, for a simple POST to mark as seen, returning the updated UserAchievement is often sufficient.
   res.status(200).json(userAchievement);
-}); 
+});
+
+export const getAllAchievements = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const achievements = await Achievement.find().lean();
+    res.status(200).json(achievements);
+  } catch (error) {
+    console.error('Error fetching all achievements:', error);
+    res.status(500).json({ message: 'Error fetching achievements', error: (error as Error).message });
+  }
+};
+
+export const getUserAchievements = async (req: AuthRequest, res: Response): Promise<void> => {
+  const userIdFromParams = req.params.userId;
+  const authenticatedUserId = req.user?._id?.toString();
+
+  if (userIdFromParams !== 'me' && userIdFromParams !== authenticatedUserId) {
+    // Optional: Restrict access if :userId is not 'me' or the authenticated user,
+    // unless admin or specific sharing rules are in place.
+    // For now, let's assume users can only fetch their own or 'me'.
+     res.status(403).json({ message: 'Forbidden: You can only fetch your own achievements.' });
+     return;
+  }
+  
+  const targetUserId = userIdFromParams === 'me' ? authenticatedUserId : userIdFromParams;
+
+  if (!targetUserId) {
+    res.status(400).json({ message: 'User ID not found for fetching achievements.' });
+    return;
+  }
+
+  try {
+    const userAchievements = await UserAchievement.find({ user: targetUserId })
+      .populate('achievement') // Populate the full achievement details
+      .lean();
+    res.status(200).json(userAchievements);
+  } catch (error) {
+    console.error(`Error fetching achievements for user ${targetUserId}:`, error);
+    res.status(500).json({ message: 'Error fetching user achievements', error: (error as Error).message });
+  }
+};
+
+export const markAchievementSeen = async (req: AuthRequest, res: Response): Promise<void> => {
+  const { userAchievementId } = req.params;
+  const authenticatedUserId = req.user?._id?.toString();
+
+  if (!authenticatedUserId) {
+    res.status(401).json({ message: 'Unauthorized' });
+    return;
+  }
+
+  try {
+    const userAchievement = await UserAchievement.findById(userAchievementId);
+
+    if (!userAchievement) {
+      res.status(404).json({ message: 'User achievement record not found.' });
+      return;
+    }
+
+    // Ensure the user marking it seen is the owner of the achievement
+    if (userAchievement.user.toString() !== authenticatedUserId) {
+      res.status(403).json({ message: 'Forbidden: You can only mark your own achievements as seen.' });
+      return;
+    }
+
+    if (userAchievement.seenByUser) {
+      // Already seen, no change needed, but return success
+      res.status(200).json(userAchievement);
+      return;
+    }
+
+    userAchievement.seenByUser = true;
+    await userAchievement.save();
+    
+    res.status(200).json(userAchievement);
+  } catch (error) {
+    console.error(`Error marking achievement ${userAchievementId} as seen:`, error);
+    res.status(500).json({ message: 'Error marking achievement as seen', error: (error as Error).message });
+  }
+}; 

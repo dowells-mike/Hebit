@@ -1,28 +1,26 @@
 import express from 'express';
-import * as achievementController from '../controllers/achievementController';
-import { protect } from '../middleware/auth';
+import {
+  getAllAchievements,
+  getUserAchievements,
+  markAchievementSeen
+} from '../controllers/achievementController';
+import { protect as authMiddleware } from '../middleware/auth';
 
 const router = express.Router();
 
-// Protect all routes
-router.use(protect);
+// @route   GET /api/achievements
+// @desc    Get all defined achievements
+// @access  Private
+router.get('/', authMiddleware, getAllAchievements);
 
-// Routes
-router.route('/')
-  .get(achievementController.getAchievements)
-  .post(achievementController.createAchievement); // Admin only in production
+// @route   GET /api/achievements/user/:userId (or /api/achievements/user/me)
+// @desc    Get a specific user's achievements and progress
+// @access  Private
+router.get('/user/:userId', authMiddleware, getUserAchievements);
 
-router.route('/earned')
-  .get(achievementController.getEarnedAchievements);
-
-router.route('/category/:category')
-  .get(achievementController.getAchievementsByCategory);
-
-router.route('/check')
-  .post(achievementController.checkAchievementProgress);
-
-router.route('/:id')
-  .put(achievementController.updateAchievement) // Admin only in production
-  .delete(achievementController.deleteAchievement); // Admin only in production
+// @route   POST /api/achievements/user-achievements/:userAchievementId/seen
+// @desc    Mark a specific user achievement as seen
+// @access  Private
+router.post('/user-achievements/:userAchievementId/seen', authMiddleware, markAchievementSeen);
 
 export default router; 
