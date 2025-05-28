@@ -21,7 +21,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.hebit.app.domain.model.Habit
+import com.hebit.app.domain.model.HabitAchievement
+import com.hebit.app.domain.model.HabitPerformanceInsight
 import com.hebit.app.domain.model.HabitStats
+import com.hebit.app.domain.model.HabitSuggestion
 import com.hebit.app.domain.model.Resource
 import com.hebit.app.ui.components.BottomNavItem
 import java.time.LocalDate
@@ -30,24 +33,17 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.*
 
-// Define DayStatus enum here or in a common place
+// DayStatus enum for calendar visualization
 enum class DayStatus {
-    PERFECT, PARTIAL, MISSED, NONE
+    COMPLETED, // Simplified from PERFECT
+    SKIPPED,   // If we can determine skipped days from HabitCompletionRecord
+    MISSED,
+    NONE       // For future dates or empty cells
 }
 
-// Mock data classes to be removed/replaced later
-data class Achievement(
-    val id: String,
-    val title: String,
-    val description: String,
-    val date: LocalDate
-)
-
-data class Suggestion(
-    val id: String,
-    val title: String,
-    val description: String
-)
+// Mock data classes (to be replaced by actual domain models from Achievement feature later)
+// data class Achievement( ... ) - Keep commented or remove if not immediately used for UI structure
+// data class Suggestion( ... ) - Keep commented or remove
 
 @SuppressLint("RememberReturnType")
 @OptIn(ExperimentalMaterial3Api::class)
@@ -55,66 +51,66 @@ data class Suggestion(
 fun HabitStreakScreen(
     habitId: String,
     onNavigateBack: () -> Unit,
+    // Navigation lambdas for bottom bar
     onHomeClick: () -> Unit = {},
     onTasksClick: () -> Unit = {},
     onHabitsClick: () -> Unit = {},
     onGoalsClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
-    // Inject ViewModel
     viewModel: HabitViewModel = hiltViewModel()
 ) {
-    // Observe state from ViewModel
     val selectedHabitState by viewModel.selectedHabitState.collectAsState()
     val habitStatsState by viewModel.habitStatsState.collectAsState()
-    // Observe new states
+
+    // Placeholder states - these will need actual implementation in ViewModel and Repository
     val performanceInsightsState by viewModel.performanceInsightsState.collectAsState()
     val relatedAchievementsState by viewModel.relatedAchievementsState.collectAsState()
     val suggestionsState by viewModel.suggestionsState.collectAsState()
 
-    // Fetch data when habitId changes
     LaunchedEffect(key1 = habitId) {
-        viewModel.getHabitById(habitId) // This will trigger stats loading too
+        viewModel.getHabitById(habitId) // This should also trigger a call to loadHabitStats in the VM
+        // viewModel.loadPerformanceInsights(habitId) // Example: if these are separate calls
+        // viewModel.loadRelatedAchievements(habitId)
+        // viewModel.loadSuggestionsForHabit(habitId)
     }
 
-    // Clean up selected state on exit
     DisposableEffect(Unit) {
         onDispose { viewModel.clearSelectedHabit() }
     }
 
-    // Month calendar state
     val today = remember { LocalDate.now() }
-    val currentMonth = remember { YearMonth.from(today) }
-    var selectedMonth by remember { mutableStateOf(currentMonth) }
+    var selectedMonth by remember { mutableStateOf(YearMonth.from(today)) }
+    val currentMonth = YearMonth.from(today)
 
-    // Calculate calendar data based on selected habit's history
     val calendarData = remember(selectedHabitState, selectedMonth) {
-        val habit = (selectedHabitState as? Resource.Success)?.data
+        val habit = (selectedHabitState as? Resource.Success<Habit?>)?.data
         val historyMap = habit?.completionHistory?.associateBy {
-            it.date.toLocalDate()
+            it.date // Already LocalDate from HabitCompletionRecord
         } ?: emptyMap()
 
         val daysInMonth = selectedMonth.lengthOfMonth()
         val firstDayOfMonth = selectedMonth.atDay(1)
-        val firstDayOfWeekValue = firstDayOfMonth.dayOfWeek.value // 1 (Mon) to 7 (Sun)
-        val emptyStartDays = firstDayOfWeekValue - 1
+        // Adjust for Locale, e.g. using WeekFields.firstDayOfWeek
+        val firstDayOfWeekValue = firstDayOfMonth.dayOfWeek.value // Monday=1, Sunday=7
+        val emptyStartDays = (firstDayOfWeekValue - 1 + 7) % 7 // Ensure it's always positive for Monday start
 
         List(daysInMonth + emptyStartDays) { index ->
             if (index < emptyStartDays) {
-                 null // Placeholder for days before the 1st
+                null // Placeholder for days before the 1st of the month
             } else {
                 val dayOfMonth = index - emptyStartDays + 1
                 val date = selectedMonth.atDay(dayOfMonth)
+                val record = historyMap[date]
+
                 val status = when {
-                    // Future days or future months
-                    date.isAfter(today) -> DayStatus.NONE
-                    // Check history for past/present days
-                    historyMap.containsKey(date) -> {
-                        if (historyMap[date]?.completed == true) DayStatus.PERFECT
-                        else DayStatus.MISSED // Assuming non-completed entry means missed
-                        // TODO: Add logic for PARTIAL if needed/possible
+                    date.isAfter(today) -> DayStatus.NONE // Future dates
+                    record != null -> {
+                        if (record.completed) DayStatus.COMPLETED
+                        else if (!record.skipReason.isNullOrBlank()) DayStatus.SKIPPED
+                        else DayStatus.MISSED
                     }
-                    // Past days with no history entry
-                    else -> DayStatus.MISSED
+                    date.isBefore(habit?.startDate ?: LocalDate.MIN) -> DayStatus.NONE // Before habit started
+                    else -> DayStatus.MISSED // Past day with no record, assuming not a skip day unless backend logic implies otherwise
                 }
                  Pair(dayOfMonth, status)
             }
@@ -124,22 +120,18 @@ fun HabitStreakScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text((selectedHabitState as? Resource.Success)?.data?.title ?: "Streak Analytics") }, // Show title
+                title = { Text((selectedHabitState as? Resource.Success<Habit?>)?.data?.title ?: "Streak Analytics") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
-                    // Share button - Enable when loaded
                      IconButton(
-                         onClick = { /* Share analytics */ },
+                        onClick = { /* TODO: Implement Share Analytics */ },
                          enabled = selectedHabitState is Resource.Success && habitStatsState is Resource.Success
                      ) {
-                        Icon(
-                            imageVector = Icons.Default.Share,
-                            contentDescription = "Share"
-                        )
+                        Icon(Icons.Default.Share, contentDescription = "Share")
                     }
                 }
             )
@@ -150,203 +142,143 @@ fun HabitStreakScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    BottomNavItem(
-                        icon = Icons.Default.Home,
-                        label = "Home",
-                        selected = false,
-                        onClick = onHomeClick
-                    )
-                    
-                    BottomNavItem(
-                        icon = Icons.Default.CheckCircle,
-                        label = "Tasks",
-                        selected = false,
-                        onClick = onTasksClick
-                    )
-                    
-                    BottomNavItem(
-                        icon = Icons.Default.Loop,
-                        label = "Habits",
-                        selected = true,
-                        onClick = onHabitsClick
-                    )
-                    
-                    BottomNavItem(
-                        icon = Icons.Default.Flag,
-                        label = "Goals",
-                        selected = false,
-                        onClick = onGoalsClick
-                    )
-                    
-                    BottomNavItem(
-                        icon = Icons.Default.Person,
-                        label = "Profile",
-                        selected = false,
-                        onClick = onProfileClick
-                    )
+                    BottomNavItem(icon = Icons.Default.Home, label = "Home", selected = false, onClick = onHomeClick)
+                    BottomNavItem(icon = Icons.Default.CheckCircle, label = "Tasks", selected = false, onClick = onTasksClick)
+                    BottomNavItem(icon = Icons.Default.Loop, label = "Habits", selected = true, onClick = onHabitsClick)
+                    BottomNavItem(icon = Icons.Default.Flag, label = "Goals", selected = false, onClick = onGoalsClick)
+                    BottomNavItem(icon = Icons.Default.Person, label = "Profile", selected = false, onClick = onProfileClick)
                 }
             }
         }
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-            // Handle Loading/Error states for primary data (habit + stats)
              val isLoading = selectedHabitState is Resource.Loading || (selectedHabitState is Resource.Success && habitStatsState is Resource.Loading)
-             val hasError = selectedHabitState is Resource.Error || habitStatsState is Resource.Error
-             val primaryErrorMessage = (selectedHabitState as? Resource.Error)?.message ?: (habitStatsState as? Resource.Error)?.message
+            val primaryError = selectedHabitState as? Resource.Error ?: habitStatsState as? Resource.Error
 
             if (isLoading) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            } else if (hasError) {
+            } else if (primaryError != null) {
                  Text(
-                     text = "Error: ${primaryErrorMessage ?: "Unknown error"}",
+                    text = "Error: ${primaryError.message ?: "Could not load habit details."}",
                      color = MaterialTheme.colorScheme.error,
                      modifier = Modifier.align(Alignment.Center).padding(16.dp)
                  )
             } else if (selectedHabitState is Resource.Success && habitStatsState is Resource.Success) {
                 val habit = (selectedHabitState as Resource.Success<Habit?>).data
-                val stats = (habitStatsState as Resource.Success<HabitStats>).data
+                val stats = (habitStatsState as Resource.Success<HabitStats?>).data // Assuming HabitStats can be nullable if not found
 
                 if (habit != null && stats != null) {
-                    // Main content
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .verticalScroll(rememberScrollState())
                             .padding(horizontal = 16.dp)
                     ) {
-                        // Current streak card - Use real data
+                        // Current Streak Display
                         Card(
                              modifier = Modifier
                                  .fillMaxWidth()
                                  .padding(vertical = 16.dp)
                         ) {
                              Column(
-                                 modifier = Modifier
-                                     .fillMaxWidth()
-                                     .padding(16.dp),
+                                modifier = Modifier.padding(16.dp),
                                  horizontalAlignment = Alignment.CenterHorizontally
                              ) {
-                                 Text(
-                                     text = "Current Streak",
-                                     style = MaterialTheme.typography.titleMedium
-                                 )
+                                Text("Current Streak", style = MaterialTheme.typography.titleMedium)
                                  Row(verticalAlignment = Alignment.CenterVertically) {
                                      Icon(
-                                         imageVector = Icons.Default.LocalFireDepartment,
-                                         contentDescription = null,
-                                         tint = MaterialTheme.colorScheme.error,
+                                        imageVector = Icons.Default.LocalFireDepartment, // Or a custom streak icon
+                                        contentDescription = "Current Streak",
+                                        tint = if ((habit.streakData?.current ?: 0) > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                          modifier = Modifier.size(48.dp)
                                      )
                                      Text(
-                                         text = stats.currentStreak.toString(), // Use stats
+                                        text = habit.streakData?.current?.toString() ?: "0",
                                          style = MaterialTheme.typography.displayLarge,
                                          fontWeight = FontWeight.Bold,
-                                         color = MaterialTheme.colorScheme.primary
+                                        color = if ((habit.streakData?.current ?: 0) > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                                      )
-                                     Text("days", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 8.dp))
+                                    Text(" days", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 8.dp))
                                  }
                                  Text(
-                                     text = "Previous best: ${stats.longestStreak} days", // Use stats
+                                    text = "Previous best: ${habit.streakData?.longest ?: 0} days",
                                      style = MaterialTheme.typography.bodyMedium,
                                      color = MaterialTheme.colorScheme.onSurfaceVariant
                                  )
                              }
                         }
 
-                        // Success rate card - Use real data
+                        // Success Rate Card (using stats from HabitStats)
                         Card(
                              modifier = Modifier
                                  .fillMaxWidth()
                                  .padding(bottom = 16.dp)
                         ) {
                              Row(
-                                 modifier = Modifier
-                                     .fillMaxWidth()
-                                     .padding(16.dp),
+                                modifier = Modifier.padding(16.dp),
                                  verticalAlignment = Alignment.CenterVertically
                              ) {
                                  Column(modifier = Modifier.weight(2f)) {
                                      Text("Success Rate", style = MaterialTheme.typography.titleMedium)
-                                     Text("30-day average", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    // TODO: Determine how to calculate 30-day average or if overall is fine
+                                    Text("Overall", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                      Text(
-                                         text = "${(stats.completionRate * 100).toInt()}%", // Use stats
+                                        text = "${(stats.completionRate * 100).toInt()}%",
                                          style = MaterialTheme.typography.displayMedium,
-                                         fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.secondary // Or primary
                                      )
                                  }
-                                 Box(modifier = Modifier.weight(1f).aspectRatio(1f).padding(8.dp), contentAlignment = Alignment.Center) {
+                                Box(
+                                    modifier = Modifier.weight(1f).aspectRatio(1f).padding(8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
                                      CircularProgressIndicator(
-                                         progress = { stats.completionRate }, // Use stats
+                                        progress = { stats.completionRate },
                                          modifier = Modifier.fillMaxSize(),
-                                         strokeWidth = 8.dp
+                                        strokeWidth = 8.dp,
+                                        color = MaterialTheme.colorScheme.secondary, // Or primary
+                                        trackColor = MaterialTheme.colorScheme.surfaceVariant
                                      )
-                                     Text("${(stats.completionRate * 100).toInt()}%", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                    Text("${(stats.completionRate * 100).toInt()}%", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                                  }
                              }
                         }
 
-                        // Points card - Placeholder for now
+                        // Monthly Calendar View
+                        Text("Monthly Progress", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(vertical = 8.dp))
                          Card(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
-                             Row(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                                 Column(Modifier.weight(1f)) {
-                                     Text("Points", style = MaterialTheme.typography.titleMedium)
-                                     Text("--", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
-                                     Text("-- points to next level", style = MaterialTheme.typography.bodySmall)
-                                 }
-                                 Badge { Text("-- rewards") }
-                             }
-                         }
-
-                        // Month calendar
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 16.dp)
-                        ) {
-                             // Month selector
-                             Row(
-                                 modifier = Modifier
-                                     .fillMaxWidth()
-                                     .padding(vertical = 8.dp),
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                                  horizontalArrangement = Arrangement.SpaceBetween,
                                  verticalAlignment = Alignment.CenterVertically
                              ) {
                                  IconButton(onClick = { selectedMonth = selectedMonth.minusMonths(1) }) {
-                                     Icon(
-                                         imageVector = Icons.Default.ChevronLeft,
-                                         contentDescription = "Previous Month"
-                                     )
+                                        Icon(Icons.Default.ChevronLeft, "Previous Month")
                                  }
                                  Text(
                                      text = "${selectedMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault())} ${selectedMonth.year}",
                                      style = MaterialTheme.typography.titleMedium
                                  )
-                                 IconButton(onClick = { if (selectedMonth.isBefore(currentMonth)) selectedMonth = selectedMonth.plusMonths(1) }, enabled = selectedMonth.isBefore(currentMonth)) {
-                                     Icon(
-                                         imageVector = Icons.Default.ChevronRight,
-                                         contentDescription = "Next Month"
-                                     )
-                                 }
-                             }
-
-                             // Days of week header
+                                    IconButton(
+                                        onClick = { selectedMonth = selectedMonth.plusMonths(1) },
+                                        enabled = selectedMonth.isBefore(currentMonth) // Can't go to future months beyond current
+                                    ) {
+                                        Icon(Icons.Default.ChevronRight, "Next Month")
+                                    }
+                                }
                              Row(
                                  modifier = Modifier.fillMaxWidth(),
                                  horizontalArrangement = Arrangement.SpaceEvenly
                              ) {
-                                 for (dayOfWeek in listOf("M", "T", "W", "T", "F", "S", "S")) {
-                                     Text(
-                                         text = dayOfWeek,
-                                         modifier = Modifier.weight(1f),
-                                         textAlign = TextAlign.Center,
-                                         style = MaterialTheme.typography.labelMedium
-                                     )
-                                 }
-                             }
-
+                                    // Use Locale to get first day of week and short names
+                                    val daysOfWeek = выворотДняНедели().map { it.getDisplayName(TextStyle.SHORT, Locale.getDefault()) }
+                                    daysOfWeek.forEach { dayLabel ->
+                                        Text(text = dayLabel, modifier = Modifier.weight(1f), textAlign = TextAlign.Center, style = MaterialTheme.typography.labelMedium)
+                                    }
+                                }
                              Spacer(modifier = Modifier.height(4.dp))
-
-                            // Calendar grid
                             Column {
                                 val chunkSize = 7
                                 calendarData.chunked(chunkSize).forEach { weekData ->
@@ -354,109 +286,120 @@ fun HabitStreakScreen(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceEvenly
                                     ) {
-                                        for (dayData in weekData) {
+                                            weekData.forEach { dayData ->
                                             Box(
                                                 modifier = Modifier
                                                     .weight(1f)
                                                     .aspectRatio(1f)
                                                     .padding(2.dp)
-                                                    .clip(RectangleShape)
+                                                        .clip(CircleShape) // Changed to CircleShape for better look
                                                     .background(
-                                                        when (dayData?.second) { // Access status from Pair
-                                                            DayStatus.PERFECT -> MaterialTheme.colorScheme.primary
-                                                            DayStatus.PARTIAL -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f)
-                                                            DayStatus.MISSED -> MaterialTheme.colorScheme.error.copy(alpha = 0.5f)
-                                                            else -> Color.Transparent // NONE or null
+                                                            when (dayData?.second) {
+                                                                DayStatus.COMPLETED -> MaterialTheme.colorScheme.primary
+                                                                DayStatus.SKIPPED -> MaterialTheme.colorScheme.tertiaryContainer
+                                                                DayStatus.MISSED -> MaterialTheme.colorScheme.errorContainer
+                                                                else -> Color.Transparent
                                                         }
                                                     ),
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                  if (dayData != null && dayData.second != DayStatus.NONE) {
                                                      Text(
-                                                         text = dayData.first.toString(), // Access day from Pair
-                                                         color = if (dayData.second == DayStatus.PERFECT) Color.White else MaterialTheme.colorScheme.onBackground,
+                                                            text = dayData.first.toString(),
+                                                            color = when (dayData.second) {
+                                                                DayStatus.COMPLETED -> MaterialTheme.colorScheme.onPrimary
+                                                                DayStatus.SKIPPED -> MaterialTheme.colorScheme.onTertiaryContainer
+                                                                DayStatus.MISSED -> MaterialTheme.colorScheme.onErrorContainer
+                                                                else -> MaterialTheme.colorScheme.onSurface
+                                                            },
                                                          style = MaterialTheme.typography.labelSmall
                                                      )
                                                  }
                                             }
                                         }
-                                        // Add spacers if row has less than 7 items (last row)
-                                        repeat(chunkSize - weekData.size) {
-                                             Spacer(modifier = Modifier.weight(1f).aspectRatio(1f))
+                                            // Fill remaining space in the row if weekData.size < chunkSize
+                                            for (i in 0 until (chunkSize - weekData.size)) {
+                                                Spacer(Modifier.weight(1f).aspectRatio(1f))
+                                            }
                                         }
                                     }
                                 }
-                            }
-
                             // Legend
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 8.dp),
-                                horizontalArrangement = Arrangement.Start,
+                                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp, start = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.Start),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(12.dp)
-                                        .clip(RectangleShape)
-                                        .background(MaterialTheme.colorScheme.primary)
-                                )
-                                
-                                Text(
-                                    text = "Perfect",
-                                    modifier = Modifier.padding(start = 4.dp, end = 12.dp),
-                                    style = MaterialTheme.typography.labelSmall
-                                )
-                                
-                                Box(
-                                    modifier = Modifier
-                                        .size(12.dp)
-                                        .clip(RectangleShape)
-                                        .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f))
-                                )
-                                
-                                Text(
-                                    text = "Partial",
-                                    modifier = Modifier.padding(start = 4.dp, end = 12.dp),
-                                    style = MaterialTheme.typography.labelSmall
-                                )
-                                
-                                Box(
-                                    modifier = Modifier
-                                        .size(12.dp)
-                                        .clip(RectangleShape)
-                                        .background(MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
-                                )
-                                
-                                Text(
-                                    text = "Missed",
-                                    modifier = Modifier.padding(start = 4.dp),
-                                    style = MaterialTheme.typography.labelSmall
-                                )
+                                    LegendItem(color = MaterialTheme.colorScheme.primary, text = "Completed")
+                                    LegendItem(color = MaterialTheme.colorScheme.tertiaryContainer, text = "Skipped")
+                                    LegendItem(color = MaterialTheme.colorScheme.errorContainer, text = "Missed")
+                                }
                             }
                         }
+                        
+                        // Placeholder sections for Performance, Achievements, Suggestions remain similar
+                        // but ensure they use the correct state objects and handle loading/error/empty states.
 
-                        // Performance analysis - Observe state
-                        Text("Performance Analysis", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(vertical = 8.dp))
+                        // Performance Analysis Card (Placeholder)
+                        PerformanceAnalysisCard(performanceInsightsState)
+
+                        // Related Achievements Card (Placeholder)
+                        RelatedAchievementsCard(relatedAchievementsState)
+
+                        // Suggestions Card (Placeholder)
+                        SuggestionsCard(suggestionsState)
+
+                        Spacer(modifier = Modifier.height(24.dp))
+                    }
+                } else {
+                    // Handle case where habit or stats is null after success (e.g. habit deleted, stats not found)
+                    Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+                        Text(
+                            if (habit == null) "Habit data not available." else "Could not load statistics for this habit.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } // End of main content loading check
+        } // End of Box padding
+    } // End of Scaffold
+}
+
+@Composable
+fun LegendItem(color: Color, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(color))
+        Text(text = text, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(start = 4.dp))
+    }
+}
+
+// Helper function to get days of the week starting from Locale's first day
+fun выворотДняНедели(): List<java.time.DayOfWeek> {
+    val firstDay = java.time.temporal.WeekFields.of(Locale.getDefault()).firstDayOfWeek
+    return (0L until 7L).map { firstDay.plus(it) }
+}
+
+// Placeholder Composable for Performance Analysis
+@Composable
+fun PerformanceAnalysisCard(performanceInsightsState: Resource<List<HabitPerformanceInsight>>) {
+    Text("Performance Analysis", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp))
                         Card(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth().padding(16.dp).heightIn(min = 100.dp)) {
-                                when(performanceInsightsState) {
+            when (performanceInsightsState) {
                                     is Resource.Loading -> CircularProgressIndicator()
-                                    is Resource.Error -> Text("Could not load insights: ${(performanceInsightsState as Resource.Error).message}", color = MaterialTheme.colorScheme.error)
+                is Resource.Error -> Text("Insights: ${performanceInsightsState.message}", color = MaterialTheme.colorScheme.error)
                                     is Resource.Success -> {
-                                        val insights = (performanceInsightsState as Resource.Success).data
+                    val insights = performanceInsightsState.data
                                         if (insights.isNullOrEmpty()) {
-                                            Text("No performance insights available yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("No performance insights yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         } else {
-                                            // TODO: Display insights (e.g., list, chart placeholder)
                                             Column {
-                                                 insights.forEach { insight ->
-                                                      Text("- ${insight.insight}", style = MaterialTheme.typography.bodyMedium)
-                                                 }
-                                                 // Placeholder for chart
-                                                  Box(modifier = Modifier.fillMaxWidth().height(150.dp).background(MaterialTheme.colorScheme.surface).padding(top = 8.dp), contentAlignment = Alignment.Center){
-                                                       Text("Performance Chart (TODO)")
+                            insights.forEach { insight -> Text("- ${insight.insight}", style = MaterialTheme.typography.bodyMedium) }
+                            // Chart placeholder
+                            Box(modifier = Modifier.fillMaxWidth().height(150.dp).background(MaterialTheme.colorScheme.surfaceVariant).padding(top = 8.dp), contentAlignment = Alignment.Center){
+                                Text("Performance Chart (Placeholder)")
+                            }
                                                   }
                                             }
                                         }
@@ -465,22 +408,22 @@ fun HabitStreakScreen(
                             }
                         }
 
-                        // Recent achievements - Observe state
-                        Text("Recent Achievements", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(vertical = 8.dp))
+// Placeholder Composable for Related Achievements
+@Composable
+fun RelatedAchievementsCard(relatedAchievementsState: Resource<List<HabitAchievement>>) {
+    Text("Related Achievements", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(vertical = 8.dp))
                         Card(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
                              Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth().padding(16.dp).heightIn(min = 60.dp)) {
-                                 when(relatedAchievementsState) {
+            when (relatedAchievementsState) {
                                       is Resource.Loading -> CircularProgressIndicator()
-                                      is Resource.Error -> Text("Could not load achievements: ${(relatedAchievementsState as Resource.Error).message}", color = MaterialTheme.colorScheme.error)
+                is Resource.Error -> Text("Achievements: ${relatedAchievementsState.message}", color = MaterialTheme.colorScheme.error)
                                       is Resource.Success -> {
-                                          val achievements = (relatedAchievementsState as Resource.Success).data
+                    val achievements = relatedAchievementsState.data
                                           if (achievements.isNullOrEmpty()) {
-                                              Text("No related achievements unlocked yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("No related achievements unlocked.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                                           } else {
-                                              // TODO: Use AchievementCard with HabitAchievement data
                                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                    achievements.forEach { ach ->
-                                                        Text("${ach.title} - Earned: ${ach.earnedDate?.format(DateTimeFormatter.ISO_DATE) ?: "N/A"}")
+                            achievements.forEach { ach -> Text("${ach.title} - Earned: ${ach.earnedDate?.format(DateTimeFormatter.ISO_LOCAL_DATE) ?: "Pending"}") }
                                                     }
                                                }
                                           }
@@ -489,22 +432,22 @@ fun HabitStreakScreen(
                              }
                         }
 
-                        // Suggestions - Observe state
-                        Text("Suggestions", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(vertical = 8.dp))
+// Placeholder Composable for Suggestions
+@Composable
+fun SuggestionsCard(suggestionsState: Resource<List<HabitSuggestion>>) {
+    Text("Suggestions For You", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(vertical = 8.dp))
                          Card(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
                               Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth().padding(16.dp).heightIn(min = 60.dp)) {
-                                   when(suggestionsState) {
+            when (suggestionsState) {
                                         is Resource.Loading -> CircularProgressIndicator()
-                                        is Resource.Error -> Text("Could not load suggestions: ${(suggestionsState as Resource.Error).message}", color = MaterialTheme.colorScheme.error)
+                is Resource.Error -> Text("Suggestions: ${suggestionsState.message}", color = MaterialTheme.colorScheme.error)
                                         is Resource.Success -> {
-                                            val suggestions = (suggestionsState as Resource.Success).data
+                    val suggestions = suggestionsState.data
                                             if (suggestions.isNullOrEmpty()) {
-                                                Text("No suggestions available right now.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("No suggestions at the moment.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                                             } else {
-                                                 // TODO: Use SuggestionCard with HabitSuggestion data
                                                  Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                      suggestions.forEach { sug ->
-                                                           Text("${sug.title}: ${sug.description}")
+                            suggestions.forEach { sug -> Text("${sug.title}: ${sug.description}") }
                                                       }
                                                  }
                                             }
@@ -513,75 +456,6 @@ fun HabitStreakScreen(
                                }
                           }
 
-                         Spacer(modifier = Modifier.height(16.dp))
-
-                        // Stats Summary
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(16.dp)
-                            ) {
-                                Text(
-                                    "Streak Statistics",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    modifier = Modifier.padding(bottom = 8.dp)
-                                )
-                                
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 4.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text("Current streak", style = MaterialTheme.typography.bodyMedium)
-                                    Text(
-                                        "${stats.currentStreak} days",
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                                
-                                // ... rest of the code ...
-                            }
-                        }
-                    }
-                } else {
-                    Text(
-                        if (habit == null) "Habit not found." else "Failed to load habit stats.",
-                        modifier = Modifier.align(Alignment.Center)
-                    )
-                }
-            } // End of Success state check
-        } // End of Box
-    } // End of Scaffold
-}
-
-// Commented out unused functions 
-/*
-@Composable
-fun AchievementCard(achievement: HabitAchievement) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 8.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        // Card content
-    }
-}
-
-@Composable
-fun SuggestionCard(suggestion: HabitSuggestion) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 8.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        // Card content
-    }
-}
-*/
+// Ensure HabitViewModel has: _performanceInsightsState, _relatedAchievementsState, _suggestionsState
+// and functions to load data for them e.g. loadPerformanceInsights(habitId: String) etc.
+// These would typically call new methods in HabitRepository.

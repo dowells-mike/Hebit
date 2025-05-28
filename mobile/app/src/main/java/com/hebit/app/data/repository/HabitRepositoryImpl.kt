@@ -68,17 +68,25 @@ class HabitRepositoryImpl @Inject constructor(
         }
     }
 
-    override fun getHabitStats(id: String): Flow<Resource<HabitStats>> = flow {
+    override fun getHabitStats(id: String): Flow<Resource<HabitStats?>> = flow {
         emit(Resource.Loading())
         try {
             val response = apiService.getHabitStats(id)
-            if (response.isSuccessful && response.body() != null) {
-                emit(Resource.Success(response.body()!!.toDomain())) // Uses HabitStatsDto.toDomain()
+            if (response.isSuccessful) {
+                emit(Resource.Success(response.body()?.toDomain()))
             } else {
-                emit(Resource.Error(response.errorBody()?.string() ?: "Failed to fetch habit stats for $id"))
+                if (response.code() == 404) {
+                    emit(Resource.Success(null))
+                } else {
+                    emit(Resource.Error(response.errorBody()?.string() ?: "Failed to fetch habit stats for $id"))
+                }
             }
         } catch (e: HttpException) {
-            emit(Resource.Error("Server error fetching stats for $id: ${e.code()} ${e.message()}"))
+            if (e.code() == 404) {
+                emit(Resource.Success(null))
+            } else {
+                emit(Resource.Error("Server error fetching stats for $id: ${e.code()} ${e.message()}"))
+            }
         } catch (e: IOException) {
             emit(Resource.Error("Network error fetching stats for $id: ${e.localizedMessage ?: "Check connection"}"))
         } catch (e: Exception) {
@@ -213,6 +221,45 @@ class HabitRepositoryImpl @Inject constructor(
         } catch (e: Exception) {
             emit(Resource.Error("Unexpected error adding note for $habitId: ${e.localizedMessage}"))
         }
+    }
+
+    // --- Placeholder Implementations for new methods ---
+    override fun getPerformanceInsights(habitId: String): Flow<Resource<List<HabitPerformanceInsight>>> = flow {
+        emit(Resource.Loading())
+        // Simulate network delay and success with empty list
+        kotlinx.coroutines.delay(500) // Simulate delay
+        emit(Resource.Success(emptyList()))
+        // TODO: Replace with actual API call when available
+        // try {
+        //     val response = apiService.getPerformanceInsights(habitId) // Assuming endpoint exists
+        //     if (response.isSuccessful && response.body() != null) {
+        //         // Assuming response.body() is a list of DTOs that can be mapped
+        //         // emit(Resource.Success(response.body()!!.map { it.toDomain() }))
+        //         emit(Resource.Success(emptyList())) // Placeholder
+        //     } else {
+        //         emit(Resource.Error(response.errorBody()?.string() ?: "Failed to get performance insights for $habitId"))
+        //     }
+        // } catch (e: HttpException) {
+        //     emit(Resource.Error("Server error getting insights for $habitId: ${e.code()} ${e.message()}"))
+        // } catch (e: IOException) {
+        //     emit(Resource.Error("Network error getting insights for $habitId: ${e.localizedMessage}"))
+        // } catch (e: Exception) {
+        //     emit(Resource.Error("Unexpected error getting insights for $habitId: ${e.localizedMessage}"))
+        // }
+    }
+
+    override fun getRelatedAchievements(habitId: String): Flow<Resource<List<HabitAchievement>>> = flow {
+        emit(Resource.Loading())
+        kotlinx.coroutines.delay(500) // Simulate delay
+        emit(Resource.Success(emptyList()))
+        // TODO: Replace with actual API call
+    }
+
+    override fun getSuggestionsForHabit(habitId: String): Flow<Resource<List<HabitSuggestion>>> = flow {
+        emit(Resource.Loading())
+        kotlinx.coroutines.delay(500) // Simulate delay
+        emit(Resource.Success(emptyList()))
+        // TODO: Replace with actual API call
     }
 
     // --- Helper: Domain Habit to CreateHabitRequest DTO ---

@@ -42,6 +42,7 @@ import java.time.format.DateTimeFormatter
 import java.util.*
 import com.hebit.app.data.remote.dto.TaskSuggestionDto
 import androidx.compose.material.icons.outlined.Lightbulb
+import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.collectAsState
@@ -50,8 +51,8 @@ import androidx.navigation.NavController
 import com.hebit.app.ui.navigation.Routes
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import com.hebit.app.ui.screens.habits.getIconByName
 
-@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
@@ -80,8 +81,8 @@ fun DashboardScreen(
         taskViewModel.loadPriorityTasks(3)
         
         // Force refresh habits data
-        android.util.Log.d("DashboardScreen", "Explicitly loading today's habits...")
-        habitViewModel.loadTodayHabits()
+        android.util.Log.d("DashboardScreen", "Explicitly loading habits...")
+        habitViewModel.loadHabits()
         
         // Goals are automatically loaded in the GoalListViewModel init block
     }
@@ -604,7 +605,7 @@ fun TodayHabitsList(onHabitClick: (String) -> Unit, habitsState: Resource<List<H
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         habits.forEach { habit ->
-                            HabitCard(habit = habit, onClick = { onHabitClick(habit.id) })
+                            TodayHabitItem(habit = habit, onHabitClick = onHabitClick)
                         }
                     }
                     
@@ -651,64 +652,48 @@ fun TodayHabitsList(onHabitClick: (String) -> Unit, habitsState: Resource<List<H
 }
 
 @Composable
-fun HabitCard(habit: Habit, onClick: () -> Unit) {
-    val iconMap = mapOf(
-        "water_drop" to Icons.Outlined.WaterDrop,
-        "book" to Icons.Default.MenuBook,
-        "meditation" to Icons.Default.SelfImprovement,
-        "exercise" to Icons.Default.FitnessCenter,
-        "journal" to Icons.Default.Edit
-    )
-    
-    val icon = iconMap[habit.iconName] ?: Icons.Default.Check
-    
+fun TodayHabitItem(habit: Habit, onHabitClick: (String) -> Unit) {
+    val isCompleted = habit.streakData?.lastCompleted == LocalDate.now()
+
     Card(
         modifier = Modifier
-            .width(100.dp)
-            .height(100.dp),
-        onClick = onClick,
+            .fillMaxWidth()
+            .clickable { onHabitClick(habit.id) },
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (habit.completedToday) 
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f) 
-            else 
-                MaterialTheme.colorScheme.surface
+            containerColor = if (isCompleted) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                           else MaterialTheme.colorScheme.surfaceVariant
         )
     ) {
-        Column(
+        Row(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+                .padding(16.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = habit.title,
-                tint = if (habit.completedToday) 
-                    MaterialTheme.colorScheme.primary 
-                else 
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                modifier = Modifier.size(32.dp)
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Text(
-                text = habit.title,
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            
-            Spacer(modifier = Modifier.height(4.dp))
-            
-            // Progress indicator
-            if (habit.completedToday) {
-                Box(
-                    modifier = Modifier
-                        .size(4.dp, 2.dp)
-                        .background(MaterialTheme.colorScheme.primary, shape = CircleShape)
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                Icon(
+                    imageVector = getIconByName(habit.icon),
+                    contentDescription = habit.title,
+                    tint = habit.color?.let { Color(android.graphics.Color.parseColor(it)) } ?: LocalContentColor.current,
+                    modifier = Modifier.size(32.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = habit.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            IconButton(onClick = { /* Toggle completion */ }) {
+                Icon(
+                    imageVector = if (isCompleted) Icons.Filled.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
+                    contentDescription = if (isCompleted) "Mark Incomplete" else "Mark Complete",
+                    tint = if (isCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

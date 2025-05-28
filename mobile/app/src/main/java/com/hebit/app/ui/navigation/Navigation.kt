@@ -2,7 +2,11 @@ package com.hebit.app.ui.navigation
 
 import android.os.Build
 import androidx.annotation.RequiresApi
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -62,6 +66,8 @@ object Routes {
     const val HABITS = "habits"
     const val HABIT_DETAIL = "habit_detail"
     const val HABIT_STREAK = "habit_streak"
+    const val HABIT_CREATE = "habit_create"
+    const val HABIT_EDIT = "habit_edit"
     const val GOALS = "goals"
     const val GOAL_DETAIL = "goal_detail"
     
@@ -297,16 +303,12 @@ fun HebitNavigation(
         // Habit Screens
         composable(Routes.HABITS) {
             HabitListScreen(
-                onNavigateBack = { navController.navigateUp() },
-                onHomeClick = { navController.navigate(Routes.DASHBOARD) {
-                    popUpTo(Routes.DASHBOARD) { inclusive = true }
-                }},
+                onNavigateToCreateHabit = { navController.navigate(Routes.HABIT_CREATE) },
+                onHabitClick = { habitId -> navController.navigate("${Routes.HABIT_DETAIL}/$habitId") },
+                onHomeClick = { navController.navigate(Routes.DASHBOARD) { popUpTo(Routes.DASHBOARD) { inclusive = true } } },
                 onTasksClick = { navController.navigate(Routes.TASKS) },
                 onGoalsClick = { navController.navigate(Routes.GOALS) },
-                onProfileClick = { navController.navigate(Routes.PROFILE) },
-                onHabitClick = { habitId ->
-                    navController.navigate("${Routes.HABIT_DETAIL}/$habitId")
-                }
+                onProfileClick = { navController.navigate(Routes.PROFILE) }
             )
         }
         
@@ -318,16 +320,13 @@ fun HebitNavigation(
             HabitDetailScreen(
                 habitId = habitId,
                 onNavigateBack = { navController.navigateUp() },
-                onHomeClick = { navController.navigate(Routes.DASHBOARD) {
-                    popUpTo(Routes.DASHBOARD) { inclusive = true }
-                }},
+                onNavigateToEditHabit = { hid -> navController.navigate("${Routes.HABIT_EDIT}/$hid") },
+                onNavigateToStreakDetail = { hid -> navController.navigate("${Routes.HABIT_STREAK}/$hid") },
+                onHomeClick = { navController.navigate(Routes.DASHBOARD) { popUpTo(Routes.DASHBOARD) { inclusive = true } } },
                 onTasksClick = { navController.navigate(Routes.TASKS) },
                 onHabitsClick = { navController.navigate(Routes.HABITS) },
                 onGoalsClick = { navController.navigate(Routes.GOALS) },
-                onProfileClick = { navController.navigate(Routes.PROFILE) },
-                onStreakClick = { 
-                    navController.navigate("${Routes.HABIT_STREAK}/$habitId")
-                }
+                onProfileClick = { navController.navigate(Routes.PROFILE) }
             )
         }
         
@@ -339,14 +338,30 @@ fun HebitNavigation(
             HabitStreakScreen(
                 habitId = habitId,
                 onNavigateBack = { navController.navigateUp() },
-                onHomeClick = { navController.navigate(Routes.DASHBOARD) {
-                    popUpTo(Routes.DASHBOARD) { inclusive = true }
-                }},
+                onHomeClick = { navController.navigate(Routes.DASHBOARD) { popUpTo(Routes.DASHBOARD) { inclusive = true } } },
                 onTasksClick = { navController.navigate(Routes.TASKS) },
                 onHabitsClick = { navController.navigate(Routes.HABITS) },
                 onGoalsClick = { navController.navigate(Routes.GOALS) },
                 onProfileClick = { navController.navigate(Routes.PROFILE) }
             )
+        }
+
+        // Placeholder for HABIT_CREATE route - Needs a Composable screen
+        composable(Routes.HABIT_CREATE) {
+            // TODO: Replace with actual HabitCreationScreen call
+            // Example: HabitCreationScreen(onNavigateBack = { navController.navigateUp() })
+            Text("Placeholder for Habit Creation Screen", modifier = Modifier.padding(16.dp))
+        }
+
+        // Placeholder for HABIT_EDIT route - Needs a Composable screen
+        composable(
+            route = "${Routes.HABIT_EDIT}/{habitId}",
+            arguments = listOf(navArgument("habitId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val habitId = backStackEntry.arguments?.getString("habitId") ?: ""
+            // TODO: Replace with actual HabitEditScreen call
+            // Example: HabitEditScreen(habitId = habitId, onNavigateBack = { navController.navigateUp() })
+            Text("Placeholder for Habit Edit Screen: ID $habitId", modifier = Modifier.padding(16.dp))
         }
 
         // Goal Screens

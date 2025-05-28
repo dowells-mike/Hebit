@@ -1,7 +1,6 @@
 package com.hebit.app.ui.screens.habits
 
-import android.os.Build
-import androidx.annotation.RequiresApi
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -9,9 +8,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.CheckCircleOutline
+import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -22,109 +24,59 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.hebit.app.domain.model.Habit
+import com.hebit.app.domain.model.Habit // Your main domain model
 import com.hebit.app.domain.model.Resource
-import com.hebit.app.ui.components.BottomNavItem
+import com.hebit.app.ui.components.BottomNavItem // Assuming this exists
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+// Removed as they are imported via HabitScreenUtils.kt or directly from domain.model
+// import com.hebit.app.domain.model.HabitFrequencyType 
+// import com.hebit.app.domain.model.DayOfWeekDomain
 
-// Define enums for UI representation (can be moved later)
-enum class HabitFrequencyUI(val title: String) {
-    DAILY("Daily"),
-    WEEKLY("Weekly"),
-    MONTHLY("Monthly"),
-    CUSTOM("Custom")
-}
+// Import helpers from the new utility file
+import com.hebit.app.ui.screens.habits.HabitCategoryUI
+import com.hebit.app.ui.screens.habits.getIconByName
+import com.hebit.app.ui.screens.habits.getCategoryUI
+import com.hebit.app.ui.screens.habits.formatHabitFrequency
 
-enum class HabitCategoryUI(val title: String, val icon: ImageVector, val color: Color) {
-    HEALTH("Health", Icons.Default.Favorite, Color(0xFFE91E63)),
-    FITNESS("Fitness", Icons.Default.FitnessCenter, Color(0xFF2196F3)),
-    MINDFULNESS("Mindfulness", Icons.Default.SelfImprovement, Color(0xFF9C27B0)),
-    PRODUCTIVITY("Productivity", Icons.Default.Schedule, Color(0xFF4CAF50)),
-    EDUCATION("Education", Icons.Default.School, Color(0xFFFF9800)),
-    CREATIVITY("Creativity", Icons.Default.Palette, Color(0xFF795548)),
-    SOCIAL("Social", Icons.Default.People, Color(0xFF3F51B5)),
-    OTHER("Other", Icons.Default.Circle, Color.Gray) // Default/fallback
-}
-
-// Helper function to map icon names to icons (can be expanded)
-fun getIconByName(iconName: String?): ImageVector {
-    return when (iconName?.lowercase()) {
-        null, "", "default_icon" -> Icons.Default.TaskAlt // Default icon for null or empty
-        "water_drop" -> Icons.Outlined.WaterDrop
-        "book", "menu_book" -> Icons.AutoMirrored.Filled.MenuBook
-        "meditation", "self_improvement" -> Icons.Default.SelfImprovement
-        "exercise", "fitness_center" -> Icons.Default.FitnessCenter
-        "journal", "edit" -> Icons.Default.Edit
-        "favorite" -> Icons.Default.Favorite
-        "schedule" -> Icons.Default.Schedule
-        "school" -> Icons.Default.School
-        "palette" -> Icons.Default.Palette
-        "people" -> Icons.Default.People
-        else -> Icons.Default.TaskAlt // Default icon
-    }
-}
-
-// Helper function to map frequency string to UI enum
-fun getFrequencyUI(frequency: String?): HabitFrequencyUI {
-    return when (frequency?.lowercase()) {
-        "daily" -> HabitFrequencyUI.DAILY
-        "weekly" -> HabitFrequencyUI.WEEKLY
-        "monthly" -> HabitFrequencyUI.MONTHLY
-        else -> HabitFrequencyUI.CUSTOM // Treat unknown as custom for now
-    }
-}
-
-// Helper function to map icon name to category UI (simple mapping for now)
-fun getCategoryUIFromIcon(iconName: String?): HabitCategoryUI {
-     return when (iconName?.lowercase()) {
-        null, "", "default_icon" -> HabitCategoryUI.OTHER
-        "water_drop", "favorite" -> HabitCategoryUI.HEALTH
-        "exercise", "fitness_center" -> HabitCategoryUI.FITNESS
-        "meditation", "self_improvement" -> HabitCategoryUI.MINDFULNESS
-        "schedule" -> HabitCategoryUI.PRODUCTIVITY
-        "book", "menu_book", "school" -> HabitCategoryUI.EDUCATION
-        "palette" -> HabitCategoryUI.CREATIVITY
-        "journal", "edit" -> HabitCategoryUI.MINDFULNESS // Or create specific
-        "people" -> HabitCategoryUI.SOCIAL
-        else -> HabitCategoryUI.OTHER
-    }
-}
+// Helper functions are now in HabitScreenUtils.kt and imported above.
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HabitListScreen(
-    onNavigateBack: () -> Unit,
-    onHabitClick: (String) -> Unit = {},
-    onHomeClick: () -> Unit = {},
-    onTasksClick: () -> Unit = {},
-    onGoalsClick: () -> Unit = {},
-    onProfileClick: () -> Unit = {},
-    // Inject ViewModel
+    onNavigateToCreateHabit: () -> Unit, // For FAB navigation
+    onHabitClick: (String) -> Unit,      // For navigating to habit detail
+    // For bottom navigation (assuming these are passed from a main NavHost)
+    onHomeClick: () -> Unit,
+    onTasksClick: () -> Unit,
+    onGoalsClick: () -> Unit,
+    onProfileClick: () -> Unit,
     viewModel: HabitViewModel = hiltViewModel()
 ) {
-    // Remove mock data
-    // val habits = remember { ... }
+    val habitsResource by viewModel.habitsState.collectAsState() // All habits for the list
+    val todayHabitsResource by viewModel.todayHabitsState.collectAsState() // Habits filtered for today by ViewModel
 
-    // Observe state from ViewModel
-    val habitsState by viewModel.habitsState.collectAsState()
-
-    var showAddHabitDialog by remember { mutableStateOf(false) }
-    // Use HabitCategoryUI for filtering state
     var selectedCategoryFilter by remember { mutableStateOf<HabitCategoryUI?>(null) }
 
-    // Calculate progress based on ViewModel data (when successful)
-    val (completedHabits, totalHabits, completionRate) = remember(habitsState) {
-        if (habitsState is Resource.Success) {
-            val habitList = (habitsState as Resource.Success<List<Habit>>).data ?: emptyList()
-            val completed = habitList.count { it.completedToday }
-            val total = habitList.size
-            val rate = if (total > 0) completed.toFloat() / total else 0f
-            Triple(completed, total, rate)
-        } else {
-            Triple(0, 0, 0f)
+    // Progress card calculation based on today's habits from ViewModel
+    val (completedTodayCount, totalTodayHabits, todayCompletionRate) = remember(todayHabitsResource) {
+        when (todayHabitsResource) {
+            is Resource.Success -> {
+                val habitList = (todayHabitsResource as Resource.Success<List<Habit>>).data ?: emptyList()
+                val completed = habitList.count {
+                    // A simple check: if lastCompleted on streakData is today.
+                    // For more complex "is completed for its current active period", ViewModel might need to provide more direct state.
+                    it.streakData?.lastCompleted == LocalDate.now()
+                }
+                val total = habitList.size
+                val rate = if (total > 0) completed.toFloat() / total else 0f
+                Triple(completed, total, rate)
+            }
+            else -> Triple(0, 0, 0f) // Loading or Error
         }
     }
 
@@ -136,68 +88,30 @@ fun HabitListScreen(
             TopAppBar(
                 title = { Text("Habits") },
                 actions = {
-                    // Search button
-                    IconButton(onClick = { /* Open search */ }) {
-                        Icon(Icons.Default.Search, contentDescription = "Search")
+                    IconButton(onClick = { /* TODO: Implement Search */ }) {
+                        Icon(Icons.Default.Search, contentDescription = "Search Habits")
                     }
-                    
-                    // Filter button
-                    IconButton(onClick = { /* Open filter */ }) {
-                        Icon(Icons.Default.FilterList, contentDescription = "Filter")
-                    }
-                    
-                    // Menu button
-                    IconButton(onClick = { /* Open menu */ }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Menu")
-                    }
+                    // Filter button can be integrated with CategoriesRow or a separate dialog
                 }
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddHabitDialog = true }) {
+            FloatingActionButton(onClick = onNavigateToCreateHabit) { // Use lambda for navigation
                 Icon(Icons.Default.Add, contentDescription = "Add Habit")
             }
         },
         bottomBar = {
-            BottomAppBar {
+            BottomAppBar { // Standard BottomAppBar
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    BottomNavItem(
-                        icon = Icons.Default.Home,
-                        label = "Home",
-                        selected = false,
-                        onClick = onHomeClick
-                    )
-                    
-                    BottomNavItem(
-                        icon = Icons.Default.CheckCircle,
-                        label = "Tasks",
-                        selected = false,
-                        onClick = onTasksClick
-                    )
-                    
-                    BottomNavItem(
-                        icon = Icons.Default.Loop,
-                        label = "Habits",
-                        selected = true,
-                        onClick = { /* Already on habits */ }
-                    )
-                    
-                    BottomNavItem(
-                        icon = Icons.Default.Flag,
-                        label = "Goals",
-                        selected = false,
-                        onClick = onGoalsClick
-                    )
-                    
-                    BottomNavItem(
-                        icon = Icons.Default.Person,
-                        label = "Profile",
-                        selected = false,
-                        onClick = onProfileClick
-                    )
+                    BottomNavItem(icon = Icons.Default.Home, label = "Home", selected = false, onClick = onHomeClick)
+                    BottomNavItem(icon = Icons.Default.CheckCircle, label = "Tasks", selected = false, onClick = onTasksClick)
+                    BottomNavItem(icon = Icons.Default.Loop, label = "Habits", selected = true, onClick = { /* Current Screen */ })
+                    BottomNavItem(icon = Icons.Default.Flag, label = "Goals", selected = false, onClick = onGoalsClick)
+                    BottomNavItem(icon = Icons.Default.Person, label = "Profile", selected = false, onClick = onProfileClick)
                 }
             }
         }
@@ -205,460 +119,232 @@ fun HabitListScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(paddingValues) // Apply padding from scaffold
                 .padding(horizontal = 16.dp)
         ) {
-            // Category tabs - Use HabitCategoryUI
-            CategoriesRow(
+            // Optional: Date display or summary
+            Text(
+                text = currentDate.format(dateFormatter),
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+
+            ProgressCard( // Assuming ProgressCard is defined elsewhere
+                completedCount = completedTodayCount,
+                totalCount = totalTodayHabits,
+                completionRate = todayCompletionRate,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            CategoriesRow( // Assuming CategoriesRow is defined elsewhere
                 selectedCategory = selectedCategoryFilter,
-                onCategorySelected = { selectedCategoryFilter = it }
+                onCategorySelected = { category ->
+                    selectedCategoryFilter = if (selectedCategoryFilter == category) null else category
+                },
+                modifier = Modifier.padding(bottom = 8.dp)
             )
 
-            // Progress card - Use calculated values
-            ProgressCard(
-                date = currentDate.format(dateFormatter),
-                completedCount = completedHabits,
-                totalCount = totalHabits,
-                completionRate = completionRate
-            )
-
-            // Habit list - Observe ViewModel state
-            Box(modifier = Modifier.fillMaxSize()) { // Use Box for alignment
-                when (habitsState) {
-                    is Resource.Loading -> {
-                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            // Habit list
+            when (habitsResource) {
+                is Resource.Loading -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
                     }
-                    is Resource.Success -> {
-                        val habitList = (habitsState as Resource.Success<List<Habit>>).data ?: emptyList()
-                        if (habitList.isEmpty()) {
-                             Text(
-                                 "No habits found. Add one using the '+' button.",
-                                 modifier = Modifier.align(Alignment.Center),
-                                 textAlign = TextAlign.Center
-                             )
-                        } else {
-                            LazyColumn(
-                                modifier = Modifier.fillMaxWidth(),
-                                contentPadding = PaddingValues(vertical = 8.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                val filteredHabits = if (selectedCategoryFilter != null) {
-                                    habitList.filter { getCategoryUIFromIcon(it.iconName) == selectedCategoryFilter }
-                                } else {
-                                    habitList
-                                }
+                }
+                is Resource.Success -> {
+                    val allHabitsList = (habitsResource as Resource.Success<List<Habit>>).data ?: emptyList()
+                    val habitsToDisplay = if (selectedCategoryFilter != null) {
+                        allHabitsList.filter { getCategoryUI(it.category) == selectedCategoryFilter }
+                    } else {
+                        allHabitsList
+                    }
 
-                                items(filteredHabits, key = { it.id }) { habit ->
-                                    HabitListItem(
-                                        habit = habit, // Use Habit domain model
-                                        onHabitClick = { onHabitClick(habit.id) },
-                                        onToggleComplete = { habitId, currentState ->
-                                            // Call ViewModel function
-                                            android.util.Log.d("HabitList", "onToggleComplete lambda called for habit: $habitId, current state: $currentState")
-                                            viewModel.toggleHabitCompletion(habitId, currentState)
-                                        }
-                                    )
-                                }
+                    if (habitsToDisplay.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(
+                                if (selectedCategoryFilter != null && allHabitsList.isNotEmpty()) "No habits in this category."
+                                else "No habits yet. Tap '+' to add one!",
+                                textAlign = TextAlign.Center,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(bottom = 16.dp), // Padding for FAB
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(habitsToDisplay, key = { habit -> habit.id }) { habit ->
+                                HabitItem(
+                                    habit = habit,
+                                    onHabitClick = { onHabitClick(habit.id) },
+                                    onCompleteClick = { viewModel.trackHabitCompletion(habit.id) }
+                                )
                             }
                         }
                     }
-                    is Resource.Error -> {
+                }
+                is Resource.Error -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
-                            "Error: ${(habitsState as Resource.Error<List<Habit>>).message}",
+                            "Error: ${(habitsResource as Resource.Error<List<Habit>>).message}",
                             color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.align(Alignment.Center)
+                            textAlign = TextAlign.Center
                         )
                     }
                 }
             }
         }
+    }
+}
 
-        // Add habit dialog - Pass ViewModel
-        if (showAddHabitDialog) {
-            HabitCreationDialog(
-                viewModel = viewModel, // Pass the viewmodel
-                onDismiss = { showAddHabitDialog = false }
-                // onHabitCreate removed, call viewModel directly
-            )
+@Composable
+fun HabitItem(
+    habit: Habit,
+    onHabitClick: () -> Unit,
+    onCompleteClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val isCompletedToday = habit.streakData?.lastCompleted == LocalDate.now() // Simple check for visual state
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onHabitClick),
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f) // Allow text to take space
+            ) {
+                Icon(
+                    imageVector = getIconByName(habit.icon),
+                    contentDescription = habit.title,
+                    tint = habit.color?.let { Color(android.graphics.Color.parseColor(it)) } ?: LocalContentColor.current,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(
+                            habit.color?.let { Color(android.graphics.Color.parseColor(it)).copy(alpha = 0.1f) }
+                                ?: MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)
+                        )
+                        .padding(8.dp)
+
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) { // Allow title to take available space
+                    Text(
+                        text = habit.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = formatHabitFrequency(habit.frequency),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (habit.streakData != null && habit.streakData.current > 0) {
+                        Text(
+                            text = "Streak: ${habit.streakData.current} day(s)",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.width(12.dp)) // Space before the button
+
+            IconButton(
+                onClick = onCompleteClick,
+                modifier = Modifier.size(48.dp) // Ensure good touch target size
+            ) {
+                Icon(
+                    imageVector = if (isCompletedToday) Icons.Filled.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
+                    contentDescription = if (isCompletedToday) "Mark as incomplete" else "Mark as complete",
+                    tint = if (isCompletedToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    modifier = Modifier.size(28.dp)
+                )
+            }
         }
     }
 }
 
+// Placeholder for CategoriesRow - you might have your own implementation
 @Composable
 fun CategoriesRow(
-    // Use HabitCategoryUI for state
     selectedCategory: HabitCategoryUI?,
-    onCategorySelected: (HabitCategoryUI?) -> Unit
+    onCategorySelected: (HabitCategoryUI) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     LazyRow(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(vertical = 8.dp)
     ) {
-        // \"All\" option
-        item {
-            FilterChip(
-                selected = selectedCategory == null,
-                onClick = { onCategorySelected(null) },
-                label = { Text("All Habits") }
-            )
-        }
-
-        // Category options - Use HabitCategoryUI
         items(HabitCategoryUI.values()) { category ->
-            FilterChip(
-                selected = selectedCategory == category,
+            SuggestionChip(
                 onClick = { onCategorySelected(category) },
-                label = { Text(category.title) }
+                label = { Text(category.title) },
+                icon = { Icon(category.icon, contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize)) },
+                shape = CircleShape,
+                border = if (selectedCategory == category) BorderStroke(1.5.dp, category.color) else null,
+                colors = if (selectedCategory == category) {
+                    SuggestionChipDefaults.suggestionChipColors()
+                } else {
+                    SuggestionChipDefaults.suggestionChipColors()
+                }
             )
         }
     }
 }
 
+// Placeholder for ProgressCard - you might have your own implementation
 @Composable
 fun ProgressCard(
-    date: String,
+    modifier: Modifier = Modifier,
+    // date: String, // Removed as it's part of the screen now
     completedCount: Int,
     totalCount: Int,
     completionRate: Float
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 16.dp)
+        modifier = modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            // Date and Progress header
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Today's Progress", // Changed from date
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = date,
-                    style = MaterialTheme.typography.titleMedium
-                )
-                
-                Text(
-                    text = "Overall Progress",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                Text("$completedCount / $totalCount habits completed")
+                Text("${(completionRate * 100).toInt()}%")
             }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Progress indicator and fraction
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .padding(8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(
-                        progress = { completionRate },
-                        modifier = Modifier.fillMaxSize(),
-                        strokeWidth = 8.dp
-                    )
-                    
-                    Text(
-                        text = "${(completionRate * 100).toInt()}%",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                
-                Column(
-                    horizontalAlignment = Alignment.End
-                ) {
-                    Text(
-                        text = "$completedCount/$totalCount",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    
-                    Text(
-                        text = "habits completed",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            
             Spacer(modifier = Modifier.height(8.dp))
-            
-            // Motivational message
-            Text(
-                text = if (completionRate >= 0.7) {
-                    "Keep going! You're doing great today!"
-                } else if (completionRate >= 0.3) {
-                    "Good progress! Keep up the momentum."
-                } else {
-                    "Let's start building those habits today!"
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-fun HabitListItem(
-    habit: Habit, // Use Habit domain model
-    onHabitClick: () -> Unit,
-    onToggleComplete: (String, Boolean) -> Unit // Pass current state
-) {
-    // Map icon name and frequency from Habit model
-    val categoryUI = getCategoryUIFromIcon(habit.iconName)
-    val frequencyUI = getFrequencyUI(habit.frequency)
-    val icon = getIconByName(habit.iconName) // Use helper
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onHabitClick),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Category icon based on mapping
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(categoryUI.color.copy(alpha = 0.2f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon, // Use resolved icon
-                contentDescription = categoryUI.title,
-                tint = categoryUI.color
-            )
-        }
-        
-        Spacer(modifier = Modifier.width(16.dp))
-        
-        // Habit info - Use fields from Habit model
-        Column(
-            modifier = Modifier.weight(1f)
-        ) {
-            Text(
-                text = habit.title,
-                style = MaterialTheme.typography.titleMedium
-            )
-            
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    // Display frequency from mapped enum
-                    text = frequencyUI.title,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                // Optionally display time if available/needed from model
-                // habit.time?.let { ... } // Habit model doesn't have time field directly
-            }
-            
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.LocalFireDepartment,
-                    contentDescription = "Streak",
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.error // Or dynamic based on streak > 0
-                )
-                
-                Spacer(modifier = Modifier.width(4.dp))
-                
-                Text(
-                    text = "Streak: ${habit.streak}d", // Use streak from Habit model
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-        
-        // Completion indicator and progress
-        Column(
-            horizontalAlignment = Alignment.End
-        ) {
-            // Completion indicator - Use completedToday from Habit model
-            IconButton(
-                // Call lambda with id and *current* completion state
-                onClick = { 
-                    android.util.Log.d("HabitList", "Toggle button clicked for habit: ${habit.id}, current state: ${habit.completedToday}")
-                    onToggleComplete(habit.id, habit.completedToday)
-                },
-                modifier = Modifier.size(48.dp)
-            ) {
-                Icon(
-                    imageVector = if (habit.completedToday) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
-                    contentDescription = if (habit.completedToday) "Completed" else "Mark as complete",
-                    tint = if (habit.completedToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            
-            // Progress indicator - Use streak from Habit model (adjust logic as needed)
             LinearProgressIndicator(
-                progress = { habit.streak.toFloat().coerceAtMost(30f) / 30f }, // Example: progress based on streak up to 30 days
-                modifier = Modifier
-                    .width(80.dp)
-                    .padding(top = 4.dp),
-                color = categoryUI.color // Use color from mapped category
+                progress = { completionRate }, // Corrected lambda for progress
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }
 }
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun HabitCreationDialog(
-    viewModel: HabitViewModel, // Inject ViewModel
-    onDismiss: () -> Unit
-    // onHabitCreate removed, call viewModel directly
-) {
-    var habitName by remember { mutableStateOf("") }
-    // Use UI enums for dialog state
-    var selectedCategory by remember { mutableStateOf(HabitCategoryUI.HEALTH) }
-    var selectedFrequency by remember { mutableStateOf(HabitFrequencyUI.DAILY) }
-    // Add description state
-    var habitDescription by remember { mutableStateOf("") }
-    // Time is not part of the simplified Habit model or basic create call, handle later if needed
-    // var habitTime by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("New Habit") },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp) // Added spacing
-            ) {
-                // Habit name
-                OutlinedTextField(
-                    value = habitName,
-                    onValueChange = { habitName = it },
-                    label = { Text("Habit name*") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-
-                 // Habit description (Optional)
-                OutlinedTextField(
-                    value = habitDescription,
-                    onValueChange = { habitDescription = it },
-                    label = { Text("Description (Optional)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 2
-                )
-
-                // Category selector chips - Use UI enum
-                Text(
-                    text = "Category*",
-                    style = MaterialTheme.typography.titleSmall
-                )
-
-                LazyRow(
-                    modifier = Modifier.padding(vertical = 0.dp), // Reduced padding
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(HabitCategoryUI.values()) { category ->
-                        FilterChip(
-                            selected = selectedCategory == category,
-                            onClick = { selectedCategory = category },
-                            label = { Text(category.title) },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = category.icon,
-                                    contentDescription = null,
-                                    // Use category color for icon tint
-                                    tint = category.color
-                                )
-                            }
-                        )
-                    }
-                }
-
-
-                // Frequency selector - Use UI enum
-                Text(
-                    text = "Frequency*",
-                    style = MaterialTheme.typography.titleSmall
-                )
-
-                // Use Row with selectable Text or Buttons
-                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp) // Added spacing
-                ) {
-                    HabitFrequencyUI.values().filter { it != HabitFrequencyUI.CUSTOM }.forEach { frequency -> // Exclude Custom for now
-                        FilterChip(
-                             selected = selectedFrequency == frequency,
-                             onClick = { selectedFrequency = frequency },
-                             label = { Text(frequency.title) }
-                         )
-                    }
-                }
-
-
-                // Time preference removed for now, add back if needed
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (habitName.isNotBlank()) {
-                        // Map UI selections back to strings for ViewModel
-                        val frequencyString = selectedFrequency.name.lowercase() // e.g., "daily"
-                        // Map selected category icon name (or title) for the backend
-                        // This mapping might need refinement based on what backend expects
-                        val iconName = when(selectedCategory) {
-                            HabitCategoryUI.HEALTH -> "favorite"
-                            HabitCategoryUI.FITNESS -> "fitness_center"
-                            HabitCategoryUI.MINDFULNESS -> "self_improvement"
-                            HabitCategoryUI.PRODUCTIVITY -> "schedule"
-                            HabitCategoryUI.EDUCATION -> "school"
-                            HabitCategoryUI.CREATIVITY -> "palette"
-                            HabitCategoryUI.SOCIAL -> "people"
-                            HabitCategoryUI.OTHER -> "circle" // Default/fallback
-                        }
-
-                        viewModel.createHabit(
-                            title = habitName,
-                            description = habitDescription, // Pass description
-                            iconName = iconName, // Pass mapped icon name
-                            frequency = frequencyString // Pass mapped frequency string
-                        )
-                        onDismiss() // Close dialog after calling create
-                    }
-                },
-                enabled = habitName.isNotBlank() // Enable only if name is entered
-            ) {
-                Text("Save Habit")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
-}
-
-// Remove local data classes HabitItem, HabitFrequency, HabitCategory
-// data class HabitItem(...)
-// enum class HabitFrequency(...)
-// enum class HabitCategory(...)

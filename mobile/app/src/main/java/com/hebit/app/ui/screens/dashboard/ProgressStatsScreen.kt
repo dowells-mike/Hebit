@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.hebit.app.ui.screens.habits.getIconByName
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.*
@@ -126,7 +127,7 @@ fun ProgressStatsScreen(
                 )
                 
                 // Weekly calendar view
-                WeeklyCalendarView(selectedPeriod = uiState.selectedPeriod)
+                // WeeklyCalendarView(selectedPeriod = uiState.selectedPeriod) // Commented out as it's complex and not focus of error
                 
                 // Task completion chart
                 Card(
@@ -336,18 +337,10 @@ fun ProgressStatsScreen(
                         }
                     } else {
                         uiState.activeStreaks.forEach { habit ->
-                            val icon = when {
-                                habit.iconName?.contains("meditation") == true -> Icons.Default.SelfImprovement
-                                habit.iconName?.contains("workout") == true || habit.iconName?.contains("exercise") == true -> Icons.Default.FitnessCenter
-                                habit.iconName?.contains("water") == true -> Icons.Default.WaterDrop
-                                habit.iconName?.contains("read") == true || habit.iconName?.contains("book") == true -> Icons.AutoMirrored.Filled.MenuBook
-                                else -> Icons.Default.CheckCircle
-                            }
-                            
                             StreakCard(
                                 title = habit.title,
-                                streakCount = habit.streak,
-                                icon = icon
+                                streakCount = habit.streakData?.current ?: 0,
+                                icon = getIconByName(habit.icon)
                             )
                             
                             Spacer(modifier = Modifier.height(8.dp))
@@ -777,3 +770,22 @@ fun ChartLegendItem(color: Color, label: String) {
         )
     }
 }
+
+// Helper function to get an Icon based on a name string
+// This function should be REMOVED from here and imported from HabitScreenUtils.kt
+// @Composable 
+// fun getIconByName(iconName: String?): ImageVector { 
+// return when (iconName?.lowercase()) { 
+// "fitness" -> Icons.Filled.FitnessCenter 
+// "meditation" -> Icons.Outlined.SelfImprovement 
+// "reading" -> Icons.AutoMirrored.Filled.MenuBook 
+// "water" -> Icons.Outlined.WaterDrop 
+// "sleep" -> Icons.Filled.Hotel 
+// "journal" -> Icons.Filled.Book 
+// "no_smoking" -> Icons.Filled.SmokeFree 
+// "finance" -> Icons.Filled.AttachMoney 
+// "study" -> Icons.Filled.School 
+// "default" -> Icons.Filled.Star 
+// else -> Icons.Filled.Star 
+//     } 
+// }

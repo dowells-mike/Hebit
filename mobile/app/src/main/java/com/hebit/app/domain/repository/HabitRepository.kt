@@ -5,6 +5,9 @@ import com.hebit.app.domain.model.Resource
 import kotlinx.coroutines.flow.Flow
 import com.hebit.app.domain.model.HabitStats // Assuming this is correctly defined
 import com.hebit.app.domain.model.Note     // Assuming this is correctly defined
+import com.hebit.app.domain.model.HabitPerformanceInsight
+import com.hebit.app.domain.model.HabitAchievement
+import com.hebit.app.domain.model.HabitSuggestion
 
 interface HabitRepository {
     // Fetches all habits for the user
@@ -31,7 +34,7 @@ interface HabitRepository {
     fun skipHabit(habitId: String): Flow<Resource<Boolean>> // True if successful
 
     // Fetches statistics for a specific habit
-    fun getHabitStats(id: String): Flow<Resource<HabitStats>>
+    fun getHabitStats(id: String): Flow<Resource<HabitStats?>>
 
     /**
      * Fetches notes associated with a specific habit.
@@ -45,4 +48,14 @@ interface HabitRepository {
      * @return A flow emitting the result of the operation, usually the created Note or a success indicator.
      */
     fun addNoteForHabit(habitId: String, content: String): Flow<Resource<Note>>
+
+    // Fetches performance insights for a specific habit
+    fun getPerformanceInsights(habitId: String): Flow<Resource<List<HabitPerformanceInsight>>>
+
+    // Fetches achievements related to a specific habit or overall habit achievements for user
+    // Adjust signature if it needs more parameters like userId
+    fun getRelatedAchievements(habitId: String): Flow<Resource<List<HabitAchievement>>>
+
+    // Fetches suggestions for a specific habit
+    fun getSuggestionsForHabit(habitId: String): Flow<Resource<List<HabitSuggestion>>>
 }

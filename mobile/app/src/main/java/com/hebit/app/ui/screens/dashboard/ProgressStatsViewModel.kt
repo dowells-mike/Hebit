@@ -168,8 +168,8 @@ class ProgressStatsViewModel @Inject constructor(
                     when (result) {
                         is Resource.Success -> {
                             val activeStreaks = result.data
-                                ?.filter { it.streak > 0 }
-                                ?.sortedByDescending { it.streak }
+                                ?.filter { (it.streakData?.current ?: 0) > 0 }
+                                ?.sortedByDescending { it.streakData?.current ?: 0 }
                                 ?.take(3)
                                 ?: emptyList()
                                 
