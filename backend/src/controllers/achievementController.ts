@@ -275,7 +275,7 @@ export const deleteAchievement = catchAsync(async (req: AuthRequest, res: Respon
   await UserAchievement.deleteMany({ achievement: achievementId });
   
   res.status(200).json({ success: true });
-});
+}); 
 
 /**
  * @desc    Mark a user achievement as seen
