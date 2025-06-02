@@ -41,6 +41,7 @@ import com.hebit.app.ui.screens.categories.CategoryEditScreen
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.hebit.app.ui.screens.categories.CategoryListScreen
 import com.hebit.app.ui.screens.stats.StatsScreen
+import com.hebit.app.ui.screens.habits.CreateEditHabitScreen
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -338,7 +339,10 @@ fun HebitNavigation(
         composable(Routes.HABIT_CREATE) {
             // TODO: Replace with actual HabitCreationScreen call
             // Example: HabitCreationScreen(onNavigateBack = { navController.navigateUp() })
-            Text("Placeholder for Habit Creation Screen", modifier = Modifier.padding(16.dp))
+            CreateEditHabitScreen(
+                habitId = null, // Create mode
+                onNavigateBack = { navController.navigateUp() }
+            )
         }
 
         // Placeholder for HABIT_EDIT route - Needs a Composable screen
@@ -346,10 +350,13 @@ fun HebitNavigation(
             route = "${Routes.HABIT_EDIT}/{habitId}",
             arguments = listOf(navArgument("habitId") { type = NavType.StringType })
         ) { backStackEntry ->
-            val habitId = backStackEntry.arguments?.getString("habitId") ?: ""
+            val habitId = backStackEntry.arguments?.getString("habitId")
             // TODO: Replace with actual HabitEditScreen call
             // Example: HabitEditScreen(habitId = habitId, onNavigateBack = { navController.navigateUp() })
-            Text("Placeholder for Habit Edit Screen: ID $habitId", modifier = Modifier.padding(16.dp))
+            CreateEditHabitScreen(
+                habitId = habitId, // Can be null if argument not found, screen should handle
+                onNavigateBack = { navController.navigateUp() }
+            )
         }
 
         // Goal Screens

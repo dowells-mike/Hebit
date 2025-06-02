@@ -1,28 +1,51 @@
 package com.hebit.app.ui.screens.habits
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddCircleOutline
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.hebit.app.domain.model.HabitFrequency
 import com.hebit.app.ui.components.ColorPicker
 import com.hebit.app.ui.components.IconPicker
+import com.hebit.app.ui.screens.habits.viewmodel.CreateEditHabitUiState
+import com.hebit.app.ui.screens.habits.viewmodel.CreateEditHabitViewModel
+import com.hebit.app.ui.screens.habits.viewmodel.HabitFrequencyType
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
@@ -30,358 +53,485 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
+import java.util.UUID
+import com.hebit.app.ui.screens.habits.getIconByName
+import com.hebit.app.ui.screens.habits.viewmodel.HabitReminder
+import com.hebit.app.ui.screens.habits.viewmodel.TimeOfDayOptions
+
+
+val sampleIcons = listOf("fitness_center", "book", "star", "work", "home", "local_fire_department", "settings", "notifications", "link")
+val sampleColors = listOf("#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF", "#00FFFF", "#FFA500") // Red, Green, Blue, Yellow, Magenta, Cyan, Orange
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateEditHabitScreen(
-    navController: androidx.navigation.NavController, // For navigation back
-    viewModel: CreateEditHabitViewModel = hiltViewModel()
+    habitId: String?, // Null for create, non-null for edit
+    onNavigateBack: () -> Unit,
+    // viewModel: CreateEditHabitViewModel = viewModel() // Default Hilt/Koin injection, manual for now
 ) {
-    val formState by viewModel.formState.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
+    // Manually creating ViewModel for now, will replace with proper DI later
+    val factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+        override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+            @Suppress("UNCHECKED_CAST")
+            return CreateEditHabitViewModel(habitId) as T
+        }
+    }
+    val viewModel: CreateEditHabitViewModel = viewModel(factory = factory)
 
-    var showStartDatePickerDialog by remember { mutableStateOf(false) }
-    var showEndDatePickerDialog by remember { mutableStateOf(false) }
+    val uiState by viewModel.uiState
+    val context = LocalContext.current
 
-    val dateFormatter = remember { DateTimeFormatter.ofPattern("MMM dd, yyyy") }
-
-    LaunchedEffect(Unit) {
-        viewModel.uiEvent.collect {
-            when (it) {
-                is CreateEditHabitUiEvent.ShowSnackbar -> {
-                    snackbarHostState.showSnackbar(
-                        message = it.message,
-                        duration = SnackbarDuration.Short
-                    )
-                }
-                is CreateEditHabitUiEvent.NavigateBack -> {
-                    navController.popBackStack()
-                }
-            }
+    LaunchedEffect(uiState) {
+        if (uiState is CreateEditHabitUiState.Success && (uiState as CreateEditHabitUiState.Success).isSaved) {
+            // Could show a toast message here
+            // Toast.makeText(context, "Habit saved!", Toast.LENGTH_SHORT).show()
+            onNavigateBack() // Navigate back after save
         }
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text(if (formState.isEditMode) "Edit Habit" else "Create Habit") },
+                title = {
+                    Text(
+                        if (uiState is CreateEditHabitUiState.Success && (uiState as CreateEditHabitUiState.Success).isEditMode) "Edit Habit"
+                        else "Create Habit"
+                    )
+                },
                 navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = { viewModel.onSaveClick() }) {
-                Icon(Icons.Default.Done, contentDescription = "Save Habit")
-            }
         }
     ) { paddingValues ->
-        if (formState.isLoading && !formState.isHabitLoaded) {
-            Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+        when (val state = uiState) {
+            is CreateEditHabitUiState.Loading -> {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(paddingValues),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    CircularProgressIndicator()
+                    Text("Loading habit details...")
+                }
             }
-        } else {
-            Column(
-                modifier = Modifier
-                    .padding(paddingValues)
-                    .padding(16.dp)
-                    .verticalScroll(rememberScrollState())
-            ) {
-                OutlinedTextField(
-                    value = formState.title,
-                    onValueChange = { viewModel.onTitleChange(it) },
-                    label = { Text("Title") },
-                    modifier = Modifier.fillMaxWidth(),
-                    isError = formState.titleError != null,
-                    singleLine = true
-                )
-                formState.titleError?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            is CreateEditHabitUiState.Error -> {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(paddingValues),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("Error: ${state.message}", color = MaterialTheme.colorScheme.error)
+                    Button(onClick = onNavigateBack) { Text("Go Back") }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+            }
+            is CreateEditHabitUiState.Success -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                        .padding(16.dp)
+                        .verticalScroll(rememberScrollState()), // Make column scrollable
+                    horizontalAlignment = Alignment.Start // Align content to start for labels
+                ) {
+                    OutlinedTextField(
+                        value = viewModel.habitName,
+                        onValueChange = { viewModel.onHabitNameChanged(it) },
+                        label = { Text("Habit Name *") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
 
-                OutlinedTextField(
-                    value = formState.description,
-                    onValueChange = { viewModel.onDescriptionChange(it) },
-                    label = { Text("Description (Optional)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 3
-                )
-                Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                IconPicker(
-                    selectedIconName = formState.iconName,
-                    onIconSelected = { viewModel.onIconChange(it) },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = viewModel.habitDescription,
+                        onValueChange = { viewModel.onHabitDescriptionChanged(it) },
+                        label = { Text("Description (Optional)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3
+                    )
 
-                ColorPicker(
-                    selectedColorHex = formState.colorHex,
-                    onColorSelected = { viewModel.onColorChange(it) },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text("Frequency", style = MaterialTheme.typography.titleMedium)
-                Spacer(modifier = Modifier.height(8.dp))
-
-                FrequencyTypeSelector(formState.selectedFrequency) {
-                    viewModel.onFrequencyTypeChange(it)
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-
-                when (formState.selectedFrequency) {
-                    HabitFrequency.DAILY -> {
-                        DaysOfWeekSelector(formState.daysOfWeek) {
-                            viewModel.onDaysOfWeekChange(it)
-                        }
-                    }
-                    HabitFrequency.WEEKLY, HabitFrequency.MONTHLY -> {
-                        OutlinedTextField(
-                            value = formState.timesPerPeriod,
-                            onValueChange = { viewModel.onTimesPerPeriodChange(it) },
-                            label = { Text("Times per ${formState.selectedFrequency.name.lowercase(Locale.getDefault())}") },
-                            modifier = Modifier.fillMaxWidth(),
-                            isError = formState.timesPerPeriodError != null,
-                            singleLine = true
-                        )
-                        formState.timesPerPeriodError?.let {
-                            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                        }
-                        if(formState.selectedFrequency == HabitFrequency.MONTHLY){
-                             Spacer(modifier = Modifier.height(8.dp))
-                             DatesOfMonthSelector(formState.datesOfMonth) {
-                                 viewModel.onDatesOfMonthChange(it)
-                             }
-                        }
-                    }
-                    HabitFrequency.SPECIFIC_DATES -> {
-                        SpecificDatesSelector(
-                            selectedDates = formState.specificDates,
-                            onDatesChange = { viewModel.onSpecificDatesChange(it) },
-                            dateFormatter = dateFormatter
-                        )
-                    }
-                    HabitFrequency.UNKNOWN -> {
-                        Text("Please select a valid frequency type.")
-                    }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text("Start Date: ${formState.startDate?.format(dateFormatter) ?: "Not set"}")
-                Button(onClick = { showStartDatePickerDialog = true }) { Text("Select Start Date") }
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("End Date: ${formState.endDate?.format(dateFormatter) ?: "Not set"}")
-                Button(onClick = { showEndDatePickerDialog = true }) { Text("Select End Date (Optional)") }
-
-                formState.generalError?.let {
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+
+                    // --- Icon Selector ---
+                    Text("Icon (Optional)", style = MaterialTheme.typography.titleMedium)
+                    IconSelector(selectedIconName = viewModel.selectedIconName, onIconSelected = viewModel::onIconSelected)
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // --- Color Selector ---
+                    Text("Color (Optional)", style = MaterialTheme.typography.titleMedium)
+                    ColorSelector(selectedColorHex = viewModel.selectedColorHex, onColorSelected = viewModel::onColorSelected)
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // --- Time of Day Selector ---
+                    Text("Time of Day (Optional)", style = MaterialTheme.typography.titleMedium)
+                    TimeOfDaySelector(selectedTimeOption = viewModel.selectedTimeOfDay, onTimeOptionSelected = viewModel::onTimeOfDayChanged)
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // --- Frequency Selection UI --- 
+                    Text("Frequency *", style = MaterialTheme.typography.titleMedium)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    FrequencyTypeSegmentedButtonSelector(viewModel.frequencySelection.type, viewModel::onFrequencyTypeChanged)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    FrequencyConfigurator(viewModel)
+                    // --- End of Frequency Selection UI ---
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Reminders (Optional)", style = MaterialTheme.typography.titleMedium)
+                    ReminderSection(viewModel.reminders, 
+                        onAddReminder = { 
+                            // In a real app, this would open a time picker dialog
+                            viewModel.addReminder(HabitReminder(id = UUID.randomUUID().toString(), time = "10:00", label = "Morning check-in"))
+                        },
+                        onRemoveReminder = viewModel::removeReminder
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text("Link to Goal (Optional)", style = MaterialTheme.typography.titleMedium)
+                    GoalLinkSection(viewModel.linkedGoalName, 
+                        onLinkGoal = {
+                             // In a real app, this would open a goal selection screen/dialog
+                            viewModel.linkGoal(UUID.randomUUID().toString(), "Achieve Peak Productivity")
+                        },
+                        onUnlinkGoal = viewModel::unlinkGoal
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Spacer(modifier = Modifier.weight(1f)) // Push buttons to bottom
+
+                    if (state.saveError != null) {
+                        Text(state.saveError, color = MaterialTheme.colorScheme.error)
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    Button(
+                        onClick = { viewModel.saveHabit() },
+                        enabled = state.canSave,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Save Habit")
+                    }
+
+                    if (state.isEditMode) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = { /* TODO: Handle archive habit */ },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Archive Habit")
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = { /* TODO: Handle delete habit */ },
+                            // colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer), // Example for destructive action
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Delete Habit")
+                        }
+                    }
                 }
-
-                Spacer(modifier = Modifier.height(80.dp))
             }
         }
     }
+}
 
-    // Start Date Picker Dialog
-    if (showStartDatePickerDialog) {
-        val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = formState.startDate?.atStartOfDay(ZoneId.systemDefault())?.toInstant()?.toEpochMilli() ?: Instant.now().toEpochMilli(),
-            yearRange = (LocalDate.now().year - 10)..(LocalDate.now().year + 10) // Example range
+// Preview for Create Mode
+@Preview(showBackground = true, name = "Create Habit Screen")
+@Composable
+fun CreateHabitScreenPreview() {
+    MaterialTheme {
+        CreateEditHabitScreen(
+            habitId = null, // Create mode
+            onNavigateBack = {}
         )
-        DatePickerDialog(
-            onDismissRequest = { showStartDatePickerDialog = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    showStartDatePickerDialog = false
-                    datePickerState.selectedDateMillis?.let {
-                        val selectedDate = Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate()
-                        viewModel.onStartDateChange(selectedDate)
-                    }
-                }) { Text("OK") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showStartDatePickerDialog = false }) { Text("Cancel") }
-            }
-        ) {
-            DatePicker(state = datePickerState)
-        }
     }
+}
 
-    // End Date Picker Dialog
-    if (showEndDatePickerDialog) {
-        val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = formState.endDate?.atStartOfDay(ZoneId.systemDefault())?.toInstant()?.toEpochMilli(), // Allow null for end date
-            yearRange = (LocalDate.now().year - 10)..(LocalDate.now().year + 10)
+// Preview for Edit Mode (simulating loaded state)
+@Preview(showBackground = true, name = "Edit Habit Screen (Loaded DAILY)")
+@Composable
+fun EditHabitScreenPreview_LoadedDaily() {
+    MaterialTheme {
+        val factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                @Suppress("UNCHECKED_CAST")
+                val vm = CreateEditHabitViewModel("editMe") as T
+                // Manually set state for preview
+                (vm as CreateEditHabitViewModel).onHabitNameChanged("Preview Habit")
+                (vm as CreateEditHabitViewModel).onFrequencyTypeChanged(HabitFrequencyType.DAILY)
+                return vm
+            }
+        }
+        val viewModel: CreateEditHabitViewModel = viewModel(factory = factory)
+        // Pass habitId to trigger edit mode logic in VM, then use the VM instance in composable
+        CreateEditHabitScreen(
+            habitId = "editMe", // Edit mode
+            onNavigateBack = {}
+            // Provide the already configured ViewModel if direct control is needed
+            // or rely on the one created inside CreateEditHabitScreen with the same habitId
         )
-        DatePickerDialog(
-            onDismissRequest = { showEndDatePickerDialog = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    showEndDatePickerDialog = false
-                    datePickerState.selectedDateMillis?.let {
-                        val selectedDate = Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate()
-                        viewModel.onEndDateChange(selectedDate)
-                    } ?: viewModel.onEndDateChange(null) // Allow clearing end date
-                }) { Text("OK") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showEndDatePickerDialog = false }) { Text("Cancel") }
-            }
-        ) {
-            DatePicker(state = datePickerState)
-        }
     }
 }
 
+@Preview(showBackground = true, name = "Edit Habit Screen (Loaded WEEKLY)")
 @Composable
-fun FrequencyTypeSelector(selected: HabitFrequency, onSelect: (HabitFrequency) -> Unit) {
-    Column {
-        HabitFrequency.values().filter { it != HabitFrequency.UNKNOWN }.forEach { freq ->
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clickable { onSelect(freq) }
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                RadioButton(
-                    selected = (freq == selected),
-                    onClick = { onSelect(freq) }
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(text = freq.name.lowercase(Locale.getDefault()).replaceFirstChar { it.titlecase(Locale.getDefault()) })
-            }
-        }
-    }
-}
-
-@Composable
-fun DaysOfWeekSelector(selectedDays: List<Int>, onSelectionChange: (List<Int>) -> Unit) {
-    val days = DayOfWeek.values() // Monday to Sunday
-    Text("Repeat on:", style = MaterialTheme.typography.labelLarge)
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
-        days.forEach { dayOfWeek ->
-            val storageValue = if (dayOfWeek == DayOfWeek.SUNDAY) 0 else dayOfWeek.value
-
-            val isSelected = selectedDays.contains(storageValue)
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()))
-                Checkbox(
-                    checked = isSelected,
-                    onCheckedChange = {
-                        val newList = selectedDays.toMutableList()
-                        if (isSelected) newList.remove(storageValue) else newList.add(storageValue)
-                        onSelectionChange(newList.sorted())
-                    }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun DatesOfMonthSelector(selectedDates: List<Int>, onDatesSelected: (List<Int>) -> Unit) {
-    val allDates = (1..31).toList()
-    Text("Select dates of month:", style = MaterialTheme.typography.labelLarge)
-    Spacer(modifier = Modifier.height(8.dp))
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 48.dp),
-        modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp), // Constrain height
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        items(allDates) { dayNum ->
-            val isSelected = selectedDates.contains(dayNum)
-            OutlinedButton(
-                onClick = {
-                    val newList = selectedDates.toMutableList()
-                    if (isSelected) newList.remove(dayNum) else newList.add(dayNum)
-                    onDatesSelected(newList.sorted())
-                },
-                shape = CircleShape,
-                border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
-                colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
-                ),
-                contentPadding = PaddingValues(0.dp),
-                modifier = Modifier.size(40.dp)
-            ) {
-                Text(dayNum.toString())
-            }
-        }
-        // Consider adding a "Last Day" toggle if needed, mapping to -1
+fun EditHabitScreenPreview_LoadedWeekly() {
+    MaterialTheme {
+         CreateEditHabitScreen(
+            habitId = "sampleHabitIdForWeekly", // Edit mode, VM will simulate loading this
+            onNavigateBack = {}
+        )
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SpecificDatesSelector(
-    selectedDates: List<LocalDate>,
-    onDatesChange: (List<LocalDate>) -> Unit,
-    dateFormatter: DateTimeFormatter
-) {
-    var showDatePickerDialog by remember { mutableStateOf(false) }
-    val zoneId = ZoneId.systemDefault()
-
-    Column {
-        Text("Selected Dates:", style = MaterialTheme.typography.labelLarge)
-        Spacer(modifier = Modifier.height(8.dp))
-
-        if (selectedDates.isEmpty()) {
-            Text("No dates selected. Add dates for your habit.", style = MaterialTheme.typography.bodyMedium)
-        } else {
-            // Using simple Column for now, could be FlowRow or LazyVerticalGrid if many dates are expected
-            selectedDates.sorted().forEach { date ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
-                ) {
-                    Text(date.format(dateFormatter), modifier = Modifier.weight(1f))
-                    IconButton(onClick = {
-                        onDatesChange(selectedDates.filterNot { it == date })
-                    }) {
-                        Icon(Icons.Default.Close, contentDescription = "Remove date")
-                    }
-                }
+fun FrequencyTypeSegmentedButtonSelector(selectedType: HabitFrequencyType, onTypeSelected: (HabitFrequencyType) -> Unit) {
+    val types = HabitFrequencyType.values()
+    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+        types.forEachIndexed { index, type ->
+            SegmentedButton(
+                shape = SegmentedButtonDefaults.itemShape(index = index, count = types.size),
+                onClick = { onTypeSelected(type) },
+                selected = type == selectedType,
+                icon = { /* Can add icons later if desired */ }
+            ) {
+                Text(type.name.lowercase().replaceFirstChar { it.titlecase(Locale.getDefault()) })
             }
         }
-        Spacer(modifier = Modifier.height(8.dp))
-        Button(
-            onClick = { showDatePickerDialog = true },
-            modifier = Modifier.align(Alignment.End)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TimeOfDaySelector(selectedTimeOption: String?, onTimeOptionSelected: (String) -> Unit) {
+    val options = TimeOfDayOptions.getAsList()
+    var expanded by remember { mutableStateOf(false) }
+    
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
+        OutlinedTextField(
+            value = selectedTimeOption ?: TimeOfDayOptions.ANY_TIME,
+            onValueChange = {}, // Not directly editable
+            readOnly = true,
+            label = { Text("Preferred Time") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier.fillMaxWidth().menuAnchor() 
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
         ) {
-            Icon(Icons.Default.Add, contentDescription = "Add Date")
-            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-            Text("Add Date")
+            options.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option) },
+                    onClick = {
+                        onTimeOptionSelected(option)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun IconSelector(selectedIconName: String?, onIconSelected: (String) -> Unit) {
+    LazyRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(sampleIcons) { iconName ->
+            val isSelected = selectedIconName == iconName
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant)
+                    .border(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline, CircleShape)
+                    .clickable { onIconSelected(iconName) },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = getIconByName(iconName),
+                    contentDescription = iconName,
+                    tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ColorSelector(selectedColorHex: String?, onColorSelected: (String) -> Unit) {
+    LazyRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(sampleColors) { colorHex ->
+            val isSelected = selectedColorHex == colorHex
+            val color = Color(android.graphics.Color.parseColor(colorHex))
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(color)
+                    .border(2.dp, if (isSelected) MaterialTheme.colorScheme.outlineVariant else Color.Transparent, CircleShape)
+                    .clickable { onColorSelected(colorHex) }
+            )
+        }
+    }
+}
+
+@Composable
+fun FrequencyConfigurator(viewModel: CreateEditHabitViewModel) {
+    when (viewModel.frequencySelection.type) {
+        HabitFrequencyType.DAILY -> {
+            Text("Select days:", style = MaterialTheme.typography.titleSmall)
+            DaysOfWeekSelector(selectedDays = viewModel.selectedDaysOfWeek, onDayToggle = viewModel::onDayOfWeekToggled)
+        }
+        HabitFrequencyType.WEEKLY -> {
+            OutlinedTextField(
+                value = viewModel.frequencySelection.config.timesPerPeriod?.toString() ?: "",
+                onValueChange = { viewModel.onTimesPerPeriodChanged(it) },
+                label = { Text("Times per week") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Optionally, select specific days:", style = MaterialTheme.typography.titleSmall)
+            DaysOfWeekSelector(selectedDays = viewModel.selectedDaysOfWeek, onDayToggle = viewModel::onDayOfWeekToggled)
+        }
+        HabitFrequencyType.MONTHLY -> {
+            OutlinedTextField(
+                value = viewModel.frequencySelection.config.timesPerPeriod?.toString() ?: "",
+                onValueChange = { viewModel.onTimesPerPeriodChanged(it) },
+                label = { Text("Times per month") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Optionally, select specific dates of the month:", style = MaterialTheme.typography.titleSmall)
+            DatesOfMonthSelector(selectedDates = viewModel.selectedDatesOfMonth, onDateToggle = viewModel::onDateOfMonthToggled)
+        }
+        HabitFrequencyType.SPECIFIC_DATES -> {
+            SpecificDatesSelector(viewModel)
+        }
+    }
+}
+
+@Composable
+fun DaysOfWeekSelector(selectedDays: List<DayOfWeek>, onDayToggle: (DayOfWeek) -> Unit) {
+    LazyRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+        items(DayOfWeek.values()) { day ->
+            val isSelected = selectedDays.contains(day)
+            Box(
+                modifier = Modifier
+                    .padding(4.dp)
+                    .border(
+                        width = 1.dp,
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                        shape = MaterialTheme.shapes.small
+                    )
+                    .background(
+                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                        shape = MaterialTheme.shapes.small
+                    )
+                    .clickable { onDayToggle(day) }
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = day.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
+                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun DatesOfMonthSelector(selectedDates: List<Int>, onDateToggle: (Int) -> Unit) {
+    val dates = (1..31).toList()
+    // Using a LazyVerticalGrid to display dates in a grid for better space utilization.
+    // A simple LazyRow might become too wide.
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 48.dp), // Adjust minSize for desired item width
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = 200.dp), // Limit height to prevent excessive scrolling within the main scroll
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        items(dates) { date ->
+            val isSelected = selectedDates.contains(date)
+            Box(
+                modifier = Modifier
+                    .aspectRatio(1f) // Makes items square
+                    .border(
+                        width = 1.dp,
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                        shape = MaterialTheme.shapes.small
+                    )
+                    .background(
+                        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                        shape = MaterialTheme.shapes.small
+                    )
+                    .clickable { onDateToggle(date) },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = date.toString(),
+                    textAlign = TextAlign.Center,
+                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+    }
+    // TODO: Consider adding a "Last Day of Month" special toggle if required by backend/feature spec.
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SpecificDatesSelector(viewModel: CreateEditHabitViewModel) {
+    var showDatePicker by remember { mutableStateOf(false) }
+    val selectedDates = viewModel.selectedSpecificDates
+
+    Column {
+        Button(onClick = { showDatePicker = true }) {
+            Icon(Icons.Default.DateRange, contentDescription = "Add Specific Date")
+            Spacer(Modifier.width(8.dp))
+            Text("Add Specific Date")
+        }
+        Spacer(Modifier.height(8.dp))
+        if (selectedDates.isNotEmpty()) {
+            Text("Selected Dates:", style = MaterialTheme.typography.titleSmall)
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)){
+                items(selectedDates.sorted()) { date ->
+                    InputChip(
+                        selected = false, 
+                        onClick = { viewModel.onSpecificDateRemoved(date) }, 
+                        label = {Text(date.format(DateTimeFormatter.ISO_LOCAL_DATE))},
+                        trailingIcon = { Icon(Icons.Filled.Close, contentDescription = "Remove date") }
+                    )
+                }
+            }
+        } else {
+            Text("No specific dates selected.")
         }
     }
 
-    if (showDatePickerDialog) {
-        val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = Instant.now().toEpochMilli(),
-            yearRange = (LocalDate.now().year - 10)..(LocalDate.now().year + 10)
-        )
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState()
         DatePickerDialog(
-            onDismissRequest = { showDatePickerDialog = false },
+            onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    showDatePickerDialog = false
-                    datePickerState.selectedDateMillis?.let { millis ->
-                        val selectedDate = Instant.ofEpochMilli(millis).atZone(zoneId).toLocalDate()
-                        if (!selectedDates.contains(selectedDate)) {
-                            onDatesChange((selectedDates + selectedDate).sorted())
-                        }
+                    showDatePicker = false
+                    datePickerState.selectedDateMillis?.let {
+                        // Correct conversion from millis to LocalDate, considering UTC for epoch day
+                        val selectedDate = LocalDate.ofEpochDay(it / (1000 * 60 * 60 * 24))
+                        viewModel.onSpecificDateAdded(selectedDate)
                     }
                 }) { Text("OK") }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePickerDialog = false }) { Text("Cancel") }
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
             }
         ) {
             DatePicker(state = datePickerState)
@@ -389,4 +539,80 @@ fun SpecificDatesSelector(
     }
 }
 
+@Preview(showBackground = true, name = "Create Habit Screen - Monthly")
+@Composable
+fun CreateHabitScreenMonthlyPreview() {
+    MaterialTheme {
+        val factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                @Suppress("UNCHECKED_CAST")
+                val vm = CreateEditHabitViewModel(null) as T
+                (vm as CreateEditHabitViewModel).onFrequencyTypeChanged(HabitFrequencyType.MONTHLY)
+                return vm
+            }
+        }
+        val viewModel: CreateEditHabitViewModel = viewModel(factory = factory)
+        CreateEditHabitScreen(
+            habitId = null, 
+            onNavigateBack = {}
+        )
+    }
+}
+
 // TODO: Need DatePickerDialog integration for Start/End dates 
+
+@Composable
+fun ReminderSection(reminders: List<HabitReminder>, onAddReminder: () -> Unit, onRemoveReminder: (String) -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        if (reminders.isEmpty()) {
+            Text("No reminders set.", style = MaterialTheme.typography.bodyMedium)
+        } else {
+            reminders.forEach { reminder ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("${reminder.time}${reminder.label?.let { " - $it" } ?: ""}", style = MaterialTheme.typography.bodyLarge)
+                    IconButton(onClick = { onRemoveReminder(reminder.id) }) {
+                        Icon(Icons.Filled.Delete, contentDescription = "Remove Reminder")
+                    }
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Button(onClick = onAddReminder, modifier = Modifier.align(Alignment.End)) {
+            Icon(Icons.Filled.AddCircleOutline, contentDescription = "Add Reminder")
+            Spacer(modifier = Modifier.width(4.dp))
+            Text("Add Reminder")
+        }
+    }
+}
+
+@Composable
+fun GoalLinkSection(linkedGoalName: String?, onLinkGoal: () -> Unit, onUnlinkGoal: () -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        if (linkedGoalName != null) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.Link, contentDescription = "Linked Goal", tint = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Linked to: ", style = MaterialTheme.typography.bodyLarge)
+                Text(linkedGoalName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(onClick = onUnlinkGoal, modifier = Modifier.align(Alignment.End)) {
+                Icon(Icons.Filled.LinkOff, contentDescription = "Unlink Goal")
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Unlink Goal")
+            }
+        } else {
+            Text("Not linked to any goal.", style = MaterialTheme.typography.bodyMedium)
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(onClick = onLinkGoal, modifier = Modifier.align(Alignment.End)) {
+                Icon(Icons.Filled.Link, contentDescription = "Link Goal")
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Link to Goal")
+            }
+        }
+    }
+} 
