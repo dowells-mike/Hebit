@@ -1,11 +1,13 @@
 package com.hebit.app.data.remote.api
 
 import com.hebit.app.data.remote.dto.* // Ensure all used DTOs are imported
+import com.squareup.moshi.JsonClass
 import retrofit2.Response
 import retrofit2.http.*
 
 /**
  * Retrofit service interface for Hebit API
+ * Updated based on actual backend implementation
  */
 interface HebitApiService {
 
@@ -59,46 +61,56 @@ interface HebitApiService {
     @GET("tasks/today")
     suspend fun getTasksDueToday(): Response<TaskListResponse>
 
-    // Habit Endpoints (Refactored Section)
-    @GET("habits") // Corresponds to GET /api/habits
+    // === CORRECTED HABIT ENDPOINTS ===
+    @GET("habits") // GET /api/habits
     suspend fun getHabits(
         @Query("page") page: Int = 1,
-        @Query("per_page") perPage: Int = 20
-    ): Response<HabitListResponse> // Contains List<HabitDto>
+        @Query("per_page") perPage: Int = 20,
+        @Query("frequency") frequency: String? = null,
+        @Query("category") category: String? = null,
+        @Query("status") status: String? = null
+    ): Response<HabitListResponse> // Response format: { habits: HabitDto[], total: number, page: number, per_page: number }
 
-    @GET("habits/{id}") // Corresponds to GET /api/habits/:id
-    suspend fun getHabitById(@Path("id") id: String): Response<HabitDto>
+    @GET("habits/today") // GET /api/habits/today
+    suspend fun getTodaysHabits(): Response<HabitListResponse> // Same response format as getHabits
 
-    @POST("habits") // Corresponds to POST /api/habits
+    @GET("habits/{id}") // GET /api/habits/:id
+    suspend fun getHabitById(@Path("id") id: String): Response<HabitDto> // Single habit with completed_today field
+
+    @POST("habits") // POST /api/habits
     suspend fun createHabit(@Body createHabitRequest: CreateHabitRequest): Response<HabitDto>
 
-    @PUT("habits/{id}") // Corresponds to PUT /api/habits/:id
+    @PUT("habits/{id}") // PUT /api/habits/:id
     suspend fun updateHabit(
         @Path("id") id: String,
         @Body updateHabitRequest: UpdateHabitRequest
     ): Response<HabitDto>
 
-    @DELETE("habits/{id}") // Corresponds to DELETE /api/habits/:id
-    suspend fun deleteHabit(@Path("id") id: String): Response<Unit> // Changed from Void for consistency
+    @DELETE("habits/{id}") // DELETE /api/habits/:id
+    suspend fun deleteHabit(@Path("id") id: String): Response<Unit>
 
-    @POST("habits/{id}/track") // Corresponds to POST /api/habits/:id/track (no body)
-    suspend fun trackHabit(@Path("id") id: String): Response<Unit> // Changed signature
+    // CORRECTED: This is PUT method, and it takes a body with { completed: boolean, date: string, notes?: string }
+    @PUT("habits/{id}/track") // PUT /api/habits/:id/track
+    suspend fun trackHabit(
+        @Path("id") id: String,
+        @Body request: HabitTrackRequest
+    ): Response<HabitDto>
 
-    @POST("habits/{id}/skip") // Corresponds to POST /api/habits/:id/skip (no body) - NEW
-    suspend fun skipHabit(@Path("id") id: String): Response<Unit>
+    @POST("habits/{id}/skip") // POST /api/habits/:id/skip
+    suspend fun skipHabit(
+        @Path("id") id: String,
+        @Body request: HabitSkipRequest
+    ): Response<HabitDto>
 
-    @GET("habits/{id}/stats") // Corresponds to GET /api/habits/:id/stats
+    @GET("habits/{id}/stats") // GET /api/habits/:id/stats
     suspend fun getHabitStats(@Path("id") id: String): Response<HabitStatsDto>
 
-    // Notes for Habits
-    @GET("habits/{id}/notes") // Path per habit
-    suspend fun getNotesForHabit(@Path("id") habitId: String): Response<NotesResponse> // Assuming NotesResponse contains List<NoteDto>
-
-    @POST("habits/{id}/notes") // Path per habit, corrected
-    suspend fun addNoteForHabit(
-        @Path("id") habitId: String,
-        @Body request: CreateNoteRequest // CreateNoteRequest DTO needs to exist
-    ): Response<NoteDto>
+    // Note: The backend does not have these endpoints yet - these were assumptions
+    // @GET("habits/{id}/notes")
+    // @POST("habits/{id}/notes")
+    // @GET("habits/{id}/performance-insights")
+    // @GET("habits/{id}/related-achievements")
+    // @GET("habits/{id}/suggestions")
 
     // Goal Endpoints
     @GET("goals")
@@ -147,24 +159,15 @@ interface HebitApiService {
     @GET("productivity/insights")
     suspend fun getProductivityInsights(@Query("period") period: String?): Response<ProductivityInsightsResponse>
 
-    // Achievement Endpoints
+    // === ACHIEVEMENT ENDPOINTS ===
     @GET("achievements")
-    suspend fun getAchievements(
-        @Query("category") category: String?,
-        @Query("earned") earned: Boolean?,
-        @Query("rarity") rarity: String?,
-        @Query("page") page: Int, // Assuming page is not optional
-        @Query("per_page") perPage: Int // Assuming perPage is not optional
-    ): Response<AchievementListResponse> // AchievementListResponse DTO needs to exist
+    suspend fun getAllAchievements(): Response<List<AchievementDto>>
 
-    @GET("achievements/progress")
-    suspend fun getAchievementProgress(): Response<AchievementProgressResponse> // DTO needs to exist
+    @GET("achievements/user/{userId}")
+    suspend fun getUserAchievements(@Path("userId") userId: String): Response<List<UserAchievementDto>>
 
-    @GET("achievements/check")
-    suspend fun checkNewAchievements(): Response<NewlyEarnedAchievementsResponse> // DTO needs to exist
-
-    @GET("achievements/user") // This path might conflict with GET /api/users/:id/achievements from backend. Verify.
-    suspend fun getUserAchievements(): Response<UserAchievementResponse> // DTO needs to exist. Usually needs user context.
+    @POST("achievements/user-achievements/{userAchievementId}/seen")
+    suspend fun markUserAchievementSeen(@Path("userAchievementId") userAchievementId: String): Response<UserAchievementDto>
 
     // Category (List) Endpoints
     @GET("categories")
@@ -206,10 +209,4 @@ interface HebitApiService {
     // Task Suggestion Endpoints
     @GET("suggestions/tasks")
     suspend fun getTaskSuggestions(): Response<List<TaskSuggestionDto>>
-
-    // Define internal data classes for specific responses if not already defined
-    // These should ideally be in their respective DTO files for clarity.
-    // Example: data class TaskListResponse(val tasks: List<TaskDto>)
-    // Example: data class GoalListResponse(val goals: List<GoalDto>)
-    // Ensure all ...Response DTOs (like AchievementListResponse, NotesResponse etc.) are properly defined in your DTO package.
 }

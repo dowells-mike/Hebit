@@ -82,7 +82,7 @@ fun DashboardScreen(
         
         // Force refresh habits data
         android.util.Log.d("DashboardScreen", "Explicitly loading habits...")
-        habitViewModel.loadHabits()
+        habitViewModel.loadAllHabits()
         
         // Goals are automatically loaded in the GoalListViewModel init block
     }
@@ -653,7 +653,7 @@ fun TodayHabitsList(onHabitClick: (String) -> Unit, habitsState: Resource<List<H
 
 @Composable
 fun TodayHabitItem(habit: Habit, onHabitClick: (String) -> Unit) {
-    val isCompleted = habit.streakData?.lastCompleted == LocalDate.now()
+    val isCompleted = habit.streakData?.lastCompleted?.toLocalDate() == LocalDate.now()
 
     Card(
         modifier = Modifier

@@ -17,10 +17,10 @@ data class CompletionHistoryEntryDto(
 
 @JsonClass(generateAdapter = true)
 data class HabitFrequencyConfigDto(
-    val daysOfWeek: List<Int>? = null,         // 0-6 for Sunday-Saturday, aligning with common libraries
-    val datesOfMonth: List<Int>? = null,       // 1-31 for monthly, -1 for last day
-    val timesPerPeriod: Int? = null,       // How many times in period (e.g., 3 times a week)
-    val specificDates: List<String>? = null // ISO date strings for specific irregular dates
+    @Json(name = "daysOfWeek") val daysOfWeek: List<Int>? = null, // 0 (Sun) - 6 (Sat)
+    @Json(name = "datesOfMonth") val datesOfMonth: List<Int>? = null, // 1-31, or -1 for last day
+    @Json(name = "timesPerPeriod") val timesPerPeriod: Int? = null,
+    @Json(name = "specificDates") val specificDates: List<String>? = null // ISO Date strings
 )
 
 @JsonClass(generateAdapter = true)
@@ -30,97 +30,67 @@ data class TimePreferenceDto(
 )
 
 @JsonClass(generateAdapter = true)
-data class StreakDataDto(
-    val current: Int,
-    val longest: Int,
-    val lastCompleted: String? = null // ISO date string of last completion
+data class HabitStreakDataDto(
+    @Json(name = "current") val current: Int?,
+    @Json(name = "longest") val longest: Int?,
+    @Json(name = "lastCompleted") val lastCompleted: String? = null // ISO Date string
+)
+
+@JsonClass(generateAdapter = true)
+data class HabitCompletionHistoryEntryDto(
+    @Json(name = "date") val date: String, // ISO Date string
+    @Json(name = "completed") val completed: Boolean,
+    @Json(name = "notes") val notes: String? = null,
+    @Json(name = "skipReason") val skipReason: String? = null,
+    @Json(name = "value") val value: Int? = null, // For measurable habits
+    @Json(name = "mood") val mood: Int? = null // 1-5 mood rating
 )
 
 @JsonClass(generateAdapter = true)
 data class ReminderSettingsDto(
-    val time: String? = null, // e.g., "09:00" in HH:mm format
-    val customMessage: String? = null,
-    val notificationStyle: String? = null // e.g., 'basic', 'motivational' (align with backend enum if any)
+    @Json(name = "time") val time: String? = null,
+    @Json(name = "customMessage") val customMessage: String? = null
 )
 
 @JsonClass(generateAdapter = true)
 data class SuccessCriteriaDto(
-    val type: String? = null, // e.g., 'boolean', 'numeric', 'timer' (align with backend enum)
-    val target: Float? = null, // Target value for numeric/timer types
-    val unit: String? = null, // e.g., 'times', 'minutes', 'pages'
-    val minimumThreshold: Float? = null // Minimum value to count as completion for numeric types
+    @Json(name = "type") val type: String? = null, // 'boolean', 'numeric', 'timer'
+    @Json(name = "target") val target: Int? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class HabitMetadataDto(
+    @Json(name = "successRate") val successRate: Float? = null
 )
 
 @JsonClass(generateAdapter = true)
 data class HabitDto(
     @Json(name = "_id") val id: String,
-    val title: String,
-    val description: String? = null, // Made optional
-    @Json(name = "icon") val icon: String? = null, // Aligned with backend, was icon_name
-    val color: String? = null, // Added
-    val goalLink: String? = null, // Added (e.g., an ID of a linked Goal)
-    val frequency: String, // e.g., "daily", "weekly", "monthly", "specific_dates"
-    val frequencyConfig: HabitFrequencyConfigDto? = null, // Added
-    val timePreference: TimePreferenceDto? = null, // Added
-    val streakData: StreakDataDto? = null, // Added (replaces old streak: Int)
-    val category: String? = null, // Added (e.g., an ID or name of a category)
-    val completionHistory: List<CompletionHistoryEntryDto> = emptyList(),
-    val difficulty: String? = null, // Added (e.g., 'easy', 'medium', 'hard')
-    val startDate: String? = null, // Added (ISO date string)
-    val endDate: String? = null, // Added (ISO date string)
-    val reminderSettings: ReminderSettingsDto? = null, // Added
-    val successCriteria: SuccessCriteriaDto? = null, // Added
-    // `completedToday` field removed. This should be derived on the client-side (ViewModel/Domain layer)
-    // based on `completionHistory` or `streakData.lastCompleted` and current date.
-    @Json(name = "createdAt") val createdAt: String? = null, // Keep as String (ISO date)
-    @Json(name = "updatedAt") val updatedAt: String? = null  // Keep as String (ISO date)
+    @Json(name = "user") val userId: String,
+    @Json(name = "title") val title: String,
+    @Json(name = "description") val description: String? = null,
+    @Json(name = "icon") val icon: String? = null,
+    @Json(name = "color") val color: String? = null,
+    @Json(name = "frequency") val frequency: String, // 'daily', 'weekly', 'monthly', 'specific_dates'
+    @Json(name = "frequencyConfig") val frequencyConfig: HabitFrequencyConfigDto? = null,
+    @Json(name = "streakData") val streakData: HabitStreakDataDto? = null,
+    @Json(name = "category") val category: String? = null,
+    @Json(name = "completionHistory") val completionHistory: List<HabitCompletionHistoryEntryDto>? = emptyList(),
+    @Json(name = "status") val status: String? = "active", // 'active', 'archived'
+    @Json(name = "difficulty") val difficulty: String? = null, // 'easy', 'medium', 'hard'
+    @Json(name = "impact") val impact: Int? = null, // Example: 1-5 scale
+    @Json(name = "startDate") val startDate: String? = null, // ISO Date string
+    @Json(name = "endDate") val endDate: String? = null, // ISO Date string
+    @Json(name = "reminderSettings") val reminderSettings: ReminderSettingsDto? = null,
+    @Json(name = "successCriteria") val successCriteria: SuccessCriteriaDto? = null,
+    @Json(name = "metadata") val metadata: HabitMetadataDto? = null,
+    @Json(name = "createdAt") val createdAt: String? = null, // ISO Date string
+    @Json(name = "updatedAt") val updatedAt: String? = null, // ISO Date string
+    @Json(name = "completed_today") val completedToday: Boolean? = null
 )
 
-@JsonClass(generateAdapter = true)
-data class HabitListResponse(
-    val habits: List<HabitDto>,
-    // These fields are often part of paginated responses. Adjust if backend sends different metadata.
-    val total: Int? = null,
-    val page: Int? = null,
-    @Json(name = "per_page") val perPage: Int? = null,
-    val message: String? = null // Optional: For any general messages from the API (e.g., errors not tied to HTTP status)
-)
-
-@JsonClass(generateAdapter = true)
-data class CreateHabitRequest( // DTO for creating a new habit. Align fields with HabitDto where applicable.
-    val title: String,
-    val description: String? = null,
-    val icon: String? = null,
-    val color: String? = null,
-    val goalLink: String? = null,
-    val frequency: String,
-    val frequencyConfig: HabitFrequencyConfigDto? = null,
-    val timePreference: TimePreferenceDto? = null,
-    val category: String? = null,
-    val difficulty: String? = null,
-    val startDate: String? = null,
-    val endDate: String? = null,
-    val reminderSettings: ReminderSettingsDto? = null,
-    val successCriteria: SuccessCriteriaDto? = null
-)
-
-@JsonClass(generateAdapter = true)
-data class UpdateHabitRequest( // DTO for updating an existing habit. All fields are optional.
-    val title: String? = null,
-    val description: String? = null,
-    val icon: String? = null,
-    val color: String? = null,
-    val goalLink: String? = null,
-    val frequency: String? = null,
-    val frequencyConfig: HabitFrequencyConfigDto? = null,
-    val timePreference: TimePreferenceDto? = null,
-    val category: String? = null,
-    val difficulty: String? = null,
-    val startDate: String? = null,
-    val endDate: String? = null,
-    val reminderSettings: ReminderSettingsDto? = null,
-    val successCriteria: SuccessCriteriaDto? = null
-)
+// Note: HabitListResponse, CreateHabitRequest, and UpdateHabitRequest have been moved to separate files
+// to avoid redeclaration conflicts and improve code organization.
 
 /* Commenting out HabitCompletionRequest as the current backend /track endpoint for habits does not take a body.
    If the backend API changes for habit tracking (e.g. to allow back-dating or adding notes upon completion),

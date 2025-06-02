@@ -6,9 +6,10 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import com.hebit.app.domain.model.DayOfWeekDomain
+import com.hebit.app.domain.model.Habit
 import com.hebit.app.domain.model.HabitFrequency
-import com.hebit.app.domain.model.HabitFrequencyType
+import java.time.format.TextStyle
+import java.util.Locale
 
 enum class HabitCategoryUI(val title: String, val icon: ImageVector, val color: Color) {
     HEALTH("Health", Icons.Default.Favorite, Color(0xFFE91E63)),
@@ -45,52 +46,74 @@ fun getCategoryUI(categoryName: String?): HabitCategoryUI {
         ?: HabitCategoryUI.OTHER
 }
 
-fun formatHabitFrequency(frequency: HabitFrequency?): String {
-    if (frequency == null) return "Not set"
-    return when (frequency.type) {
-        HabitFrequencyType.DAILY -> "Daily"
-        HabitFrequencyType.WEEKLY -> {
-            val days = frequency.daysOfWeek?.joinToString(", ") { day ->
-                when (day) {
-                    DayOfWeekDomain.SUNDAY -> "Sun"
-                    DayOfWeekDomain.MONDAY -> "Mon"
-                    DayOfWeekDomain.TUESDAY -> "Tue"
-                    DayOfWeekDomain.WEDNESDAY -> "Wed"
-                    DayOfWeekDomain.THURSDAY -> "Thu"
-                    DayOfWeekDomain.FRIDAY -> "Fri"
-                    DayOfWeekDomain.SATURDAY -> "Sat"
-                    DayOfWeekDomain.UNKNOWN -> ""
-                }
-            }?.trim()?.removeSuffix(",") ?: "days"
+fun formatHabitFrequency(habit: Habit): String {
+    val freqEnum = habit.frequency
+    val config = habit.frequencyConfig
 
-            if (days.isBlank() && frequency.timesPerPeriod == null) return "Weekly"
-            if (days.isBlank() && frequency.timesPerPeriod != null) return "Weekly (${frequency.timesPerPeriod}x)"
-
-            if (frequency.timesPerPeriod != null && frequency.timesPerPeriod > 0) {
-                "${frequency.timesPerPeriod}x a week on $days"
+    return when (freqEnum) {
+        HabitFrequency.DAILY -> {
+            if (config?.daysOfWeek.isNullOrEmpty() || config?.daysOfWeek?.size == 7) {
+                "Daily"
             } else {
-                "Weekly on $days"
+                val days = config?.daysOfWeek
+                    ?.sorted()
+                    // Assuming daysOfWeek in domain model is 0(Sun)-6(Sat)
+                    // java.time.DayOfWeek uses 1(Mon)-7(Sun).
+                    // Mapping 0-6 to 1-7 for DayOfWeek.of()
+                    ?.mapNotNull { dayNumber ->
+                        try {
+                            // Adjust 0 (Sun) to 7 for DayOfWeek.of, and 1-6 remain 1-6
+                            val javaDayOfWeek = if (dayNumber == 0) 7 else dayNumber
+                            java.time.DayOfWeek.of(javaDayOfWeek).getDisplayName(TextStyle.SHORT, Locale.getDefault())
+                        } catch (e: Exception) { null } // Catch invalid day numbers
+                    }
+                    ?.joinToString(", ")
+                if (days.isNullOrBlank()) "Daily" else "Daily: $days"
             }
         }
-        HabitFrequencyType.MONTHLY -> {
-            val times = frequency.timesPerPeriod
-            val dates = frequency.datesOfMonth?.joinToString(", ")
-
+        HabitFrequency.WEEKLY -> {
+            val times = config?.timesPerPeriod ?: 1
+            val plural = if (times > 1) "s" else ""
+            // If daysOfWeek is relevant for WEEKLY, this needs enhancement. For now, simple.
+            if (!config?.daysOfWeek.isNullOrEmpty()) {
+                val days = config?.daysOfWeek
+                    ?.sorted()
+                    ?.mapNotNull { dayNumber ->
+                        try {
+                            val javaDayOfWeek = if (dayNumber == 0) 7 else dayNumber
+                            java.time.DayOfWeek.of(javaDayOfWeek).getDisplayName(TextStyle.SHORT, Locale.getDefault())
+                        } catch (e: Exception) { null }
+                    }
+                    ?.joinToString(", ")
+                "$times time$plural a week on: $days"
+            } else {
+                "$times time$plural a week"
+            }
+        }
+        HabitFrequency.MONTHLY -> {
+            val times = config?.timesPerPeriod
             if (times != null && times > 0) {
-                if (dates?.isNotBlank() == true) "Monthly ($times x on $dates)" else "Monthly ($times x)"
-            } else if (dates?.isNotBlank() == true) {
-                "Monthly on day(s): $dates"
+                val plural = if (times > 1) "s" else ""
+                "$times time$plural a month"
+            } else if (!config?.datesOfMonth.isNullOrEmpty()) {
+                val dates = config?.datesOfMonth?.joinToString(", ") {
+                    if (it == -1) "Last Day" else it.toString() // 'it' is already an Int here
+                }
+                "Monthly on: $dates"
             } else {
                 "Monthly"
             }
         }
-        HabitFrequencyType.SPECIFIC_DATES -> {
-            if (frequency.specificDates?.isNotEmpty() == true) {
-                "On specific dates"
+        HabitFrequency.SPECIFIC_DATES -> {
+            if (config?.specificDates?.isNotEmpty() == true) {
+                // Potentially format the dates if needed, e.g., count or a summary
+                "On ${config.specificDates.size} specific date(s)"
             } else {
-                "Custom Schedule"
+                "Custom Schedule (Specific Dates)"
             }
         }
-        HabitFrequencyType.UNKNOWN -> "Custom Schedule"
+        HabitFrequency.UNKNOWN -> "Custom Schedule" // Handles UNKNOWN explicitly
+        // No else needed if all enum cases are covered and the type is non-nullable.
+        // If freqEnum could be null (though it shouldn't be based on Habit model), then an else would be required.
     }
 } 

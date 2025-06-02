@@ -15,14 +15,27 @@ data class TimedCompletionStat(
     val count: Int
 )
 
+// Represents the completion count for a specific day of the week.
+data class HabitCompletionByDay(
+    val day: String, // e.g., "Sunday", "Monday"
+    val count: Int
+)
+
+// Represents the completion count for a specific time range in a day.
+data class HabitCompletionByTime(
+    val name: String, // e.g., "Morning (5am-12pm)"
+    val count: Int
+)
+
+// Domain model for habit statistics.
+// This should map from HabitStatsDto and be used in the UI/ViewModel.
 data class HabitStats(
-    val currentStreak: Int,
-    val longestStreak: Int,
-    val completionRate: Float,
-    val completedEntries: Int, // Domain expects this
-    val totalEntries: Int,     // Domain expects this
-    val completionsByDay: Map<String, Int>,
-    val completionsByTime: Map<String, Int>,
-    val consistency: Float,      // Domain expects this
-    val lastCompletedDate: LocalDate?
+    val completionRate: Float?,
+    val currentStreak: Int?,
+    val longestStreak: Int?,
+    val consistency: Float?, // Percentage
+    val totalEntries: Int?,
+    val completedEntries: Int?,
+    val completionsByDay: List<HabitCompletionByDay> = emptyList(),
+    val completionsByTime: List<HabitCompletionByTime> = emptyList()
 )

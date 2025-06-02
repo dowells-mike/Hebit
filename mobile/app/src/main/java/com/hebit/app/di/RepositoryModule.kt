@@ -1,13 +1,13 @@
 package com.hebit.app.di
 
-import com.hebit.app.data.repository.AchievementRepository
+import com.hebit.app.data.repository.AchievementRepositoryImpl
 import com.hebit.app.data.repository.AuthRepository
 import com.hebit.app.data.repository.GoalRepositoryImpl
 import com.hebit.app.data.repository.HabitRepositoryImpl
 import com.hebit.app.data.repository.ProductivityRepository
 import com.hebit.app.data.repository.TaskRepositoryImpl
 import com.hebit.app.domain.repository.GoalRepository
-import com.hebit.app.domain.repository.HabitRepository
+import com.hebit.app.domain.repository.IHabitRepository
 import com.hebit.app.domain.repository.IAchievementRepository
 import com.hebit.app.domain.repository.IAuthRepository
 import com.hebit.app.domain.repository.IProductivityRepository
@@ -38,7 +38,7 @@ abstract class RepositoryModule {
     @Singleton
     abstract fun bindHabitRepository(
         habitRepositoryImpl: HabitRepositoryImpl
-    ): HabitRepository
+    ): IHabitRepository
     
     @Binds
     @Singleton
@@ -51,11 +51,11 @@ abstract class RepositoryModule {
     abstract fun bindProductivityRepository(
         productivityRepository: ProductivityRepository
     ): IProductivityRepository
-    
+
     @Binds
     @Singleton
     abstract fun bindAchievementRepository(
-        achievementRepository: AchievementRepository
+        achievementRepositoryImpl: AchievementRepositoryImpl
     ): IAchievementRepository
     
     // Add other repositories here as they're implemented

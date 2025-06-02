@@ -21,6 +21,7 @@ import com.hebit.app.domain.model.Profile
 fun ProfileScreen(
     onNavigateToSettings: () -> Unit,
     onNavigateToAchievements: () -> Unit,
+    onNavigateToAchievementCenter: () -> Unit,
     onNavigateToStatistics: () -> Unit,
     onNavigateToEditProfile: () -> Unit,
     onHomeClick: () -> Unit = {},
@@ -112,6 +113,7 @@ fun ProfileScreen(
                     ProfileContent(
                         profile = profile,
                         onNavigateToAchievements = onNavigateToAchievements,
+                        onNavigateToAchievementCenter = onNavigateToAchievementCenter,
                         onNavigateToStatistics = onNavigateToStatistics,
                         onNavigateToEditProfile = onNavigateToEditProfile
                     )
@@ -164,6 +166,7 @@ fun ProfileScreen(
 fun ProfileContent(
     profile: Profile,
     onNavigateToAchievements: () -> Unit,
+    onNavigateToAchievementCenter: () -> Unit,
     onNavigateToStatistics: () -> Unit,
     onNavigateToEditProfile: () -> Unit
 ) {
@@ -222,6 +225,12 @@ fun ProfileContent(
             title = "Achievements",
             icon = Icons.Default.EmojiEvents,
             onClick = onNavigateToAchievements
+        )
+
+        ProfileActionItem(
+            title = "Achievement Center",
+            icon = Icons.Default.MilitaryTech,
+            onClick = onNavigateToAchievementCenter
         )
     }
 }

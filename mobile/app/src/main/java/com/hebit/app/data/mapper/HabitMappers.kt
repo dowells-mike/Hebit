@@ -1,205 +1,168 @@
 package com.hebit.app.data.mapper
 
-import com.hebit.app.data.remote.dto.*
-import com.hebit.app.domain.model.*
+import com.hebit.app.data.remote.dto.* // ktlint-disable no-wildcard-imports
+import com.hebit.app.domain.model.* // ktlint-disable no-wildcard-imports
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
-import java.util.Locale
 
-// --- Helper Functions ---
+// Re-using existing helpers from AchievementMappers.kt if applicable or define locally
+private fun String?.toSafeLocalDateTime(): LocalDateTime? {
+    if (this == null) return null
+    return try {
+        LocalDateTime.parse(this, DateTimeFormatter.ISO_DATE_TIME)
+    } catch (e: DateTimeParseException) {
+        try {
+            LocalDateTime.parse(this, DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+        } catch (e2: DateTimeParseException) {
+            null // Add logging if necessary
+        }
+    }
+}
 
-inline fun <reified T : Enum<T>> safeEnumValueOf(name: String?, default: T): T {
+private fun String?.toSafeLocalDate(): LocalDate? {
+    if (this == null) return null
+    return try {
+        LocalDate.parse(this, DateTimeFormatter.ISO_LOCAL_DATE)
+    } catch (e: DateTimeParseException) {
+        try {
+            // Handle cases where date might come with time info from ISO_DATE_TIME
+            LocalDateTime.parse(this, DateTimeFormatter.ISO_DATE_TIME).toLocalDate()
+        } catch (e1: DateTimeParseException) {
+            try {
+                LocalDateTime.parse(this, DateTimeFormatter.ISO_OFFSET_DATE_TIME).toLocalDate()
+            } catch (e2: DateTimeParseException) {
+                null // Add logging if necessary
+            }
+        }
+    }
+}
+
+private inline fun <reified T : Enum<T>> enumValueOfOrUnknown(name: String?, default: T): T {
     if (name == null) return default
     return try {
-        enumValueOf<T>(name.uppercase(Locale.ROOT).replace("-", "_"))
+        java.lang.Enum.valueOf(T::class.java, name.trim().uppercase().replace("-", "_"))
     } catch (e: IllegalArgumentException) {
         default
     }
 }
 
-fun String.toSafeLocalDate(): LocalDate? {
-    return try {
-        LocalDate.parse(this, DateTimeFormatter.ISO_DATE_TIME.withZone(java.time.ZoneOffset.UTC))
-    } catch (e: DateTimeParseException) {
-        try {
-            LocalDate.parse(this, DateTimeFormatter.ISO_LOCAL_DATE)
-        } catch (e2: DateTimeParseException) {
-            try {
-                LocalDate.parse(this, DateTimeFormatter.ISO_DATE)
-            } catch (e3: DateTimeParseException) {
-                null // Consider logging
-            }
-        }
-    }
-}
-
-fun String.toSafeLocalTime(): LocalTime? {
-    return try {
-        LocalTime.parse(this, DateTimeFormatter.ofPattern("HH:mm:ss"))
-    } catch (e: DateTimeParseException) {
-        try {
-            LocalTime.parse(this, DateTimeFormatter.ofPattern("HH:mm"))
-        } catch (e2: DateTimeParseException) {
-            try {
-                LocalTime.parse(this, DateTimeFormatter.ISO_LOCAL_TIME)
-            } catch (e3: DateTimeParseException) {
-                null // Consider logging
-            }
-        }
-    }
-}
-
-fun String.toSafeLocalDateTime(): LocalDateTime? {
-    return try {
-        LocalDateTime.parse(this, DateTimeFormatter.ISO_DATE_TIME.withZone(java.time.ZoneOffset.UTC))
-    } catch (e: DateTimeParseException) {
-        try {
-            // If only date is provided, append start of day
-            LocalDate.parse(this, DateTimeFormatter.ISO_LOCAL_DATE).atStartOfDay()
-        } catch (e2: DateTimeParseException) {
-            try {
-                LocalDate.parse(this, DateTimeFormatter.ISO_DATE).atStartOfDay()
-            } catch (e3: DateTimeParseException) {
-                null // Consider logging
-            }
-        }
-    }
-}
-
-
-fun Int.toDayOfWeekDomain(): DayOfWeekDomain {
-    return when (this) { // Assuming 0 is Sunday from DTO
-        0 -> DayOfWeekDomain.SUNDAY
-        1 -> DayOfWeekDomain.MONDAY
-        2 -> DayOfWeekDomain.TUESDAY
-        3 -> DayOfWeekDomain.WEDNESDAY
-        4 -> DayOfWeekDomain.THURSDAY
-        5 -> DayOfWeekDomain.FRIDAY
-        6 -> DayOfWeekDomain.SATURDAY
-        else -> DayOfWeekDomain.UNKNOWN
-    }
-}
-
-// --- DTO to Domain Mappers ---
-
-fun CompletionHistoryEntryDto.toDomain(): HabitCompletionRecord {
-    return HabitCompletionRecord(
-        date = this.date.toSafeLocalDate() ?: LocalDate.now(), // Fallback
-        completed = this.completed,
-        value = this.value,
-        notes = this.notes,
-        mood = this.mood,
-        skipReason = this.skipReason
-    )
-}
-
-fun HabitFrequencyConfigDto?.toDomain(parentFrequencyType: HabitFrequencyType): HabitFrequency {
-    // If 'this' (HabitFrequencyConfigDto) is null, create a default HabitFrequency based on parent type
-    if (this == null) {
-        return HabitFrequency(type = parentFrequencyType)
-    }
-    return HabitFrequency(
-        type = parentFrequencyType,
-        daysOfWeek = this.daysOfWeek?.map { it.toDayOfWeekDomain() },
+fun HabitFrequencyConfigDto?.toDomain(): HabitFrequencyConfig? {
+    if (this == null) return null
+    return HabitFrequencyConfig(
+        daysOfWeek = this.daysOfWeek,
         datesOfMonth = this.datesOfMonth,
         timesPerPeriod = this.timesPerPeriod,
         specificDates = this.specificDates?.mapNotNull { it.toSafeLocalDate() }
     )
 }
 
-fun TimePreferenceDto?.toDomain(): HabitTimePreference? {
+fun HabitStreakDataDto?.toDomain(): HabitStreakData? {
     if (this == null) return null
-    return HabitTimePreference(
-        preferredTime = this.preferredTime?.toSafeLocalTime(),
-        flexibilityMinutes = this.flexibility
-    )
-}
-
-fun StreakDataDto?.toDomain(): HabitStreakDetails? {
-    if (this == null) return null
-    return HabitStreakDetails(
+    return HabitStreakData(
         current = this.current,
         longest = this.longest,
-        lastCompleted = this.lastCompleted?.toSafeLocalDate()
+        lastCompleted = this.lastCompleted.toSafeLocalDateTime()
     )
 }
 
-fun ReminderSettingsDto?.toDomain(): HabitReminderSettings? {
-    if (this == null) return null
-    return HabitReminderSettings(
-        time = this.time?.toSafeLocalTime(),
-        customMessage = this.customMessage,
-        notificationStyle = safeEnumValueOf(this.notificationStyle, ReminderNotificationStyle.UNKNOWN)
+fun HabitCompletionHistoryEntryDto.toDomain(): HabitCompletionHistoryEntry {
+    return HabitCompletionHistoryEntry(
+        date = this.date.toSafeLocalDateTime() ?: LocalDateTime.now(), // Fallback, consider error handling
+        completed = this.completed,
+        notes = this.notes,
+        skipReason = this.skipReason,
+        value = this.value,
+        mood = this.mood
     )
 }
 
-fun SuccessCriteriaDto?.toDomain(): HabitSuccessCriteria? {
+fun ReminderSettingsDto?.toDomain(): ReminderSettings? {
     if (this == null) return null
-    return HabitSuccessCriteria(
-        type = safeEnumValueOf(this.type, SuccessCriteriaType.UNKNOWN),
-        target = this.target,
-        unit = this.unit,
-        minimumThreshold = this.minimumThreshold
+    return ReminderSettings(
+        time = this.time,
+        customMessage = this.customMessage
+    )
+}
+
+fun SuccessCriteriaDto?.toDomain(): SuccessCriteria? {
+    if (this == null) return null
+    return SuccessCriteria(
+        type = enumValueOfOrUnknown(this.type, SuccessCriteriaType.UNKNOWN),
+        target = this.target
+    )
+}
+
+fun HabitMetadataDto?.toDomain(): HabitMetadata? {
+    if (this == null) return null
+    return HabitMetadata(
+        successRate = this.successRate
     )
 }
 
 fun HabitDto.toDomain(): Habit {
-    val domainFrequencyType = safeEnumValueOf(this.frequency, HabitFrequencyType.UNKNOWN)
     return Habit(
         id = this.id,
+        userId = this.userId,
         title = this.title,
         description = this.description,
         icon = this.icon,
         color = this.color,
-        goalLink = this.goalLink,
-        frequency = this.frequencyConfig.toDomain(domainFrequencyType), // Pass DTO, mapper handles null
-        timePreference = this.timePreference.toDomain(), // Pass DTO, mapper handles null
-        streakData = this.streakData.toDomain(), // Pass DTO, mapper handles null
+        frequency = enumValueOfOrUnknown(this.frequency, HabitFrequency.UNKNOWN),
+        frequencyConfig = this.frequencyConfig.toDomain(),
+        streakData = this.streakData.toDomain(),
         category = this.category,
-        completionHistory = this.completionHistory.map { it.toDomain() },
-        difficulty = safeEnumValueOf(this.difficulty, HabitDifficulty.UNKNOWN),
-        startDate = this.startDate?.toSafeLocalDate(),
-        endDate = this.endDate?.toSafeLocalDate(),
-        reminderSettings = this.reminderSettings.toDomain(), // Pass DTO, mapper handles null
-        successCriteria = this.successCriteria.toDomain(), // Pass DTO, mapper handles null
-        createdAt = this.createdAt?.toSafeLocalDateTime()?.toLocalDate(), // Example if domain wants LocalDate
-        updatedAt = this.updatedAt?.toSafeLocalDateTime()?.toLocalDate()  // Example
+        completionHistory = this.completionHistory?.map { it.toDomain() } ?: emptyList(),
+        status = enumValueOfOrUnknown(this.status, HabitStatus.UNKNOWN),
+        difficulty = enumValueOfOrUnknown(this.difficulty, HabitDifficulty.UNKNOWN),
+        impact = this.impact,
+        startDate = this.startDate.toSafeLocalDate(),
+        endDate = this.endDate.toSafeLocalDate(),
+        reminderSettings = this.reminderSettings.toDomain(),
+        successCriteria = this.successCriteria.toDomain(),
+        metadata = this.metadata.toDomain(),
+        createdAt = this.createdAt.toSafeLocalDateTime(),
+        updatedAt = this.updatedAt.toSafeLocalDateTime(),
+        completedToday = this.completedToday
     )
 }
 
-fun List<HabitDto>.toDomainModels(): List<Habit> {
-    return this.map { it.toDomain() }
-}
-
-fun NoteDto.toDomain(): Note {
-    return Note(
-        id = this.id,
-        habitId = this.habitId,
-        content = this.content,
-        createdAt = this.createdAt.toSafeLocalDateTime() ?: LocalDateTime.now() // Fallback
+// Mapper for HabitStatsDto to HabitStats domain model
+fun HabitCompletionByDayDto.toDomain(): HabitCompletionByDay {
+    return HabitCompletionByDay(
+        day = this.day,
+        count = this.count
     )
 }
 
-fun List<NoteDto>.toNoteDomainModels(): List<Note> {
-    return this.map { it.toDomain() }
+fun HabitCompletionByTimeDto.toDomain(): HabitCompletionByTime {
+    return HabitCompletionByTime(
+        name = this.name,
+        count = this.count
+    )
 }
 
 fun HabitStatsDto.toDomain(): HabitStats {
-    val mappedCompletionsByDay = this.completionsByDay.associate { it.day to it.count }
-    val mappedCompletionsByTime = this.completionsByTime.associate { it.name to it.count }
-
     return HabitStats(
+        completionRate = this.completionRate,
         currentStreak = this.currentStreak,
         longestStreak = this.longestStreak,
-        completionRate = this.completionRate,
-        completedEntries = this.completedEntries, // Matches DTO field
-        totalEntries = this.totalEntries,       // Matches DTO field
-        completionsByDay = mappedCompletionsByDay,
-        completionsByTime = mappedCompletionsByTime,
-        consistency = this.consistency,           // Matches DTO field
-        lastCompletedDate = null // This field is not in HabitStatsDto, so pass null
+        consistency = this.consistency,
+        totalEntries = this.totalEntries,
+        completedEntries = this.completedEntries,
+        completionsByDay = this.completionsByDay?.map { it.toDomain() } ?: emptyList(),
+        completionsByTime = this.completionsByTime?.map { it.toDomain() } ?: emptyList()
+    )
+}
+
+// --- Domain to DTO Mappers (for Requests) ---
+
+fun HabitFrequencyConfig.toDto(): HabitFrequencyConfigDto {
+    return HabitFrequencyConfigDto(
+        daysOfWeek = this.daysOfWeek,
+        datesOfMonth = this.datesOfMonth,
+        timesPerPeriod = this.timesPerPeriod,
+        specificDates = this.specificDates?.map { it.format(DateTimeFormatter.ISO_LOCAL_DATE) }
     )
 }

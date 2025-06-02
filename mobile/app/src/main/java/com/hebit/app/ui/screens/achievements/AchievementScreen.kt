@@ -6,6 +6,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -27,9 +28,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.hebit.app.data.remote.dto.AchievementDto
-import com.hebit.app.data.remote.dto.AchievementProgressDto
-import com.hebit.app.data.remote.dto.UserAchievementDto
+import com.hebit.app.domain.model.Achievement
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -46,8 +45,14 @@ fun AchievementScreen(
     var earnedFilter by remember { mutableStateOf<Boolean?>(null) }
     var showFilterDialog by remember { mutableStateOf(false) }
     
-    LaunchedEffect(Unit) {
-        viewModel.checkNewAchievements()
+    LaunchedEffect(key1 = Unit) {
+        viewModel.uiEvent.collect { event ->
+            when (event) {
+                is AchievementsUiEvent.ShowSnackbar -> {
+                    println("Snackbar: ${event.message}")
+                }
+            }
+        }
     }
     
     Column(
@@ -56,16 +61,27 @@ fun AchievementScreen(
             .padding(16.dp)
     ) {
         AchievementHeader(
-            onCheckClick = { viewModel.checkNewAchievements() },
+            onRefreshClick = { viewModel.retryLoadInitialData() },
             onFilterClick = { showFilterDialog = true }
         )
         
-        if (uiState.isLoadingAchievements) {
+        if (uiState.isLoading) {
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier.fillMaxSize()
             ) {
                 CircularProgressIndicator()
+            }
+        } else if (uiState.error != null) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Text("Error: ${uiState.error}")
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(onClick = { viewModel.retryLoadInitialData() }) {
+                    Text("Retry")
+                }
             }
         } else {
             LazyVerticalGrid(
@@ -75,43 +91,19 @@ fun AchievementScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(
-                    uiState.achievements.filter { achievement ->
-                        (selectedFilter == null || achievement.category == selectedFilter) &&
-                        (earnedFilter == null || achievement.earned == earnedFilter)
-                    }
-                ) { achievement ->
-                    val progress = uiState.achievementProgress.find { 
-                        it.id == achievement.id 
-                    }
-                    val userAchievement = uiState.userAchievements.find { 
-                        it.achievementId == achievement.id 
-                    }
-                    
-                    AchievementItem(
-                        achievement = achievement,
-                        progress = progress,
-                        userAchievement = userAchievement
-                    )
+                items(uiState.displayedAchievements) { achievementData ->
+                    AchievementItem(achievementData = achievementData)
                 }
             }
         }
     }
     
-    NewAchievementsDialog(
-        achievements = uiState.newlyEarnedAchievements,
-        isVisible = uiState.hasNewAchievements,
-        onDismiss = { viewModel.clearNewAchievementsState() }
-    )
-    
     if (showFilterDialog) {
         FilterDialog(
-            selectedCategory = selectedFilter,
-            earnedFilter = earnedFilter,
+            currentFilter = uiState.currentFilter,
             onDismiss = { showFilterDialog = false },
-            onApplyFilter = { category, earned ->
-                selectedFilter = category
-                earnedFilter = earned
+            onApplyFilter = { newFilter ->
+                viewModel.setFilter(newFilter)
                 showFilterDialog = false
             }
         )
@@ -120,7 +112,7 @@ fun AchievementScreen(
 
 @Composable
 fun AchievementHeader(
-    onCheckClick: () -> Unit,
+    onRefreshClick: () -> Unit,
     onFilterClick: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -137,15 +129,15 @@ fun AchievementHeader(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Button(
-                onClick = onCheckClick,
+                onClick = onRefreshClick,
                 modifier = Modifier.weight(1f)
             ) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
-                    contentDescription = "Check for new achievements"
+                    contentDescription = "Refresh achievements"
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Check New")
+                Text("Refresh")
             }
             
             Spacer(modifier = Modifier.width(16.dp))
@@ -170,17 +162,18 @@ fun AchievementHeader(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AchievementItem(
-    achievement: AchievementDto,
-    progress: AchievementProgressDto?,
-    userAchievement: UserAchievementDto?
+    achievementData: AchievementDisplayData
 ) {
-    val isEarned = achievement.earned || userAchievement != null
+    val achievement = achievementData.achievement
+    val isEarned = achievementData.isEarned
+    val currentProgress = achievementData.progress
+    val targetValue = (achievement.criteria.targetValue as? Number)?.toInt() ?: 1
     
     ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(0.8f)
-            .alpha(if (isEarned) 1f else 0.7f)
+            .alpha(if (isEarned || !achievement.secret) 1f else 0.5f)
     ) {
         Column(
             modifier = Modifier
@@ -189,8 +182,7 @@ fun AchievementItem(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Rarity indicator
-            val rarityColor = when (achievement.rarity.lowercase()) {
+            val rarityColor = when (achievement.rarity.toString().lowercase()) {
                 "common" -> Color(0xFF78909C)
                 "uncommon" -> Color(0xFF4CAF50)
                 "rare" -> Color(0xFF2196F3)
@@ -203,49 +195,24 @@ fun AchievementItem(
                 modifier = Modifier
                     .size(56.dp)
                     .clip(CircleShape)
-                    .background(rarityColor.copy(alpha = 0.1f)),
+                    .background(rarityColor.copy(alpha = if (isEarned || !achievement.secret) 0.1f else 0.05f)),
                 contentAlignment = Alignment.Center
             ) {
-                // This would be an image in a real app
-                // For now, use an icon based on the category
-                when (achievement.category.lowercase()) {
-                    "task" -> Icon(
-                        Icons.Default.CheckCircle,
-                        contentDescription = null,
-                        tint = rarityColor,
-                        modifier = Modifier.size(32.dp)
-                    )
-                    "habit" -> Icon(
-                        Icons.Default.Repeat,
-                        contentDescription = null,
-                        tint = rarityColor,
-                        modifier = Modifier.size(32.dp)
-                    )
-                    "goal" -> Icon(
-                        Icons.Default.EmojiEvents,
-                        contentDescription = null,
-                        tint = rarityColor,
-                        modifier = Modifier.size(32.dp)
-                    )
-                    "streak" -> Icon(
-                        Icons.Default.LocalFireDepartment,
-                        contentDescription = null,
-                        tint = rarityColor,
-                        modifier = Modifier.size(32.dp)
-                    )
-                    "focus" -> Icon(
-                        Icons.Default.Timer,
-                        contentDescription = null,
-                        tint = rarityColor,
-                        modifier = Modifier.size(32.dp)
-                    )
-                    else -> Icon(
-                        Icons.Default.Star,
-                        contentDescription = null,
-                        tint = rarityColor,
-                        modifier = Modifier.size(32.dp)
-                    )
+                val iconToShow = when (achievement.category.toString().lowercase()) {
+                    "tasks" -> Icons.Default.CheckCircle
+                    "habits" -> Icons.Default.Repeat
+                    "goals" -> Icons.Default.EmojiEvents
+                    "streaks" -> Icons.Default.LocalFireDepartment
+                    "focus" -> Icons.Default.Timer
+                    "special" -> Icons.Default.Celebration
+                    else -> Icons.Default.Star
                 }
+                Icon(
+                    iconToShow,
+                    contentDescription = achievement.name,
+                    tint = if (isEarned || !achievement.secret) rarityColor else Color.Gray,
+                    modifier = Modifier.size(32.dp)
+                )
                 
                 if (isEarned) {
                     Box(
@@ -258,7 +225,7 @@ fun AchievementItem(
                     ) {
                         Icon(
                             Icons.Default.Check,
-                            contentDescription = null,
+                            contentDescription = "Earned",
                             tint = Color.White,
                             modifier = Modifier.size(12.dp)
                         )
@@ -269,60 +236,62 @@ fun AchievementItem(
             Spacer(modifier = Modifier.height(8.dp))
             
             Text(
-                text = achievement.name,
+                text = if (achievement.secret && !isEarned) "Hidden Achievement" else achievement.name,
                 style = MaterialTheme.typography.titleMedium,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.alpha(if (achievement.secret && !isEarned && !isEarned) 0.7f else 1f)
             )
             
             Spacer(modifier = Modifier.height(4.dp))
             
-            Text(
-                text = achievement.description,
-                style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            if (!(achievement.secret && !isEarned)) {
+                Text(
+                    text = achievement.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.Center,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             
             Spacer(modifier = Modifier.height(8.dp))
             
-            if (progress != null && !isEarned) {
+            if (!isEarned && !achievement.secret && targetValue > 0 && achievement.criteria.type.toString().lowercase() == "count") {
                 Spacer(modifier = Modifier.height(8.dp))
-                
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
                 ) {
-                    Text(
-                        text = "${progress.current}/${progress.threshold}",
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.weight(0.4f)
+                    LinearProgressIndicator(
+                        progress = { currentProgress.toFloat() / targetValue.toFloat() },
+                        modifier = Modifier.fillMaxWidth(0.6f),
+                        color = rarityColor
                     )
-                    
-                    Box(
-                        modifier = Modifier
-                            .weight(0.6f)
-                            .height(8.dp)
-                    ) {
-                        LinearProgressIndicator(
-                            progress = { progress.progress },
-                            modifier = Modifier.fillMaxSize(),
-                            color = rarityColor
-                        )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "$currentProgress/$targetValue",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            } else if (isEarned && achievementData.earnedAt != null) {
+                val formatter = remember { DateTimeFormatter.ofPattern("MMM dd, yyyy") }
+                val earnedDate = remember(achievementData.earnedAt) {
+                    try {
+                        LocalDateTime.parse(achievementData.earnedAt.substringBefore("."), DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                           .atZone(ZoneId.of("UTC"))
+                           .withZoneSameInstant(ZoneId.systemDefault())
+                           .toLocalDateTime()
+                    } catch (e: Exception) {
+                        null
                     }
                 }
-            } else if (isEarned && userAchievement != null) {
-                val earnedDate = LocalDateTime.ofInstant(
-                    Instant.parse(userAchievement.earnedAt),
-                    ZoneId.systemDefault()
-                )
-                val formatter = DateTimeFormatter.ofPattern("MMM dd, yyyy")
                 
                 Text(
-                    text = "Earned on ${earnedDate.format(formatter)}",
+                    text = earnedDate?.format(formatter)?.let { "Earned on $it" } ?: "Earned",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -334,22 +303,16 @@ fun AchievementItem(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FilterDialog(
-    selectedCategory: String?,
-    earnedFilter: Boolean?,
+    currentFilter: AchievementFilterType,
     onDismiss: () -> Unit,
-    onApplyFilter: (String?, Boolean?) -> Unit
+    onApplyFilter: (AchievementFilterType) -> Unit
 ) {
-    var category by remember { mutableStateOf(selectedCategory) }
-    var earned by remember { mutableStateOf(earnedFilter) }
+    var selectedFilterType by remember { mutableStateOf(currentFilter) }
     
-    val categories = listOf(
-        null to "All",
-        "task" to "Tasks",
-        "habit" to "Habits",
-        "goal" to "Goals",
-        "streak" to "Streaks",
-        "focus" to "Focus",
-        "general" to "General"
+    val filterOptions = listOf(
+        AchievementFilterType.ALL to "All",
+        AchievementFilterType.UNLOCKED to "Unlocked",
+        AchievementFilterType.LOCKED to "Locked"
     )
     
     AlertDialog(
@@ -357,74 +320,29 @@ fun FilterDialog(
         title = { Text("Filter Achievements") },
         text = {
             Column {
-                Text("Category")
-                
+                Text("Status")
                 Spacer(modifier = Modifier.height(8.dp))
                 
-                categories.forEach { (value, label) ->
+                filterOptions.forEach { (type, label) ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp)
+                            .clickable { selectedFilterType = type }
                     ) {
                         RadioButton(
-                            selected = category == value,
-                            onClick = { category = value }
+                            selected = selectedFilterType == type,
+                            onClick = { selectedFilterType = type }
                         )
-                        Text(label)
+                        Text(label, modifier = Modifier.padding(start = 8.dp))
                     }
-                }
-                
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                
-                Text("Status")
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                ) {
-                    RadioButton(
-                        selected = earned == null,
-                        onClick = { earned = null }
-                    )
-                    Text("All")
-                }
-                
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                ) {
-                    RadioButton(
-                        selected = earned == true,
-                        onClick = { earned = true }
-                    )
-                    Text("Earned")
-                }
-                
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                ) {
-                    RadioButton(
-                        selected = earned == false,
-                        onClick = { earned = false }
-                    )
-                    Text("Not Earned")
                 }
             }
         },
         confirmButton = {
             Button(
-                onClick = { onApplyFilter(category, earned) }
+                onClick = { onApplyFilter(selectedFilterType) }
             ) {
                 Text("Apply")
             }
@@ -440,7 +358,7 @@ fun FilterDialog(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewAchievementsDialog(
-    achievements: List<AchievementDto>,
+    achievements: List<Achievement>,
     isVisible: Boolean,
     onDismiss: () -> Unit
 ) {
@@ -477,7 +395,7 @@ fun NewAchievementsDialog(
                             }
                         }
                         
-                        if (achievement != achievements.last()) {
+                        if (achievement != achievements.lastOrNull()) {
                             HorizontalDivider(
                                 modifier = Modifier.padding(vertical = 8.dp)
                             )

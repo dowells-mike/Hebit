@@ -81,6 +81,9 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
+# MCP Configuration (contains sensitive access tokens)
+.cursor/mcp.json
+
 # OS specific
 .DS_Store
 Thumbs.db

@@ -6,7 +6,7 @@ import com.hebit.app.data.remote.dto.ProductivityInsightsResponse
 import com.hebit.app.data.remote.dto.ProductivityMetricsDto
 import com.hebit.app.domain.model.Habit
 import com.hebit.app.domain.model.Resource
-import com.hebit.app.domain.repository.HabitRepository
+import com.hebit.app.domain.repository.IHabitRepository
 import com.hebit.app.domain.repository.IProductivityRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,7 +24,7 @@ import javax.inject.Inject
 @HiltViewModel
 class ProgressStatsViewModel @Inject constructor(
     private val productivityRepository: IProductivityRepository,
-    private val habitRepository: HabitRepository
+    private val habitRepository: IHabitRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProgressStatsUiState())
@@ -107,13 +107,13 @@ class ProgressStatsViewModel @Inject constructor(
                                 error = null
                             )}
                         }
-                        is Resource.Error -> {
+                        is Resource.Error<*> -> {
                             _uiState.update { it.copy(
                                 error = result.message,
                                 isLoading = false
                             )}
                         }
-                        is Resource.Loading -> {
+                        is Resource.Loading<*> -> {
                             // Already set loading state
                         }
                     }
@@ -147,13 +147,13 @@ class ProgressStatsViewModel @Inject constructor(
                                 )}
                             }
                         }
-                        is Resource.Error -> {
+                        is Resource.Error<*> -> {
                             _uiState.update { it.copy(
                                 error = result.message,
                                 isLoading = false
                             )}
                         }
-                        is Resource.Loading -> {
+                        is Resource.Loading<*> -> {
                             // Already set loading state
                         }
                     }
@@ -178,13 +178,13 @@ class ProgressStatsViewModel @Inject constructor(
                                 isLoading = false
                             )}
                         }
-                        is Resource.Error -> {
+                        is Resource.Error<*> -> {
                             _uiState.update { it.copy(
                                 error = result.message,
                                 isLoading = false
                             )}
                         }
-                        is Resource.Loading -> {
+                        is Resource.Loading<*> -> {
                             // Already set loading state
                         }
                     }

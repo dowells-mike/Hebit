@@ -35,6 +35,7 @@ import com.hebit.app.ui.screens.goals.GoalDetailScreen
 import com.hebit.app.ui.screens.settings.SettingsScreen
 import com.hebit.app.ui.screens.profile.ProfileScreen
 import com.hebit.app.ui.screens.profile.StatisticsScreen
+import com.hebit.app.ui.screens.profile.AchievementCenterScreen
 import com.hebit.app.ui.screens.tasks.TaskCreationScreen
 import com.hebit.app.ui.screens.categories.CategoryEditScreen
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -75,6 +76,7 @@ object Routes {
     const val PROFILE = "profile"
     const val PROFILE_EDIT = "profile_edit"
     const val PROFILE_STATISTICS = "profile_statistics"
+    const val ACHIEVEMENT_CENTER = "achievement_center"
     const val SETTINGS = "settings"
     
     // New features
@@ -321,12 +323,7 @@ fun HebitNavigation(
                 habitId = habitId,
                 onNavigateBack = { navController.navigateUp() },
                 onNavigateToEditHabit = { hid -> navController.navigate("${Routes.HABIT_EDIT}/$hid") },
-                onNavigateToStreakDetail = { hid -> navController.navigate("${Routes.HABIT_STREAK}/$hid") },
-                onHomeClick = { navController.navigate(Routes.DASHBOARD) { popUpTo(Routes.DASHBOARD) { inclusive = true } } },
-                onTasksClick = { navController.navigate(Routes.TASKS) },
-                onHabitsClick = { navController.navigate(Routes.HABITS) },
-                onGoalsClick = { navController.navigate(Routes.GOALS) },
-                onProfileClick = { navController.navigate(Routes.PROFILE) }
+                onNavigateToStreakScreen = { hid -> navController.navigate("${Routes.HABIT_STREAK}/$hid") }
             )
         }
         
@@ -334,16 +331,7 @@ fun HebitNavigation(
             route = "${Routes.HABIT_STREAK}/{habitId}",
             arguments = listOf(navArgument("habitId") { type = NavType.StringType })
         ) { backStackEntry ->
-            val habitId = backStackEntry.arguments?.getString("habitId") ?: ""
-            HabitStreakScreen(
-                habitId = habitId,
-                onNavigateBack = { navController.navigateUp() },
-                onHomeClick = { navController.navigate(Routes.DASHBOARD) { popUpTo(Routes.DASHBOARD) { inclusive = true } } },
-                onTasksClick = { navController.navigate(Routes.TASKS) },
-                onHabitsClick = { navController.navigate(Routes.HABITS) },
-                onGoalsClick = { navController.navigate(Routes.GOALS) },
-                onProfileClick = { navController.navigate(Routes.PROFILE) }
-            )
+            HabitStreakScreen()
         }
 
         // Placeholder for HABIT_CREATE route - Needs a Composable screen
@@ -404,6 +392,7 @@ fun HebitNavigation(
             ProfileScreen(
                 onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
                 onNavigateToAchievements = { navController.navigate(Routes.ACHIEVEMENTS) },
+                onNavigateToAchievementCenter = { navController.navigate(Routes.ACHIEVEMENT_CENTER) },
                 onNavigateToStatistics = { navController.navigate(Routes.PROFILE_STATISTICS) },
                 onNavigateToEditProfile = { navController.navigate(Routes.PROFILE_EDIT) },
                 onHomeClick = { navController.navigate(Routes.DASHBOARD) {
@@ -426,6 +415,7 @@ fun HebitNavigation(
             ProfileScreen(
                 onNavigateToSettings = { navController.navigate(Routes.SETTINGS) },
                 onNavigateToAchievements = { navController.navigate(Routes.ACHIEVEMENTS) },
+                onNavigateToAchievementCenter = { navController.navigate(Routes.ACHIEVEMENT_CENTER) },
                 onNavigateToStatistics = { navController.navigate(Routes.PROFILE_STATISTICS) },
                 onNavigateToEditProfile = { navController.navigateUp() },
                 onHomeClick = { navController.navigate(Routes.DASHBOARD) {
@@ -457,6 +447,12 @@ fun HebitNavigation(
         
         composable(Routes.ACHIEVEMENTS) {
             AchievementScreen()
+        }
+
+        composable(Routes.ACHIEVEMENT_CENTER) {
+            AchievementCenterScreen(
+                onNavigateBack = { navController.navigateUp() }
+            )
         }
 
         // Add Composable for CategoryEditScreen
