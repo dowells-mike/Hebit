@@ -29,7 +29,7 @@ const habitSchema = new Schema<HabitDocument>(
     },
     frequency: {
       type: String,
-      enum: ['daily', 'weekly', 'monthly'],
+      enum: ['daily', 'weekly', 'monthly', 'specific_dates'],
       default: 'daily'
     },
     frequencyConfig: {
@@ -51,7 +51,12 @@ const habitSchema = new Schema<HabitDocument>(
         type: Number,
         default: 1,
         min: 1
-      }
+      },
+      specificDates: [
+        {
+          type: Date
+        }
+      ]
     },
     timeOfDay: {
       type: String
