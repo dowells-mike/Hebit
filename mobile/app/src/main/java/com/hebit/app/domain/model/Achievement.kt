@@ -8,7 +8,7 @@ data class Achievement(
     val description: String,
     val category: AchievementCategory,
     val points: Int,
-    val icon: String, // Consider mapping to a drawable resource or a Composable Icon
+    val icon: String,
     val criteria: AchievementCriteria,
     val rarity: AchievementRarity,
     val secret: Boolean,
@@ -19,7 +19,7 @@ data class Achievement(
 data class AchievementCriteria(
     val type: AchievementCriteriaType,
     val source: AchievementSourceType?,
-    val targetValue: Any, // String or Number (Int/Double). Consider specific types or a sealed class.
+    val targetValue: Any, // String or Number (Int/Double)
     val conditionDetails: Map<String, Any>?
 )
 

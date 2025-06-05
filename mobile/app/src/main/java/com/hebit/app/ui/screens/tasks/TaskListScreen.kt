@@ -269,9 +269,9 @@ fun TaskListScreen(
                                             true // Allow settling at EndToStart to show dialog & background
                                         } else if (proposedTargetValue == SwipeToDismissBoxValue.Settled) {
                                             // Trying to swipe back to "settled" position
-                                            true // Allow settling back to normal (e.g., user swipes it back)
+                                            true // Allow settling back to normal
                                         } else {
-                                            // Reject other transitions (e.g., StartToEnd, which we don't enable anyway)
+                                            // Reject other transitions
                                             false
                                         }
                                     },
@@ -338,7 +338,7 @@ fun TaskListScreen(
     val currentTaskToDelete = taskForDeletionDialog
     if (currentTaskToDelete != null) {
         AlertDialog(
-            onDismissRequest = { // Dialog dismissed (e.g., back press or click outside)
+            onDismissRequest = { // Dialog dismissed
                 coroutineScope.launch {
                     swipeStates[currentTaskToDelete.id]?.reset()
                 }

@@ -17,7 +17,7 @@ import android.util.Log
 
 @HiltViewModel
 class CategoryViewModel @Inject constructor(
-    private val repository: TaskRepository // Inject TaskRepository (or CategoryRepository if separated)
+    private val repository: TaskRepository // Inject TaskRepository
 ) : ViewModel() {
 
     private val _categoriesState = MutableStateFlow<Resource<List<Category>>>(Resource.Loading())

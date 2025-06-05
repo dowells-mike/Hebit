@@ -17,7 +17,6 @@ import javax.inject.Inject
 
 sealed class AchievementsUiEvent {
     data class ShowSnackbar(val message: String) : AchievementsUiEvent()
-    // Add other specific UI events if needed, e.g., NavigateToAchievementDetail
 }
 
 // Data class to hold combined data for UI display
@@ -139,7 +138,7 @@ class AchievementViewModel @Inject constructor(
             }
 
             // Optionally, show a loading state for this specific action if needed
-            // _uiState.value = _uiState.value.copy(isLoading = true) // Or a more specific loading flag
+            // _uiState.value = _uiState.value.copy(isLoading = true)
             when (val result = achievementRepository.markUserAchievementAsSeen(userAchievementId)) {
                 is Resource.Success -> {
                     // Update local state
@@ -149,24 +148,16 @@ class AchievementViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(userAchievementsInternal = updatedUserAchievements)
                     combineAndFilterAchievements() // Re-apply filter to update displayed list
                     // _uiState.value = _uiState.value.copy(isLoading = false)
-                    // _eventChannel.send(AchievementsUiEvent.ShowSnackbar("Achievement marked as seen.")) // Optional
+                    // _eventChannel.send(AchievementsUiEvent.ShowSnackbar("Achievement marked as seen."))
                 }
                 is Resource.Error -> {
                     // _uiState.value = _uiState.value.copy(isLoading = false)
                     _eventChannel.send(AchievementsUiEvent.ShowSnackbar(result.message ?: "Error marking achievement as seen"))
                 }
                 is Resource.Loading -> {
-                    // Optionally handle loading state, e.g., show a spinner for this specific action
-                    // For now, we do nothing as it's a quick operation and overall loading is handled elsewhere.
                 }
             }
         }
     }
-    
-    // Removed: loadAchievements, loadAchievementProgress, checkNewAchievements, filterAchievements, clearNewAchievementsState
-    // Removed: isLoading StateFlow (now part of UiState)
-    // Removed: old AchievementUiState data class (replaced by AchievementsScreenState)
 }
 
-// Removed old AchievementUiState data class at the end of the file.
-// The definition of AchievementsScreenState is now at the top. 

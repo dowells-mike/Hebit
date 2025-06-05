@@ -8,7 +8,7 @@ data class UserAchievementDto(
     @Json(name = "_id") val id: String, // ID of this UserAchievement record itself
     @Json(name = "user") val userId: String,
     // The 'achievement' field can be either a String (ID) or a populated AchievementDto object.
-    // For simplicity in initial DTO, we'll expect it to be populated by the backend, or handle ID-only cases in the mapper/repository if needed.
+    // For simplicity in initial DTO, I'll expect it to be populated by the backend, or handle ID-only cases in the mapper/repository if needed.
     @Json(name = "achievement") val achievement: AchievementDto,
     @Json(name = "progress") val progress: Double, // Changed from Int to Double to handle potential fractional progress
     @Json(name = "earned") val earned: Boolean,

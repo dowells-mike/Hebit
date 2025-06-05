@@ -197,7 +197,7 @@ fun SettingsScreen(
                 }
                 
                 else -> {
-                    // For other states, we'll just show a simple loading indicator
+                    // For other states, I'll just show a simple loading indicator
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center

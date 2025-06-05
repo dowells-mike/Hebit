@@ -1,34 +1,33 @@
-package com.hebit.app.domain.model // Or your appropriate domain model package
+package com.hebit.app.domain.model
 
 import java.time.LocalDate
-import java.time.LocalTime // If completionsByTime implies specific times
 
-// Domain model for individual day completion stats (if needed beyond just a map)
+
+// Domain model for individual day completion stats
 data class DailyCompletionStat(
-    val day: LocalDate, // Or String if you prefer to keep it as is from DTO
+    val day: LocalDate,
     val count: Int
 )
 
-// Domain model for completion counts at different times (if needed beyond just a map)
+// Domain model for completion counts at different times
 data class TimedCompletionStat(
-    val timeSlotName: String, // e.g., "Morning", "Afternoon", or a LocalTime
+    val timeSlotName: String,
     val count: Int
 )
 
 // Represents the completion count for a specific day of the week.
 data class HabitCompletionByDay(
-    val day: String, // e.g., "Sunday", "Monday"
+    val day: String,
     val count: Int
 )
 
 // Represents the completion count for a specific time range in a day.
 data class HabitCompletionByTime(
-    val name: String, // e.g., "Morning (5am-12pm)"
+    val name: String,
     val count: Int
 )
 
 // Domain model for habit statistics.
-// This should map from HabitStatsDto and be used in the UI/ViewModel.
 data class HabitStats(
     val completionRate: Float?,
     val currentStreak: Int?,

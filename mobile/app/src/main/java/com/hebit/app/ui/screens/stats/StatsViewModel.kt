@@ -35,9 +35,6 @@ class StatsViewModel @Inject constructor(
     fun refreshStats(period: String? = null, startDate: String? = null, endDate: String? = null) {
         fetchTaskStatistics(period, startDate, endDate)
         fetchProductivityScore(period, startDate, endDate)
-        // Fetch default history (e.g., last 7 days) or based on current period selection
-        // For simplicity, let's fetch last 7 days daily history initially or when period is 'week' or 'today'
-        // More complex logic can be added later if a separate history period selector is introduced.
         fetchScoreHistory("daily", 7)
     }
 

@@ -40,8 +40,6 @@ fun parseSubtasks(subtasksString: String?): List<SubTask> {
                 isCompleted = parts[2].toBooleanStrictOrNull() ?: false
             )
         } else {
-            // Optionally log a warning for malformed subtask parts
-            // Log.w("TaskUtils", "Malformed subtask part: $subtaskPart")
             null
         }
     }
@@ -80,7 +78,3 @@ fun getSubtaskProgressCounts(subtasksMetadata: Any?): SubtaskProgress {
     val completed = subtasksList.count { it.isCompleted }
     return SubtaskProgress(completed, total)
 }
-
-// TODO: Add other utility functions like parseRecurrencePattern, parseReminderSettings if they are generic enough
-// For now, parseSubtasks is included here for completeness of getSubtaskProgressCounts.
-// If parseSubtasks is already defined elsewhere (e.g. TaskDetailScreen), it could be moved or referenced. 

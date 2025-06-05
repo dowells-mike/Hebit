@@ -184,20 +184,6 @@ fun DashboardScreen(
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold
                 )
-                
-                // Row(verticalAlignment = Alignment.CenterVertically) { // Weather display removed
-                //     Icon(
-                //         imageVector = Icons.Default.Cloud,
-                //         contentDescription = "Weather",
-                //         tint = MaterialTheme.colorScheme.primary
-                //     )
-                //     Spacer(modifier = Modifier.width(4.dp))
-                //     Text(
-                //         text = "23°",
-                //         style = MaterialTheme.typography.bodyLarge,
-                //         fontWeight = FontWeight.Bold
-                //     )
-                // }
             }
             
             // New Productivity and Achievements shortcuts
@@ -333,23 +319,16 @@ fun DashboardScreen(
                 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp) // Will just be one item now
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     QuickLinkCard(
                         title = "Progress Stats",
                         icon = Icons.Default.BarChart,
                         description = "View your productivity metrics",
                         onClick = onProgressStatsClick,
-                        modifier = Modifier.weight(1f) // This will now take full width if it's the only one
+                        modifier = Modifier.weight(1f)
                     )
-                    
-                    // QuickLinkCard( // Removed Quick Actions card
-                    //     title = "Quick Actions",
-                    //     icon = Icons.Default.Speed,
-                    //     description = "Access common tasks faster",
-                    //     onClick = onQuickActionsClick,
-                    //     modifier = Modifier.weight(1f)
-                    // )
+
                 }
             }
             

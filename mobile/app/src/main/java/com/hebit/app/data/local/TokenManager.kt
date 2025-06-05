@@ -9,8 +9,8 @@ import javax.inject.Singleton
 /**
  * Manager for storing and retrieving authentication tokens
  * 
- * Note: In a production app, this would use EncryptedSharedPreferences
- * for added security, but we're using regular SharedPreferences for simplicity
+ * In a production app, this would use EncryptedSharedPreferences
+ * for added security, but I'm using regular SharedPreferences for simplicity
  */
 @Singleton
 class TokenManager @Inject constructor(

@@ -217,8 +217,6 @@ fun TaskCreationScreen(
             }
         } else if (!isEditMode) {
             // If NOT in edit mode, ensure initial values (already set in remember) are respected.
-            // Additional logic can go here if needed when not in edit mode but after taskState might change (e.g. after a failed save attempt etc.)
-            // For now, the remember blocks handle initial population for non-edit mode.
         }
     }
     

@@ -21,13 +21,6 @@ import java.time.LocalDate
 import java.util.UUID
 import javax.inject.Inject
 
-// TODO: Define data classes for Frequency, Reminder, etc. based on backend API and feature requirements
-// For example:
-// data class FrequencySelection(
-//    val type: String = "daily", // daily, weekly, monthly
-//    val daysOfWeek: List<Int>? = null, // For weekly
-//    val timesPerPeriod: Int? = null // For weekly/monthly
-// )
 
 // --- Data classes for Frequency ---
 enum class HabitFrequencyType {
@@ -52,15 +45,12 @@ data class HabitFrequencySelection(
     val type: HabitFrequencyType = HabitFrequencyType.DAILY,
     val config: FrequencyConfig = FrequencyConfig()
 )
-// --- End of Frequency Data classes ---
 
 object TimeOfDayOptions {
     const val ANY_TIME = "Any Time"
     const val MORNING = "Morning (6am-12pm)"
     const val AFTERNOON = "Afternoon (12pm-6pm)"
     const val EVENING = "Evening (6pm-10pm)"
-    // Placeholder for custom time, actual implementation would involve TimePickerDialog
-    // const val CUSTOM = "Custom"
     fun getAsList() = listOf(ANY_TIME, MORNING, AFTERNOON, EVENING)
 }
 
@@ -214,7 +204,7 @@ class CreateEditHabitViewModel @Inject constructor(
         val newConfig = when (currentType) {
             HabitFrequencyType.DAILY -> frequencySelection.config.copy(
                 daysOfWeek = selectedDaysOfWeek.toList().sorted(),
-                timesPerPeriod = null, // Ensure others are null for daily
+                timesPerPeriod = null,
                 datesOfMonth = emptyList(),
                 specificDates = emptyList()
             )
@@ -241,7 +231,7 @@ class CreateEditHabitViewModel @Inject constructor(
         validateInput()
     }
 
-    // Placeholder functions for reminders and goal linking
+    // functions for reminders and goal linking
     fun addReminder(reminder: HabitReminder) {
         if (!reminders.any { it.id == reminder.id}) {
             reminders.add(reminder)
@@ -267,11 +257,6 @@ class CreateEditHabitViewModel @Inject constructor(
                 HabitFrequencyType.WEEKLY -> (frequencySelection.config.timesPerPeriod ?: 0) > 0 // And potentially daysOfWeek if that's also a criteria
                 HabitFrequencyType.MONTHLY -> {
                     val timesValid = (frequencySelection.config.timesPerPeriod ?: 0) > 0
-                    // If dates are selected, timesPerPeriod should not be the primary validation, or they should work together.
-                    // For now, if timesPerPeriod is set, it must be > 0. If dates are selected, that implies validity too.
-                    // Backend will ultimately decide complex rules. For now, either times or dates must be somewhat configured.
-                    // Simplified: if timesPerPeriod is set, it must be valid. Or, if dates are selected, it's valid.
-                    // Backend will ultimately decide complex rules. For now, either times or dates must be somewhat configured.
                     val datesValid = !frequencySelection.config.datesOfMonth.isNullOrEmpty()
                     (timesValid && !datesValid) || (datesValid && !timesValid) || (timesValid && datesValid) || (!timesValid && datesValid) // More flexible: allow times/period, specific dates, or both
                 }

@@ -443,9 +443,9 @@ private fun SimpleBarChart(
     val density = LocalDensity.current
 
     val maxScore = historyItems.maxOfOrNull { it.score }?.toFloat() ?: 0f
-    val minScore = 0f // Assuming score doesn't go below 0
+    val minScore = 0f // Assuming score doesn't go < 0
 
-    // Define chart dimensions and padding - Much larger chart
+    // Define chart dimensions and padding and Much larger chart
     val chartHeight = 300.dp // Increased significantly from 200.dp
     val barWidthRatio = 0.6f // Bar takes 60% of available space per item
     val xAxisLabelHeight = 40.dp // More space for X-axis labels
@@ -469,7 +469,7 @@ private fun SimpleBarChart(
                     topLeft = Offset(0f, yPos - 8.sp.toPx()/2), // Center text vertically
                     style = TextStyle(fontSize = 12.sp, color = axisLabelColor)
                 )
-                // Optional: Draw horizontal grid lines
+                // Draw horizontal grid lines
                 drawLine(
                     color = axisLabelColor.copy(alpha = 0.3f),
                     start = Offset(yAxisLabelWidth.toPx(), yPos),
@@ -512,7 +512,7 @@ private fun SimpleBarChart(
                             topLeft = Offset(xPosition + actualBarWidth / 2 - textLayoutResult.size.width / 2 , chartAreaHeight + 8.dp.toPx())
                         )
                     } catch (e: Exception) { // Catch parsing errors for date
-                        // Optionally draw a placeholder or skip
+
                     }
                 }
             }

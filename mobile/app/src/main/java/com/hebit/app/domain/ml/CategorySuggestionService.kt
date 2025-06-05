@@ -93,7 +93,7 @@ class CategorySuggestionService @Inject constructor(
             return@withContext listOf(CategorySuggestion("Work", 1.0f))
         }
         
-        // Since we're using a rule-based approach for now, just use keywords
+        // Since  using a rule-based approach for now, just use keywords
         return@withContext getKeywordBasedSuggestions(text)
     }
     

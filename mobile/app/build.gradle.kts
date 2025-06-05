@@ -62,6 +62,7 @@ dependencies {
     implementation(libs.androidx.compose.material)
     implementation(libs.androidx.uiautomator.v18)
     implementation(libs.androidx.runtime.livedata)
+    implementation("io.coil-kt:coil-compose:2.6.0")
     // implementation(libs.androidx.security.crypto.ktx) // Temporarily disabled due to dependency issues
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)

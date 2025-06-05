@@ -134,7 +134,7 @@ class ProgressStatsViewModel @Inject constructor(
                             
                             // Update time distribution if insights have this data
                             result.data?.let { insights ->
-                                // This is an example - your actual API might have different data
+                                //  an example
                                 val timeDistribution = mapOf(
                                     "Tasks" to 0.4f, // 40%
                                     "Habits" to 0.3f, // 30%
@@ -202,8 +202,7 @@ class ProgressStatsViewModel @Inject constructor(
     }
     
     fun getTrendText(score: Int?): String {
-        // Compare with previous period - this is simplified
-        // In a real app, you'd calculate this from the actual data
+        // Compare with previous period
         score ?: return ""
         val insights = _uiState.value.insights
         

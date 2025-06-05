@@ -58,5 +58,5 @@ abstract class RepositoryModule {
         achievementRepositoryImpl: AchievementRepositoryImpl
     ): IAchievementRepository
     
-    // Add other repositories here as they're implemented
+    // I'll add other repositories here when I implement them
 } 

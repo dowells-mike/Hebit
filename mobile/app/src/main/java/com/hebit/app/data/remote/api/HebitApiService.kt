@@ -1,17 +1,16 @@
+// Kotlin
 package com.hebit.app.data.remote.api
 
-import com.hebit.app.data.remote.dto.* // Ensure all used DTOs are imported
+import com.hebit.app.data.remote.dto.*
 import com.squareup.moshi.JsonClass
 import retrofit2.Response
 import retrofit2.http.*
 
 /**
- * Retrofit service interface for Hebit API
- * Updated based on actual backend implementation
+ * Retrofit service interface for Hebit API.
  */
 interface HebitApiService {
 
-    // Auth Endpoints
     @POST("auth/login")
     suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
 
@@ -27,12 +26,11 @@ interface HebitApiService {
     @POST("auth/forgot-password")
     suspend fun requestPasswordReset(@Body request: ForgotPasswordRequest): Response<ForgotPasswordResponse>
 
-    // Task Endpoints
     @GET("tasks")
     suspend fun getTasks(
         @Query("page") page: Int = 1,
         @Query("per_page") perPage: Int = 20
-    ): Response<List<TaskDto>> // Note: Backend might send a TaskListResponse DTO instead of raw List
+    ): Response<List<TaskDto>>
 
     @GET("tasks/{id}")
     suspend fun getTaskById(@Path("id") id: String): Response<TaskDto>
@@ -47,12 +45,12 @@ interface HebitApiService {
     ): Response<TaskDto>
 
     @DELETE("tasks/{id}")
-    suspend fun deleteTask(@Path("id") id: String): Response<Void> // Or Response<Unit>
+    suspend fun deleteTask(@Path("id") id: String): Response<Void>
 
-    @PATCH("tasks/{id}/complete") // Assuming PATCH is used for toggling completion
+    @PATCH("tasks/{id}/complete")
     suspend fun toggleTaskCompletion(@Path("id") id: String): Response<TaskDto>
 
-    @PUT("tasks/{id}") // This seems to duplicate updateTask or is for specific status update
+    @PUT("tasks/{id}")
     suspend fun updateTaskStatus(@Path("id") id: String, @Body statusUpdate: Map<String, String>): Response<TaskDto>
 
     @GET("tasks/priority")
@@ -61,63 +59,53 @@ interface HebitApiService {
     @GET("tasks/today")
     suspend fun getTasksDueToday(): Response<TaskListResponse>
 
-    // === CORRECTED HABIT ENDPOINTS ===
-    @GET("habits") // GET /api/habits
+    @GET("habits")
     suspend fun getHabits(
         @Query("page") page: Int = 1,
         @Query("per_page") perPage: Int = 20,
         @Query("frequency") frequency: String? = null,
         @Query("category") category: String? = null,
         @Query("status") status: String? = null
-    ): Response<HabitListResponse> // Response format: { habits: HabitDto[], total: number, page: number, per_page: number }
+    ): Response<HabitListResponse>
 
-    @GET("habits/today") // GET /api/habits/today
-    suspend fun getTodaysHabits(): Response<HabitListResponse> // Same response format as getHabits
+    @GET("habits/today")
+    suspend fun getTodaysHabits(): Response<HabitListResponse>
 
-    @GET("habits/{id}") // GET /api/habits/:id
-    suspend fun getHabitById(@Path("id") id: String): Response<HabitDto> // Single habit with completed_today field
+    @GET("habits/{id}")
+    suspend fun getHabitById(@Path("id") id: String): Response<HabitDto>
 
-    @POST("habits") // POST /api/habits
+    @POST("habits")
     suspend fun createHabit(@Body createHabitRequest: CreateHabitRequest): Response<HabitDto>
 
-    @PUT("habits/{id}") // PUT /api/habits/:id
+    @PUT("habits/{id}")
     suspend fun updateHabit(
         @Path("id") id: String,
         @Body updateHabitRequest: UpdateHabitRequest
     ): Response<HabitDto>
 
-    @DELETE("habits/{id}") // DELETE /api/habits/:id
+    @DELETE("habits/{id}")
     suspend fun deleteHabit(@Path("id") id: String): Response<Unit>
 
-    // CORRECTED: This is PUT method, and it takes a body with { completed: boolean, date: string, notes?: string }
-    @PUT("habits/{id}/track") // PUT /api/habits/:id/track
+    @PUT("habits/{id}/track")
     suspend fun trackHabit(
         @Path("id") id: String,
         @Body request: HabitTrackRequest
     ): Response<HabitDto>
 
-    @POST("habits/{id}/skip") // POST /api/habits/:id/skip
+    @POST("habits/{id}/skip")
     suspend fun skipHabit(
         @Path("id") id: String,
         @Body request: HabitSkipRequest
     ): Response<HabitDto>
 
-    @GET("habits/{id}/stats") // GET /api/habits/:id/stats
+    @GET("habits/{id}/stats")
     suspend fun getHabitStats(@Path("id") id: String): Response<HabitStatsDto>
 
-    // Note: The backend does not have these endpoints yet - these were assumptions
-    // @GET("habits/{id}/notes")
-    // @POST("habits/{id}/notes")
-    // @GET("habits/{id}/performance-insights")
-    // @GET("habits/{id}/related-achievements")
-    // @GET("habits/{id}/suggestions")
-
-    // Goal Endpoints
     @GET("goals")
     suspend fun getGoals(
         @Query("page") page: Int = 1,
         @Query("per_page") perPage: Int = 20
-    ): Response<List<GoalDto>> // Note: Backend might send a GoalListResponse DTO
+    ): Response<List<GoalDto>>
 
     @GET("goals/{id}")
     suspend fun getGoalById(@Path("id") id: String): Response<GoalDto>
@@ -132,18 +120,17 @@ interface HebitApiService {
     ): Response<GoalDto>
 
     @DELETE("goals/{id}")
-    suspend fun deleteGoal(@Path("id") id: String): Response<Void> // Or Response<Unit>
+    suspend fun deleteGoal(@Path("id") id: String): Response<Void>
 
     @GET("goals/active")
-    suspend fun getActiveGoals(): Response<GoalListResponse> // GoalListResponse DTO needs to exist
+    suspend fun getActiveGoals(): Response<GoalListResponse>
 
     @PATCH("goals/{id}/progress")
     suspend fun updateGoalProgress(
         @Path("id") id: String,
-        @Body request: GoalProgressRequest // GoalProgressRequest DTO needs to exist
+        @Body request: GoalProgressRequest
     ): Response<GoalDto>
 
-    // Productivity Metrics Endpoints
     @GET("productivity/metrics")
     suspend fun getProductivityMetrics(
         @Query("from_date") fromDate: String?,
@@ -159,7 +146,6 @@ interface HebitApiService {
     @GET("productivity/insights")
     suspend fun getProductivityInsights(@Query("period") period: String?): Response<ProductivityInsightsResponse>
 
-    // === ACHIEVEMENT ENDPOINTS ===
     @GET("achievements")
     suspend fun getAllAchievements(): Response<List<AchievementDto>>
 
@@ -169,7 +155,6 @@ interface HebitApiService {
     @POST("achievements/user-achievements/{userAchievementId}/seen")
     suspend fun markUserAchievementSeen(@Path("userAchievementId") userAchievementId: String): Response<UserAchievementDto>
 
-    // Category (List) Endpoints
     @GET("categories")
     suspend fun getCategories(): Response<List<CategoryDto>>
 
@@ -183,30 +168,28 @@ interface HebitApiService {
     suspend fun updateCategory(@Path("id") id: String, @Body request: UpdateCategoryRequest): Response<CategoryDto>
 
     @DELETE("categories/{id}")
-    suspend fun deleteCategory(@Path("id") id: String): Response<Void> // Or Response<Unit>
+    suspend fun deleteCategory(@Path("id") id: String): Response<Void>
 
-    // Stats Endpoints
     @GET("stats/tasks")
     suspend fun getTaskStatistics(
         @Query("period") period: String? = null,
         @Query("startDate") startDate: String? = null,
         @Query("endDate") endDate: String? = null
-    ): Response<TaskStatisticsResponseDto> // DTO needs to exist
+    ): Response<TaskStatisticsResponseDto>
 
     @GET("stats/productivity-score")
     suspend fun getProductivityScore(
         @Query("period") period: String? = null,
         @Query("startDate") startDate: String? = null,
         @Query("endDate") endDate: String? = null
-    ): Response<ProductivityScoreResponseDto> // DTO needs to exist
+    ): Response<ProductivityScoreResponseDto>
 
     @GET("stats/score-history")
     suspend fun getScoreHistory(
         @Query("periodType") periodType: String? = null,
         @Query("count") count: Int? = null
-    ): Response<ScoreHistoryResponseDto> // DTO needs to exist
+    ): Response<ScoreHistoryResponseDto>
 
-    // Task Suggestion Endpoints
     @GET("suggestions/tasks")
     suspend fun getTaskSuggestions(): Response<List<TaskSuggestionDto>>
 }

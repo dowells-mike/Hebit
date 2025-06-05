@@ -8,13 +8,12 @@ import com.squareup.moshi.JsonClass
  */
 @JsonClass(generateAdapter = true)
 data class HabitCompletionByDayDto(
-    @Json(name = "day") val day: String, // "Sunday", "Monday", etc.
-    @Json(name = "count") val count: Int
+    @Json(name = "day") val day: String, // "Sunday"etc
 )
 
 @JsonClass(generateAdapter = true)
 data class HabitCompletionByTimeDto(
-    @Json(name = "name") val name: String, // "Morning (5am-12pm)", etc.
+    @Json(name = "name") val name: String, // Morning (5am-12pm)"
     @Json(name = "count") val count: Int
 )
 

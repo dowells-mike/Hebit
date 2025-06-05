@@ -5,13 +5,12 @@ import com.squareup.moshi.JsonClass
 
 @JsonClass(generateAdapter = true)
 data class RecurrenceRuleDto(
-    val frequency: String? = null, // e.g., "DAILY", "WEEKLY", "MONTHLY", "YEARLY"
-    val interval: Int? = null,
-    @Json(name = "end_date") val endDate: String? = null, // ISO date string e.g., "2025-12-31"
-    // Potentially add other RRULE components if parsed on mobile, or expect a full RRULE string
-    @Json(name = "rrule_string") val rruleString: String? = null, // To hold the full RRULE string
-    @Json(name = "dt_start") val dtStart: String? = null, // ISO DateTime string for recurrence start
-    @Json(name = "ex_dates") val exDates: List<String>? = null // List of ISO DateTime strings for exception dates
+    val frequency: String? = null,               // Possible values: "DAILY", "WEEKLY", "MONTHLY", "YEARLY"
+    val interval: Int? = null,                    // Number of units between occurrences
+    @Json(name = "end_date") val endDate: String? = null,            // ISO date, for example "2025-12-31"
+    @Json(name = "rrule_string") val rruleString: String? = null,     // Full RRULE string when provided
+    @Json(name = "dt_start") val dtStart: String? = null,             // ISO date-time for the start of recurrence
+    @Json(name = "ex_dates") val exDates: List<String>? = null        // ISO date-time strings for excluded dates
 )
 
 @JsonClass(generateAdapter = true)
@@ -21,27 +20,26 @@ data class TaskDto(
     val description: String,
     val category: String,
     @Json(name = "dueDate") val dueDate: String?,
-    val priority: String, // "low", "medium", "high" from backend
+    val priority: String,                         // "low", "medium", or "high"
     val progress: Int? = 0,
     val completed: Boolean,
-    val createdAt: String,
-    val updatedAt: String,
-    val metadata: Map<String, Any>? = null, // Keeping metadata for other potential uses
+    val createdAt: String,                        // ISO date-time when task was created
+    val updatedAt: String,                        // ISO date-time when task was last updated
+    val metadata: Map<String, Any>? = null,       // Additional data if needed
 
-    // New fields for recurrence and reminders
-    @Json(name = "recurrenceRule") val recurrenceRule: String? = null, // RRULE string
-    @Json(name = "recurrenceStartDate") val recurrenceStartDate: String? = null, // ISO DateTime string
-    @Json(name = "recurrenceExceptions") val recurrenceExceptions: List<String>? = null, // List of ISO DateTime strings
-    val reminders: List<ReminderDto>? = null,
-    @Json(name = "upcomingOccurrences") val upcomingOccurrences: List<String>? = null // Added: List of ISO DateTime strings
+    @Json(name = "recurrenceRule") val recurrenceRule: String? = null,        // RRULE string for recurrence
+    @Json(name = "recurrenceStartDate") val recurrenceStartDate: String? = null,   // ISO date-time for when recurrence begins
+    @Json(name = "recurrenceExceptions") val recurrenceExceptions: List<String>? = null, // ISO date-time strings for skipped occurrences
+    val reminders: List<ReminderDto>? = null,     // List of reminders associated with the task
+    @Json(name = "upcomingOccurrences") val upcomingOccurrences: List<String>? = null // ISO date-time strings for next occurrences
 )
 
 @JsonClass(generateAdapter = true)
 data class TaskListResponse(
     val tasks: List<TaskDto>,
-    val total: Int = 0,
-    val page: Int = 1,
-    @Json(name = "per_page") val perPage: Int = 20
+    val total: Int = 0,                           // Total number of tasks in the current query
+    val page: Int = 1,                            // Current page index
+    @Json(name = "per_page") val perPage: Int = 20 // Number of tasks per page
 )
 
 @JsonClass(generateAdapter = true)
@@ -49,15 +47,14 @@ data class CreateTaskRequest(
     val title: String,
     val description: String,
     val category: String?,
-    @Json(name = "due_date") val dueDate: String?,
-    val priority: String, // "low", "medium", "high" in backend
-    val metadata: Map<String, Any>? = null,
+    @Json(name = "due_date") val dueDate: String?, // ISO date for task deadline
+    val priority: String,                         // "low", "medium", or "high"
+    val metadata: Map<String, Any>? = null,       // Optional extra fields
 
-    // New fields for recurrence and reminders in CreateTaskRequest
-    @Json(name = "recurrenceRule") val recurrenceRuleRequest: String? = null,
-    @Json(name = "recurrenceStartDate") val recurrenceStartDateRequest: String? = null,
-    @Json(name = "recurrenceExceptions") val recurrenceExceptionsRequest: List<String>? = null,
-    val remindersRequest: List<ReminderDto>? = null
+    @Json(name = "recurrenceRule") val recurrenceRuleRequest: String? = null,       // RRULE string for recurrence
+    @Json(name = "recurrenceStartDate") val recurrenceStartDateRequest: String? = null, // ISO date-time for start of recurrence
+    @Json(name = "recurrenceExceptions") val recurrenceExceptionsRequest: List<String>? = null, // ISO date-time strings to skip
+    val remindersRequest: List<ReminderDto>? = null // List of reminder data
 )
 
 @JsonClass(generateAdapter = true)
@@ -65,15 +62,14 @@ data class UpdateTaskRequest(
     val title: String? = null,
     val description: String? = null,
     val category: String?,
-    @Json(name = "due_date") val dueDate: String? = null,
-    val priority: String? = null,
-    val progress: Int? = null,
+    @Json(name = "due_date") val dueDate: String? = null, // ISO date for updated deadline
+    val priority: String? = null,                    // "low", "medium", or "high"
+    val progress: Int? = null,                       // Progress percentage
     @Json(name = "completed") val isCompleted: Boolean? = null,
-    val metadata: Map<String, Any>? = null, // For other metadata if any
+    val metadata: Map<String, Any>? = null,          // Optional extra fields
 
-    // New fields for recurrence and reminders in UpdateTaskRequest
-    @Json(name = "recurrenceRule") val recurrenceRuleRequest: String? = null,
-    @Json(name = "recurrenceStartDate") val recurrenceStartDateRequest: String? = null,
-    @Json(name = "recurrenceExceptions") val recurrenceExceptionsRequest: List<String>? = null,
-    val remindersRequest: List<ReminderDto>? = null
-) 
+    @Json(name = "recurrenceRule") val recurrenceRuleRequest: String? = null,       // New RRULE string if changing recurrence
+    @Json(name = "recurrenceStartDate") val recurrenceStartDateRequest: String? = null, // New ISO date-time for recurrence start
+    @Json(name = "recurrenceExceptions") val recurrenceExceptionsRequest: List<String>? = null, // New ISO date-time strings to skip
+    val remindersRequest: List<ReminderDto>? = null   // Updated list of reminders
+)

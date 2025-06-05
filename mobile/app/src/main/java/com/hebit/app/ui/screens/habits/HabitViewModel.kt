@@ -39,7 +39,6 @@ class HabitViewModel @Inject constructor(
 
     sealed class UiEvent {
         data class ShowSnackbar(val message: String) : UiEvent()
-        // Add other events like Navigation if needed
     }
 
     init {
@@ -235,7 +234,6 @@ class HabitViewModel @Inject constructor(
         loadTodaysHabits() // Reload today's habits
     }
 
-    // Consider adding a clearSelectedHabit method if UI needs it
     fun clearSelectedHabit() {
         _selectedHabitState.value = Resource.Loading() // Represent empty/cleared selection as Loading
         _habitStatsState.value = Resource.Loading()

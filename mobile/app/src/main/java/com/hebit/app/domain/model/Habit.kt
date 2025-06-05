@@ -3,8 +3,7 @@ package com.hebit.app.domain.model
 import java.time.LocalDate
 import java.time.LocalDateTime
 
-// Using java.time for dates and times. Ensure your project's minSdk supports this
-// or has core library desugaring enabled.
+// Using java.time for dates and times
 
 enum class HabitFrequency {
     DAILY, WEEKLY, MONTHLY, SPECIFIC_DATES, UNKNOWN
@@ -49,7 +48,7 @@ data class HabitCompletionHistoryEntry(
 )
 
 data class ReminderSettings(
-    val time: String? = null, // Consider LocalTime if appropriate
+    val time: String? = null, // could consider LocalTime
     val customMessage: String? = null
 )
 
@@ -72,7 +71,7 @@ data class Habit(
     val frequency: HabitFrequency,
     val frequencyConfig: HabitFrequencyConfig? = null,
     val streakData: HabitStreakData? = null,
-    val category: String? = null, // Could be a Category domain model if it exists
+    val category: String? = null, // Could be a Category domain model
     val completionHistory: List<HabitCompletionHistoryEntry> = emptyList(),
     val status: HabitStatus = HabitStatus.ACTIVE,
     val difficulty: HabitDifficulty? = null,

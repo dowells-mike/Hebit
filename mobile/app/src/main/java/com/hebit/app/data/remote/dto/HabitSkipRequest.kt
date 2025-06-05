@@ -9,6 +9,6 @@ import com.squareup.moshi.JsonClass
  */
 @JsonClass(generateAdapter = true)
 data class HabitSkipRequest(
-    @Json(name = "date") val date: String, // ISO8601 String, e.g., "YYYY-MM-DDTHH:mm:ss.sssZ"
+    @Json(name = "date") val date: String, // ISO8601 String e.g. "YYYY-MM-DDTHH:mm:ss.sssZ"
     @Json(name = "skipReason") val skipReason: String? = null
 ) 

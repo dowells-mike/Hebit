@@ -54,17 +54,12 @@ object ReminderScheduler {
                 triggerAtMillis = triggerDateTime
                     .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
             }
-            // else -> {
-            //     Log.e(TAG, "Unknown reminder type for task ${task.id}. Skipping.")
-            //     return
-            // }
         }
 
         val intent = Intent(context, ReminderBroadcastReceiver::class.java).apply {
             action = ReminderBroadcastReceiver.ACTION_SHOW_REMINDER
             putExtra(ReminderBroadcastReceiver.EXTRA_TASK_ID, task.id)
             putExtra(ReminderBroadcastReceiver.EXTRA_TASK_TITLE, task.title)
-            // Potentially add task.description if small, or rely on fetching by ID in receiver
         }
 
         // Using reminderId makes the PendingIntent unique for each specific reminder of a task
@@ -78,7 +73,6 @@ object ReminderScheduler {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
                 Log.w(TAG, "Cannot schedule exact alarms. App needs SCHEDULE_EXACT_ALARM permission or user setting enabled.")
-                // TODO: Consider alternative or inform user. For now, we'll still try but it might be inexact.
             }
 
             alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
@@ -86,7 +80,6 @@ object ReminderScheduler {
                 Instant.ofEpochMilli(triggerAtMillis), ZoneId.systemDefault())}")
         } catch (e: SecurityException) {
             Log.e(TAG, "SecurityException while scheduling reminder for task ${task.id}. Check SCHEDULE_EXACT_ALARM permission.", e)
-            // TODO: Handle this case, perhaps by notifying the user or falling back to inexact alarms if appropriate
         }
     }
 
@@ -124,13 +117,13 @@ object ReminderScheduler {
     // This is crucial for AlarmManager to distinguish between different alarms for potentially the same task.
     private fun generateReminderId(taskId: String, reminder: Reminder): Int {
         // Combining hashCodes can produce unique enough IDs for this purpose.
-        // For absolute reminders, use the dateTime. For relative, use the offset.
+        // For absolute reminders, use dateTime. For relative, use offset.
         val reminderSpecificPart = when (reminder.type) {
             ReminderType.ABSOLUTE -> reminder.absoluteDateTime?.hashCode() ?: 0
             ReminderType.RELATIVE -> reminder.offsetMinutes?.hashCode() ?: 0
             // else -> 0
         }
-        // A simple way to combine, ensuring it fits in an Int. More sophisticated methods exist if collisions become an issue.
+        // A simple way to combine, ensuring it fits in an Int
         val combinedHash = taskId.hashCode() + reminder.type.hashCode() + reminderSpecificPart
         Log.d(TAG, "Generated reminderId for task $taskId, type ${reminder.type}, specificPart $reminderSpecificPart -> ID: $combinedHash")
         return combinedHash

@@ -127,8 +127,8 @@ fun ProgressStatsScreen(
                 )
                 
                 // Weekly calendar view
-                // WeeklyCalendarView(selectedPeriod = uiState.selectedPeriod) // Commented out as it's complex and not focus of error
-                
+                // WeeklyCalendarView(selectedPeriod = uiState.selectedPeriod)
+
                 // Task completion chart
                 Card(
                     modifier = Modifier
@@ -388,14 +388,12 @@ fun ProgressStatsScreen(
                                     )
                                 }
                             } else {
-                                // Simple visualization - in a real app you'd use a chart library
+                                // Simple visualization
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .weight(1f)
                                 ) {
-                                    // Here we'd render a proper pie chart
-                                    // For now we'll just show a placeholder with real percentages
                                     Box(
                                         modifier = Modifier
                                             .size(120.dp)
@@ -770,22 +768,3 @@ fun ChartLegendItem(color: Color, label: String) {
         )
     }
 }
-
-// Helper function to get an Icon based on a name string
-// This function should be REMOVED from here and imported from HabitScreenUtils.kt
-// @Composable 
-// fun getIconByName(iconName: String?): ImageVector { 
-// return when (iconName?.lowercase()) { 
-// "fitness" -> Icons.Filled.FitnessCenter 
-// "meditation" -> Icons.Outlined.SelfImprovement 
-// "reading" -> Icons.AutoMirrored.Filled.MenuBook 
-// "water" -> Icons.Outlined.WaterDrop 
-// "sleep" -> Icons.Filled.Hotel 
-// "journal" -> Icons.Filled.Book 
-// "no_smoking" -> Icons.Filled.SmokeFree 
-// "finance" -> Icons.Filled.AttachMoney 
-// "study" -> Icons.Filled.School 
-// "default" -> Icons.Filled.Star 
-// else -> Icons.Filled.Star 
-//     } 
-// }

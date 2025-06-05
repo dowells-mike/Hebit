@@ -57,9 +57,6 @@ fun formatHabitFrequency(habit: Habit): String {
             } else {
                 val days = config?.daysOfWeek
                     ?.sorted()
-                    // Assuming daysOfWeek in domain model is 0(Sun)-6(Sat)
-                    // java.time.DayOfWeek uses 1(Mon)-7(Sun).
-                    // Mapping 0-6 to 1-7 for DayOfWeek.of()
                     ?.mapNotNull { dayNumber ->
                         try {
                             // Adjust 0 (Sun) to 7 for DayOfWeek.of, and 1-6 remain 1-6
@@ -74,7 +71,6 @@ fun formatHabitFrequency(habit: Habit): String {
         HabitFrequency.WEEKLY -> {
             val times = config?.timesPerPeriod ?: 1
             val plural = if (times > 1) "s" else ""
-            // If daysOfWeek is relevant for WEEKLY, this needs enhancement. For now, simple.
             if (!config?.daysOfWeek.isNullOrEmpty()) {
                 val days = config?.daysOfWeek
                     ?.sorted()
@@ -114,6 +110,6 @@ fun formatHabitFrequency(habit: Habit): String {
         }
         HabitFrequency.UNKNOWN -> "Custom Schedule" // Handles UNKNOWN explicitly
         // No else needed if all enum cases are covered and the type is non-nullable.
-        // If freqEnum could be null (though it shouldn't be based on Habit model), then an else would be required.
+        // If freqEnum could be null, then an else would be required.
     }
 } 

@@ -546,7 +546,7 @@ fun ProductivityTrendsCard(insights: com.hebit.app.data.remote.dto.ProductivityI
             
             Spacer(modifier = Modifier.height(16.dp))
             
-            // Placeholder for chart
+            // chart placeholder
             Box(
                 modifier = Modifier
                     .fillMaxWidth()

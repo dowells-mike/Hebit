@@ -59,7 +59,7 @@ class MainActivity : ComponentActivity() {
                         finish()
                     }
                     
-                    // Notification Permission Handling (Android 13+)
+                    // Notification Permission Handling
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         val context = LocalContext.current
                         val launcher = rememberLauncherForActivityResult(
@@ -69,7 +69,6 @@ class MainActivity : ComponentActivity() {
                                     Log.d(TAG, "POST_NOTIFICATIONS permission granted.")
                                 } else {
                                     Log.w(TAG, "POST_NOTIFICATIONS permission denied.")
-                                    // Optionally, show a rationale to the user explaining why the permission is needed
                                 }
                             }
                         )

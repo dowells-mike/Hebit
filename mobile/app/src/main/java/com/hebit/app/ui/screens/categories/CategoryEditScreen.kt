@@ -150,7 +150,7 @@ fun CategoryEditScreen(
                     singleLine = true
                 )
 
-                // Spacer(modifier = Modifier.height(8.dp)) // Add some space
+                // Spacer(modifier = Modifier.height(8.dp)) to add some space
 
                 Text(
                     text = "Category Color",
@@ -188,14 +188,6 @@ fun CategoryEditScreen(
                         }
                     }
                 }
-                // Remove old text field for color
-                // OutlinedTextField(
-                //     value = categoryColorHex,
-                //     onValueChange = { categoryColorHex = it },
-                //     label = { Text("Category Color (e.g., #RRGGBB)") },
-                //     modifier = Modifier.fillMaxWidth(),
-                //     singleLine = true
-                // )
             }
         }
     }

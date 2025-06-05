@@ -10,9 +10,9 @@ import com.squareup.moshi.JsonClass
 data class CategoryDto(
     @Json(name = "_id") val id: String,
     val name: String,
-    val color: String, // Assuming backend sends hex color string
-    val icon: String? = null, // Assuming backend sends icon name/identifier
-    val user: String // Assuming categories are user-specific
+    val color: String, // backend sends hex color string
+    val icon: String? = null, // backend sends icon name/identifier
+    val user: String // categories are user-specific
 )
 
 /**

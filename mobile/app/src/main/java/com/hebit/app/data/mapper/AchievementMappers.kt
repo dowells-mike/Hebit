@@ -45,7 +45,7 @@ fun UserAchievementDto.toDomain(): UserAchievement {
     )
 }
 
-// Helper function for safe enum parsing (can be moved to a common util if used elsewhere)
+// Helper function for safe enum parsing
 inline fun <reified T : Enum<T>> safeEnumValueOf(value: String, default: T): T {
     return try {
         enumValueOf<T>(value.uppercase())

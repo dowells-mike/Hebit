@@ -20,7 +20,6 @@ class ReminderBroadcastReceiver : BroadcastReceiver() {
         const val ACTION_SHOW_REMINDER = "com.hebit.app.ACTION_SHOW_REMINDER"
         const val EXTRA_TASK_ID = "extra_task_id"
         const val EXTRA_TASK_TITLE = "extra_task_title"
-        // Could add EXTRA_TASK_DESCRIPTION, EXTRA_DUE_TIME_FORMATTED etc.
         private const val REMINDER_NOTIFICATION_ID_OFFSET = 1000 // Offset to avoid collision with other notification IDs
     }
 
@@ -45,10 +44,6 @@ class ReminderBroadcastReceiver : BroadcastReceiver() {
 
             // Create an intent to open the app, specifically the task detail screen
             val resultIntent = Intent(context, MainActivity::class.java).apply {
-                // Potentially pass data to navigate to the specific task
-                // e.g., flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                // putExtra("deep_link_task_id", taskId) // MainActivity would need to handle this
-                // For now, just opens the app's main entry point
             }
             
             val resultPendingIntent: PendingIntent? = PendingIntent.getActivity(
@@ -59,18 +54,18 @@ class ReminderBroadcastReceiver : BroadcastReceiver() {
             )
 
             val notificationBuilder = NotificationCompat.Builder(context, HebitApplication.TASK_REMINDER_CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_notification_icon) // Ensure you have this drawable
+                .setSmallIcon(R.drawable.ic_notification_icon)
                 .setContentTitle(taskTitle)
-                .setContentText("Your task is due soon or has a reminder.") // Generic message, can be improved
+                .setContentText("Your task is due soon or has a reminder.") // Generic message
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_REMINDER)
                 .setContentIntent(resultPendingIntent) // Set tap action
                 .setAutoCancel(true) // Dismiss notification when tapped
                 // .setDefaults(NotificationCompat.DEFAULT_ALL) // Default sound, vibration, lights
-                // TODO: Add actions like "Mark as Done" or "Snooze"
+
 
             with(NotificationManagerCompat.from(context)) {
-                // notificationId is a unique int for each notification that you must define
+                // notificationId is a unique int for each notification that must be define
                 // Using taskId's hashcode should make it unique per task
                 // Adding an offset in case other parts of the app use simple integer IDs like 0, 1, 2...
                 val notificationId = taskId.hashCode() + REMINDER_NOTIFICATION_ID_OFFSET
@@ -78,7 +73,7 @@ class ReminderBroadcastReceiver : BroadcastReceiver() {
                     notify(notificationId, notificationBuilder.build())
                     Log.i(TAG, "Notification displayed for task $taskId with notification ID $notificationId")
                 } catch (e: SecurityException) {
-                    // This can happen if POST_NOTIFICATIONS permission is revoked after being granted
+                    //can happen if POST_NOTIFICATIONS permission is revoked after being granted
                     Log.e(TAG, "SecurityException while showing notification for task $taskId. Is POST_NOTIFICATIONS permission granted?", e)
                 }
             }

@@ -44,7 +44,7 @@ class HebitApplication : Application() {
     private fun initializeML() {
         applicationScope.launch(Dispatchers.IO) {
             try {
-                // Try to install the ML model (this operation is safe to retry)
+                // Try to install the ML model
                 categorySuggestionService.installModelFromAssets()
                 Log.d("HebitApplication", "ML model initialization attempted")
             } catch (e: Exception) {
@@ -62,11 +62,6 @@ class HebitApplication : Application() {
             val importance = NotificationManager.IMPORTANCE_HIGH
             val channel = NotificationChannel(TASK_REMINDER_CHANNEL_ID, name, importance).apply {
                 description = descriptionText
-                // Optional: Configure light, vibration, etc.
-                // enableLights(true)
-                // lightColor = Color.RED
-                // enableVibration(true)
-                // vibrationPattern = longArrayOf(100, 200, 300, 400, 500, 400, 300, 200, 400)
             }
             // Register the channel with the system
             val notificationManager: NotificationManager =

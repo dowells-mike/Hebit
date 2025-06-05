@@ -91,7 +91,6 @@ fun CreateEditHabitScreen(
             val errorMessage = (uiState as CreateEditHabitUiState.Success).saveError
             if (errorMessage != null) {
                 println("CreateEditHabitScreen: Error saving habit: $errorMessage")
-                // TODO: Show error toast or snackbar
                 // Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
             }
         }
@@ -201,7 +200,7 @@ fun CreateEditHabitScreen(
                     Text("Link to Goal (Optional)", style = MaterialTheme.typography.titleMedium)
                     GoalLinkSection(viewModel.linkedGoalName, 
                         onLinkGoal = {
-                             // In a real app, this would open a goal selection screen/dialog
+                             // this would open a goal selection screen/dialog
                             viewModel.linkGoal(UUID.randomUUID().toString(), "Achieve Peak Productivity")
                         },
                         onUnlinkGoal = viewModel::unlinkGoal
@@ -251,7 +250,7 @@ fun CreateEditHabitScreen(
 @Composable
 fun CreateHabitScreenPreview() {
     MaterialTheme {
-        // For previews, we'll create a simple composable that simulates the UI without the ViewModel
+        // For previews, will create a simple composable that simulates the UI without the ViewModel
         CreateEditHabitScreenPreview(habitId = null)
     }
 }
@@ -285,7 +284,6 @@ fun CreateHabitScreenMonthlyPreview() {
 @Composable
 private fun CreateEditHabitScreenPreview(habitId: String?) {
     // This is a simplified preview version that doesn't require ViewModel injection
-    // In a real app, you might use a fake/mock ViewModel for previews
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -493,7 +491,6 @@ fun DatesOfMonthSelector(selectedDates: List<Int>, onDateToggle: (Int) -> Unit) 
             }
         }
     }
-    // TODO: Consider adding a "Last Day of Month" special toggle if required by backend/feature spec.
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

@@ -50,16 +50,16 @@ data class ProductivityScoreResponseDto(
     @Json(name = "queryUsed") val queryUsed: Map<String, String>? = null // For debugging
 )
 
-// Data class for /api/stats/score-history endpoint (even if placeholder)
+// Data class for /api/stats/score-history endpoint
 @JsonClass(generateAdapter = true)
 data class ScoreHistoryItemDto(
-    @Json(name = "date") val date: String, // e.g., "2023-10-27"
+    @Json(name = "date") val date: String, // e.g "2023-10-27"
     @Json(name = "score") val score: Int
 )
 
 @JsonClass(generateAdapter = true)
 data class ScoreHistoryResponseDto(
-    @Json(name = "periodType") val periodType: String, // e.g., "daily", "weekly"
+    @Json(name = "periodType") val periodType: String, // e.g "daily", "weekly"
     @Json(name = "count") val count: Int,
     @Json(name = "history") val history: List<ScoreHistoryItemDto>
 ) 

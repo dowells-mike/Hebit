@@ -10,8 +10,8 @@ import androidx.compose.ui.Modifier
 @Composable
 fun HabitStreakScreen() {
     Box(
-                                         modifier = Modifier.fillMaxSize(),
-                                                contentAlignment = Alignment.Center
+         modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
     ) {
         Text("Habit Streak Screen - Not implemented yet")
     }

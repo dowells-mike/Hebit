@@ -290,8 +290,7 @@ fun TaskDetailScreen(
                     val reminderString = task.metadata["reminder"]
                     val reminder = if (reminderString is String) parseReminderSettings(reminderString) else null
                     
-                    // Recurrence (assuming it might still be in metadata for older tasks)
-                    // Or, it might be in the dedicated recurrenceRule field
+                    // Recurrence
                     val recurrencePatternString = task.metadata["recurrencePattern"]
                     val recurrenceFromMetadata = if (recurrencePatternString is String) parseRecurrencePattern(recurrencePatternString) else null
                     
@@ -1175,4 +1174,3 @@ fun ReminderDialog(
     )
 }
 
-// Utility functions moved to TaskUtils.kt

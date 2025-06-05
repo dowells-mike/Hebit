@@ -6,6 +6,6 @@ package com.hebit.app.domain.model
 data class Category(
     val id: String,
     val name: String,
-    val color: String, // Hex color code (e.g., "#FF5733") or predefined name
-    val icon: String? = null // Optional: Name or resource ID of an icon
+    val color: String, // Hex color code (e.g., "#FF5733")
+    val icon: String? = null
 ) 

@@ -351,8 +351,6 @@ fun HebitNavigation(
             arguments = listOf(navArgument("habitId") { type = NavType.StringType })
         ) { backStackEntry ->
             val habitId = backStackEntry.arguments?.getString("habitId")
-            // TODO: Replace with actual HabitEditScreen call
-            // Example: HabitEditScreen(habitId = habitId, onNavigateBack = { navController.navigateUp() })
             CreateEditHabitScreen(
                 habitId = habitId, // Can be null if argument not found, screen should handle
                 onNavigateBack = { navController.navigateUp() }
@@ -462,7 +460,7 @@ fun HebitNavigation(
             )
         }
 
-        // Add Composable for CategoryEditScreen
+        // Added Composable for CategoryEditScreen
         composable(
             route = Routes.CATEGORY_EDIT + "?categoryId={categoryId}&returnTo={returnTo}",
             arguments = listOf(

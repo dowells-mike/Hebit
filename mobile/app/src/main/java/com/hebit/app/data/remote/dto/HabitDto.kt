@@ -2,12 +2,12 @@ package com.hebit.app.data.remote.dto
 
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
-// Removed java.time.LocalDateTime as it's not directly used in DTOs; parsing will be handled elsewhere.
+
 
 // DTO for individual completion history entry
 @JsonClass(generateAdapter = true)
 data class CompletionHistoryEntryDto(
-    val date: String, // Assuming ISO date string
+    val date: String, // ISO date string
     val completed: Boolean,
     val value: Float? = null,
     val notes: String? = null,
@@ -25,7 +25,7 @@ data class HabitFrequencyConfigDto(
 
 @JsonClass(generateAdapter = true)
 data class TimePreferenceDto(
-    val preferredTime: String? = null, // e.g., "10:00" in HH:mm format
+    val preferredTime: String? = null, // "10:00" in HH:mm format
     val flexibility: Int? = null      // Flexibility in minutes before/after preferredTime
 )
 
@@ -78,7 +78,7 @@ data class HabitDto(
     @Json(name = "completionHistory") val completionHistory: List<HabitCompletionHistoryEntryDto>? = emptyList(),
     @Json(name = "status") val status: String? = "active", // 'active', 'archived'
     @Json(name = "difficulty") val difficulty: String? = null, // 'easy', 'medium', 'hard'
-    @Json(name = "impact") val impact: Int? = null, // Example: 1-5 scale
+    @Json(name = "impact") val impact: Int? = null, // 1-5 scale
     @Json(name = "startDate") val startDate: String? = null, // ISO Date string
     @Json(name = "endDate") val endDate: String? = null, // ISO Date string
     @Json(name = "reminderSettings") val reminderSettings: ReminderSettingsDto? = null,
@@ -89,16 +89,5 @@ data class HabitDto(
     @Json(name = "completed_today") val completedToday: Boolean? = null
 )
 
-// Note: HabitListResponse, CreateHabitRequest, and UpdateHabitRequest have been moved to separate files
-// to avoid redeclaration conflicts and improve code organization.
-
-/* Commenting out HabitCompletionRequest as the current backend /track endpoint for habits does not take a body.
-   If the backend API changes for habit tracking (e.g. to allow back-dating or adding notes upon completion),
-   this DTO might need to be reinstated and adjusted.
-@JsonClass(generateAdapter = true)
-data class HabitCompletionRequest(
-    val completed: Boolean,
-    val date: String, // ISO Date string for which completion is recorded
-    val notes: String? = null
-)
-*/
+// HabitListResponse, CreateHabitRequest, and UpdateHabitRequest have been moved to separate files
+//to avoid redeclaration conflicts and improve code organization

@@ -502,7 +502,7 @@ class TaskRepositoryImpl @Inject constructor(
         )
     }
 
-    // --- Stats Methods --- //
+    //  Stats Methods
 
     override suspend fun getTaskStatistics(
         period: String?,

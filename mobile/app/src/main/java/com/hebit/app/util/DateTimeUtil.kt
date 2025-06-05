@@ -62,7 +62,7 @@ object DateTimeUtil {
     }
 
     fun defaultDateTime(): LocalDateTime {
-        // Return a sensible default, e.g., epoch or a specific fallback date
+        // Return a sensible default
         return LocalDateTime.ofInstant(Instant.EPOCH, ZoneId.systemDefault())
     }
 

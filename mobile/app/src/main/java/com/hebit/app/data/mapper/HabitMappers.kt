@@ -1,13 +1,13 @@
 package com.hebit.app.data.mapper
 
-import com.hebit.app.data.remote.dto.* // ktlint-disable no-wildcard-imports
-import com.hebit.app.domain.model.* // ktlint-disable no-wildcard-imports
+import com.hebit.app.data.remote.dto.*
+import com.hebit.app.domain.model.*
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 
-// Re-using existing helpers from AchievementMappers.kt if applicable or define locally
+// Re-using existing helpers from AchievementMappers.kt
 private fun String?.toSafeLocalDateTime(): LocalDateTime? {
     if (this == null) return null
     return try {
@@ -33,7 +33,7 @@ private fun String?.toSafeLocalDate(): LocalDate? {
             try {
                 LocalDateTime.parse(this, DateTimeFormatter.ISO_OFFSET_DATE_TIME).toLocalDate()
             } catch (e2: DateTimeParseException) {
-                null // Add logging if necessary
+                null
             }
         }
     }
@@ -69,7 +69,7 @@ fun HabitStreakDataDto?.toDomain(): HabitStreakData? {
 
 fun HabitCompletionHistoryEntryDto.toDomain(): HabitCompletionHistoryEntry {
     return HabitCompletionHistoryEntry(
-        date = this.date.toSafeLocalDateTime() ?: LocalDateTime.now(), // Fallback, consider error handling
+        date = this.date.toSafeLocalDateTime() ?: LocalDateTime.now(), // Fallback error handling
         completed = this.completed,
         notes = this.notes,
         skipReason = this.skipReason,
@@ -156,7 +156,7 @@ fun HabitStatsDto.toDomain(): HabitStats {
     )
 }
 
-// --- Domain to DTO Mappers (for Requests) ---
+// Domain to DTO Mappers (for Requests)
 
 fun HabitFrequency.toStringForDto(): String {
     return when (this) {

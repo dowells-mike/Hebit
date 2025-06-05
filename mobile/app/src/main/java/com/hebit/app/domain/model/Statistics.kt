@@ -14,7 +14,21 @@ data class Statistics(
     val timeAnalysis: TimeAnalysis = TimeAnalysis(),
     val streakRecords: List<StreakRecord> = emptyList(),
     val lastUpdated: Long = System.currentTimeMillis()
-)
+) {
+    companion object {
+        fun empty() = Statistics(
+            userId = "",
+            taskStats = TaskStats(),
+            habitStats = HabitStatsSummary(),
+            goalStats = GoalStats(),
+            categoryDistribution = emptyMap(),
+            timeAnalysis = TimeAnalysis(),
+            streakRecords = emptyList(),
+            lastUpdated = 0L
+        )
+    }
+}
+
 
 /**
  * Statistics related to tasks

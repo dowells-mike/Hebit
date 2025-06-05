@@ -179,8 +179,8 @@ class AuthRepository @Inject constructor(
             tokenManager.clearAuthData()
             originalFlowCollector.emit(Resource.Error("Session expired. Please log in again. (Refresh HTTP error: ${e.message()})"))
         } catch (e: IOException) {
-            // For network errors during refresh, we might not want to clear the token immediately,
-            // as it might be a temporary network issue. We can emit the original error or a specific network error.
+            // For network errors during refresh, I might not want to clear the token immediately,
+            // as it might be a temporary network issue. I can emit the original error or a specific network error.
              originalFlowCollector.emit(Resource.Error(originalException?.message() ?: "Network error during token refresh. Please try again."))
         } catch (e: Exception) {
             tokenManager.clearAuthData()

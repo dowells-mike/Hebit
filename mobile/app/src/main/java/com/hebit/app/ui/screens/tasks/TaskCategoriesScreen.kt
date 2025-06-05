@@ -29,7 +29,7 @@ fun TaskCategoriesScreen(
     onGoalsClick: () -> Unit = {},
     onProfileClick: () -> Unit = {}
 ) {
-    // Mock categories data - would come from ViewModel in real app
+    // Mock categories data
     val categories = remember {
         listOf(
             TaskCategory("Work", 12, Color(0xFF4285F4)),

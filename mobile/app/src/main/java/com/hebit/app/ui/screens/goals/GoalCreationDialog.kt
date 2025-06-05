@@ -193,7 +193,7 @@ fun GoalCreationDialog(
                                 currentStep++
                             } else {
                                 // Create goal with all the data
-                                onGoalAdd(goalTitle, goalDescription, 3) // For now using default 3 months
+                                onGoalAdd(goalTitle, goalDescription, 3) // For now using 3 months
                             }
                         },
                         enabled = when (currentStep) {

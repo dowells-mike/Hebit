@@ -96,7 +96,6 @@ class GoalListViewModel @Inject constructor(
             updateGoalProgressUseCase(goalId, progress).onEach { result ->
                 when (result) {
                     is Resource.Loading -> {
-                        // Optionally indicate loading state for the specific item being updated
                     }
                     is Resource.Success -> {
                         result.data?.let { updatedGoal ->
@@ -122,7 +121,6 @@ class GoalListViewModel @Inject constructor(
             deleteGoalUseCase(goalId).onEach { result ->
                 when (result) {
                     is Resource.Loading -> {
-                        // Optionally indicate loading state for the specific item being deleted
                     }
                     is Resource.Success -> {
                         if (result.data == true) {

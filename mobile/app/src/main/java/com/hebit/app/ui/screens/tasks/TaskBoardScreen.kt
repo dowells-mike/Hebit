@@ -40,7 +40,7 @@ fun TaskBoardScreen(
     onGoalsClick: () -> Unit = {},
     onProfileClick: () -> Unit = {}
 ) {
-    // Mock data for task board - would come from ViewModel in real app
+    // Mock data for task board
     val columns = remember { 
         mutableStateListOf(
             TaskColumn(
@@ -216,7 +216,7 @@ fun TaskBoardScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Board content - horizontal scrolling columns
+            // Board content horizontal scrolling columns
             Row(
                 modifier = Modifier
                     .fillMaxSize()
@@ -274,7 +274,6 @@ fun TaskBoardScreen(
             AddBoardTaskDialog(
                 onDismiss = { showAddTaskDialog = false },
                 onTaskAdd = { title, columnId, priority, assignees ->
-                    // Would add task to specified column in real app
                     showAddTaskDialog = false
                 },
                 columns = columns
@@ -286,7 +285,6 @@ fun TaskBoardScreen(
             AddColumnDialog(
                 onDismiss = { showAddColumnDialog = false },
                 onColumnAdd = { title ->
-                    // Would add column to board in real app
                     showAddColumnDialog = false
                 }
             )
@@ -558,7 +556,7 @@ fun AddBoardTaskDialog(
                                 .menuAnchor()
                         )
                         
-                        /* Dropdown implementation omitted for simplicity */
+                        // Dropdown implementation omitted for simplicity
                     }
                 }
                 

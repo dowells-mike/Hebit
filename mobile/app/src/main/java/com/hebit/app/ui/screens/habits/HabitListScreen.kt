@@ -23,16 +23,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.hebit.app.domain.model.Habit // Your main domain model
+import com.hebit.app.domain.model.Habit //  main domain model
 import com.hebit.app.domain.model.Resource
-import com.hebit.app.ui.components.BottomNavItem // Assuming this exists
+import com.hebit.app.ui.components.BottomNavItem
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-// Removed as they are imported via HabitScreenUtils.kt or directly from domain.model
-// import com.hebit.app.domain.model.HabitFrequencyType 
-// import com.hebit.app.domain.model.DayOfWeekDomain
 
-// Import helpers from the new utility file
+
+
 
 // Helper functions are now in HabitScreenUtils.kt and imported above.
 
@@ -41,7 +39,7 @@ import java.time.format.DateTimeFormatter
 fun HabitListScreen(
     onNavigateToCreateHabit: () -> Unit, // For FAB navigation
     onHabitClick: (String) -> Unit,      // For navigating to habit detail
-    // For bottom navigation (assuming these are passed from a main NavHost)
+    // For bottom navigation
     onHomeClick: () -> Unit,
     onTasksClick: () -> Unit,
     onGoalsClick: () -> Unit,
@@ -53,7 +51,7 @@ fun HabitListScreen(
 
     var selectedCategoryFilter by remember { mutableStateOf<HabitCategoryUI?>(null) }
 
-    // Refresh habits when screen becomes visible (e.g., returning from create screen)
+    // Refresh habits when screen becomes visible
     LaunchedEffect(Unit) {
         viewModel.loadAllHabits()
         viewModel.loadTodaysHabits()
@@ -65,8 +63,6 @@ fun HabitListScreen(
             is Resource.Success -> {
                 val habitList = (todayHabitsResource as Resource.Success<List<Habit>>).data ?: emptyList()
                 val completed = habitList.count {
-                    // A simple check: if lastCompleted on streakData is today.
-                    // For more complex "is completed for its current active period", ViewModel might need to provide more direct state.
                     it.streakData?.lastCompleted?.toLocalDate() == LocalDate.now()
                 }
                 val total = habitList.size
@@ -80,12 +76,12 @@ fun HabitListScreen(
     val currentDate = remember { LocalDate.now() }
     val dateFormatter = remember { DateTimeFormatter.ofPattern("MMMM d, yyyy") }
 
-    // Example of how to collect UI events for Snackbar, if needed in this screen
+    // Example of how would collect UI events for Snackbar
     LaunchedEffect(Unit) {
         viewModel.eventFlow.collect { event ->
             when (event) {
                 is HabitViewModel.UiEvent.ShowSnackbar -> {
-                    // Show snackbar here if you have a SnackbarHostState
+                    // would show snackbar if I implement a SnackbarHostState
                 }
             }
         }
@@ -190,13 +186,6 @@ fun HabitListScreen(
                                     habit = habit,
                                     onHabitClick = { onHabitClick(habit.id) },
                                     onCompleteClick = {
-                                        // Pass the inverse of current completedToday state, or let ViewModel decide
-                                        // For simplicity, let's tell ViewModel to toggle or handle logic.
-                                        // The onCompleteClick lambda in HabitItem is now parameterless.
-                                        // The ViewModel's trackHabitCompletion can decide what 'completed' value to send.
-                                        // Let's assume trackHabitCompletion in ViewModel will handle the toggle.
-                                        // It knows the current state or can fetch it.
-                                        // For a simple toggle for UI initiated action:
                                         viewModel.trackHabitCompletion(habit.id, !(habit.completedToday ?: false))
                                     }
                                 )
@@ -225,7 +214,7 @@ fun HabitItem(
     onCompleteClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Use the direct 'completedToday' field from the Habit domain model
+    // Using the direct 'completedToday' field from the Habit domain model
     val isCompletedToday = habit.completedToday == true
 
     Card(
@@ -333,11 +322,10 @@ fun CategoriesRow(
     }
 }
 
-// Placeholder for ProgressCard - you might have your own implementation
+// Placeholder for ProgressCard
 @Composable
 fun ProgressCard(
     modifier: Modifier = Modifier,
-    // date: String, // Removed as it's part of the screen now
     completedCount: Int,
     totalCount: Int,
     completionRate: Float
@@ -370,7 +358,7 @@ fun ProgressCard(
     }
 }
 
-// Dummy Streak Color Logic - to be refined in Theme
+// Dummy Streak Color Logic to be refined in Theme
 object HebitTheme {
     @Composable
     fun getStreakColor(streak: Int): Color {

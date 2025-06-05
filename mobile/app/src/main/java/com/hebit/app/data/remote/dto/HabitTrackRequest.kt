@@ -10,6 +10,6 @@ import com.squareup.moshi.JsonClass
 @JsonClass(generateAdapter = true)
 data class HabitTrackRequest(
     @Json(name = "completed") val completed: Boolean,
-    @Json(name = "date") val date: String, // ISO8601 String, e.g., "YYYY-MM-DDTHH:mm:ss.sssZ"
+    @Json(name = "date") val date: String, // ISO8601 String e.g. "YYYY-MM-DDTHH:mm:ss.sssZ"
     @Json(name = "notes") val notes: String? = null
 ) 

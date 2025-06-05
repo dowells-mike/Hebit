@@ -53,8 +53,7 @@ class BooleanAdapter {
 object NetworkModule {
     
     // Constants for network requests
-    // TODO: Move to a more secure and configurable location like buildConfigField in build.gradle
-    // private const val BASE_URL = "http://192.168.0.137:5000/api/" // Local network IP address
+    // private const val BASE_URL = "http://192.168.0.137:5000/api/" // Local network IP address. Switched to one below for prod
     private const val BASE_URL = "https://hebit-backend.onrender.com/api/" // Deployed Render backend
     private const val CONNECT_TIMEOUT_SECONDS = 30L
     private const val READ_TIMEOUT = 30L
