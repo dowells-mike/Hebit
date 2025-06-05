@@ -32,6 +32,7 @@ navigationCompose = "2.7.6"
 securityCryptoKtx = "1.0.0"
 composeMaterial = "1.4.1"
 uiautomatorV18 = "2.2.0-alpha1"
+runtimeLivedata = "1.8.2"
 
 [libraries]
 # Existing libraries...
@@ -85,6 +86,7 @@ navigation-compose = { group = "androidx.navigation", name = "navigation-compose
 androidx-security-crypto-ktx = { group = "androidx.security", name = "security-crypto-ktx", version.ref = "securityCryptoKtx" }
 androidx-compose-material = { group = "androidx.wear.compose", name = "compose-material", version.ref = "composeMaterial" }
 androidx-uiautomator-v18 = { group = "androidx.test.uiautomator", name = "uiautomator-v18", version.ref = "uiautomatorV18" }
+androidx-runtime-livedata = { group = "androidx.compose.runtime", name = "runtime-livedata", version.ref = "runtimeLivedata" }
 
 [plugins]
 # Existing plugins...

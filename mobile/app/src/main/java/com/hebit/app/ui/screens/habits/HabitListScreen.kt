@@ -53,6 +53,12 @@ fun HabitListScreen(
 
     var selectedCategoryFilter by remember { mutableStateOf<HabitCategoryUI?>(null) }
 
+    // Refresh habits when screen becomes visible (e.g., returning from create screen)
+    LaunchedEffect(Unit) {
+        viewModel.loadAllHabits()
+        viewModel.loadTodaysHabits()
+    }
+
     // Progress card calculation based on today's habits from ViewModel
     val (completedTodayCount, totalTodayHabits, todayCompletionRate) = remember(todayHabitsResource) {
         when (todayHabitsResource) {

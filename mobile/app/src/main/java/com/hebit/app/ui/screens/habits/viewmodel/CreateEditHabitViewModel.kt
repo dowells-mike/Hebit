@@ -7,9 +7,19 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hebit.app.domain.model.Habit
+import com.hebit.app.domain.model.HabitFrequency
+import com.hebit.app.domain.model.HabitFrequencyConfig
+import com.hebit.app.domain.model.HabitStatus
+import com.hebit.app.domain.model.Resource
+import com.hebit.app.domain.repository.IHabitRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.util.UUID
+import javax.inject.Inject
 
 // TODO: Define data classes for Frequency, Reminder, etc. based on backend API and feature requirements
 // For example:
@@ -57,10 +67,13 @@ object TimeOfDayOptions {
 // Placeholder data class for a reminder
 data class HabitReminder(val id: String, val time: String, val label: String? = null)
 
-class CreateEditHabitViewModel(
-    // TODO: Inject UseCases/Repositories for saving/loading habits
-    private val habitId: String? // Null for create mode, non-null for edit mode
+@HiltViewModel
+class CreateEditHabitViewModel @Inject constructor(
+    private val habitRepository: IHabitRepository
+    // habitId will be passed via SavedStateHandle if needed, or through a separate method
 ) : ViewModel() {
+
+    private var habitId: String? = null // Will be set via setHabitId method
 
     var habitName by mutableStateOf("")
         private set
@@ -100,7 +113,8 @@ class CreateEditHabitViewModel(
     // Helper for specific dates selection
     val selectedSpecificDates = mutableStateListOf<LocalDate>()
 
-    init {
+    fun initializeWithHabitId(habitId: String?) {
+        this.habitId = habitId
         if (habitId != null) {
             loadHabitDetails(habitId)
         } else {
@@ -256,6 +270,8 @@ class CreateEditHabitViewModel(
                     // If dates are selected, timesPerPeriod should not be the primary validation, or they should work together.
                     // For now, if timesPerPeriod is set, it must be > 0. If dates are selected, that implies validity too.
                     // Backend will ultimately decide complex rules. For now, either times or dates must be somewhat configured.
+                    // Simplified: if timesPerPeriod is set, it must be valid. Or, if dates are selected, it's valid.
+                    // Backend will ultimately decide complex rules. For now, either times or dates must be somewhat configured.
                     val datesValid = !frequencySelection.config.datesOfMonth.isNullOrEmpty()
                     (timesValid && !datesValid) || (datesValid && !timesValid) || (timesValid && datesValid) || (!timesValid && datesValid) // More flexible: allow times/period, specific dates, or both
                 }
@@ -269,65 +285,213 @@ class CreateEditHabitViewModel(
     private fun loadHabitDetails(id: String) {
         viewModelScope.launch {
             _uiState.value = CreateEditHabitUiState.Loading
-            // TODO: Implement actual loading logic from repository/use case
-            // For example:
-            // val habit = habitRepository.getHabitById(id)
-            // habitName = habit.name
-            // habitDescription = habit.description
-            // frequencySelection = mapBackendFrequencyToLocal(habit.frequency, habit.frequencyConfig)
-            // selectedDaysOfWeek.clear()
-            // selectedDaysOfWeek.addAll(frequencySelection.config.daysOfWeek)
-            // ... etc. for other frequency parts
-            kotlinx.coroutines.delay(500) // Simulate network delay
-            habitName = "Loaded Habit Name"
-            habitDescription = "Loaded Habit Description"
-            selectedIconName = "fitness_center" // Simulate loaded icon
-            selectedColorHex = "#FF0000"      // Simulate loaded color (Red)
-            selectedTimeOfDay = TimeOfDayOptions.MORNING // Simulate loaded time of day
-            reminders.addAll(listOf(HabitReminder("1", "09:00"), HabitReminder("2", "17:30"))) // Simulate loaded reminders
-            linkedGoalId = "goal123"
-            linkedGoalName = "Run a Marathon"
-            // Simulate loaded frequency
-            val loadedFrequency = HabitFrequencySelection(
-                type = HabitFrequencyType.WEEKLY,
-                config = FrequencyConfig(daysOfWeek = listOf(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY, DayOfWeek.FRIDAY), timesPerPeriod = 3)
-            )
-            frequencySelection = loadedFrequency
-            selectedDaysOfWeek.clear()
-            selectedDaysOfWeek.addAll(loadedFrequency.config.daysOfWeek)
-            selectedDatesOfMonth.clear()
-            selectedSpecificDates.clear()
-            // Update other helper lists based on loadedFrequency.config if necessary
-
-            _uiState.value = CreateEditHabitUiState.Success(isEditMode = true, canSave = true) // Assuming loaded data is valid
-            validateInput() // Re-validate after loading
+            habitRepository.getHabitById(id)
+                .catch { e ->
+                    _uiState.value = CreateEditHabitUiState.Error("Failed to load habit: ${e.localizedMessage}")
+                }
+                .collect { result ->
+                    when (result) {
+                        is Resource.Loading -> {
+                            _uiState.value = CreateEditHabitUiState.Loading
+                        }
+                        is Resource.Success -> {
+                            val habit = result.data
+                            if (habit != null) {
+                                // Populate UI state from loaded habit
+                                habitName = habit.title
+                                habitDescription = habit.description ?: ""
+                                selectedIconName = habit.icon
+                                selectedColorHex = habit.color
+                                selectedTimeOfDay = TimeOfDayOptions.ANY_TIME // TODO: Map from habit if available
+                                linkedGoalId = null // TODO: Map from habit.goalLink if available
+                                linkedGoalName = null // TODO: Map from habit if available
+                                
+                                // Map frequency
+                                frequencySelection = mapDomainFrequencyToUI(habit.frequency, habit.frequencyConfig)
+                                updateUISelectionsFromFrequency()
+                                
+                                _uiState.value = CreateEditHabitUiState.Success(isEditMode = true, canSave = true)
+                                validateInput()
+                            } else {
+                                _uiState.value = CreateEditHabitUiState.Error("Habit not found")
+                            }
+                        }
+                        is Resource.Error -> {
+                            _uiState.value = CreateEditHabitUiState.Error(result.message ?: "Failed to load habit")
+                        }
+                    }
+                }
         }
     }
 
     fun saveHabit() {
         val currentUiState = _uiState.value
         if (currentUiState !is CreateEditHabitUiState.Success || !currentUiState.canSave) {
+            println("SaveHabit: Cannot save - currentUiState is not Success or canSave is false")
             return
         }
 
+        _uiState.value = currentUiState.copy(saveError = null) // Clear any previous error
+        
         viewModelScope.launch {
-            // TODO: Construct habit object from states including frequencySelection
-            // val backendFrequencyType = mapLocalFrequencyTypeToBackend(frequencySelection.type)
-            // val backendFrequencyConfig = mapLocalFrequencyConfigToBackend(frequencySelection.config)
-            // val habitToSave = HabitDto(..., frequency = backendFrequencyType, frequencyConfig = backendFrequencyConfig)
-
-            // TODO: Call repository/use case to save the habit
-            println("Saving habit: Name=$habitName, Icon=$selectedIconName, Color=$selectedColorHex, TimeOfDay=$selectedTimeOfDay, Frequency=$frequencySelection, Reminders=$reminders, GoalID=$linkedGoalId")
-            kotlinx.coroutines.delay(500) // Simulate network delay
-            _uiState.value = currentUiState.copy(isSaved = true)
+            try {
+                val habitToSave = createHabitFromUIState()
+                println("SaveHabit: Created habit from UI state: ${habitToSave.title}, frequency: ${habitToSave.frequency}")
+                
+                val result = if (habitId != null) {
+                    // Update existing habit
+                    println("SaveHabit: Updating existing habit with ID: $habitId")
+                    habitRepository.updateHabit(habitToSave.copy(id = habitId!!))
+                } else {
+                    // Create new habit
+                    println("SaveHabit: Creating new habit")
+                    habitRepository.createHabit(habitToSave)
+                }
+                
+                result.catch { e ->
+                    println("SaveHabit: Error in repository call: ${e.localizedMessage}")
+                    _uiState.value = currentUiState.copy(
+                        saveError = "Error saving habit: ${e.localizedMessage}"
+                    )
+                }.collect { resource ->
+                    when (resource) {
+                        is Resource.Loading -> {
+                            println("SaveHabit: Repository returned Loading")
+                            // Keep current state, maybe add loading indicator later
+                        }
+                        is Resource.Success -> {
+                            println("SaveHabit: Repository returned Success")
+                            _uiState.value = currentUiState.copy(isSaved = true)
+                        }
+                        is Resource.Error -> {
+                            println("SaveHabit: Repository returned Error: ${resource.message}")
+                            _uiState.value = currentUiState.copy(
+                                saveError = resource.message ?: "Failed to save habit"
+                            )
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                println("SaveHabit: Exception in saveHabit: ${e.localizedMessage}")
+                _uiState.value = currentUiState.copy(
+                    saveError = "Error creating habit: ${e.localizedMessage}"
+                )
+            }
         }
     }
 
-    // TODO: Add mapping functions if backend DTOs differ significantly from ViewModel's representation
-    // private fun mapBackendFrequencyToLocal(type: String, config: BackendFrequencyConfig?): HabitFrequencySelection { ... }
-    // private fun mapLocalFrequencyTypeToBackend(type: HabitFrequencyType): String { ... }
-    // private fun mapLocalFrequencyConfigToBackend(config: FrequencyConfig): BackendFrequencyConfig { ... }
+    private fun createHabitFromUIState(): Habit {
+        val domainFrequency = mapUIFrequencyToDomain(frequencySelection.type)
+        val domainFrequencyConfig = mapUIFrequencyConfigToDomain(frequencySelection.config)
+        
+        return Habit(
+            id = habitId ?: UUID.randomUUID().toString(), // Use existing ID or generate new
+            userId = "", // Will be set by repository/backend
+            title = habitName,
+            description = if (habitDescription.isBlank()) null else habitDescription,
+            icon = selectedIconName,
+            color = selectedColorHex,
+            frequency = domainFrequency,
+            frequencyConfig = domainFrequencyConfig,
+            status = HabitStatus.ACTIVE,
+            // Set other fields to defaults for now
+            streakData = null,
+            category = null,
+            completionHistory = emptyList(),
+            difficulty = null,
+            impact = null,
+            startDate = LocalDate.now(),
+            endDate = null,
+            reminderSettings = null,
+            successCriteria = null,
+            metadata = null,
+            createdAt = null,
+            updatedAt = null,
+            completedToday = null
+        )
+    }
 
+    private fun mapUIFrequencyToDomain(uiType: HabitFrequencyType): HabitFrequency {
+        return when (uiType) {
+            HabitFrequencyType.DAILY -> HabitFrequency.DAILY
+            HabitFrequencyType.WEEKLY -> HabitFrequency.WEEKLY
+            HabitFrequencyType.MONTHLY -> HabitFrequency.MONTHLY
+            HabitFrequencyType.SPECIFIC_DATES -> HabitFrequency.SPECIFIC_DATES
+        }
+    }
+
+    private fun mapUIFrequencyConfigToDomain(uiConfig: FrequencyConfig): HabitFrequencyConfig? {
+        if (uiConfig.daysOfWeek.isEmpty() && 
+            uiConfig.timesPerPeriod == null && 
+            uiConfig.datesOfMonth.isEmpty() && 
+            uiConfig.specificDates.isEmpty()) {
+            return null
+        }
+        
+        return HabitFrequencyConfig(
+            daysOfWeek = uiConfig.daysOfWeek.map { dayOfWeek ->
+                // Convert java.time.DayOfWeek to 0-6 (Sun-Sat) for backend
+                when (dayOfWeek) {
+                    DayOfWeek.SUNDAY -> 0
+                    DayOfWeek.MONDAY -> 1
+                    DayOfWeek.TUESDAY -> 2
+                    DayOfWeek.WEDNESDAY -> 3
+                    DayOfWeek.THURSDAY -> 4
+                    DayOfWeek.FRIDAY -> 5
+                    DayOfWeek.SATURDAY -> 6
+                }
+            }.takeIf { it.isNotEmpty() },
+            datesOfMonth = uiConfig.datesOfMonth.takeIf { it.isNotEmpty() },
+            timesPerPeriod = uiConfig.timesPerPeriod,
+            specificDates = uiConfig.specificDates.takeIf { it.isNotEmpty() }
+        )
+    }
+
+    private fun mapDomainFrequencyToUI(domainFreq: HabitFrequency, domainConfig: HabitFrequencyConfig?): HabitFrequencySelection {
+        val uiType = when (domainFreq) {
+            HabitFrequency.DAILY -> HabitFrequencyType.DAILY
+            HabitFrequency.WEEKLY -> HabitFrequencyType.WEEKLY
+            HabitFrequency.MONTHLY -> HabitFrequencyType.MONTHLY
+            HabitFrequency.SPECIFIC_DATES -> HabitFrequencyType.SPECIFIC_DATES
+            HabitFrequency.UNKNOWN -> HabitFrequencyType.DAILY // Fallback
+        }
+        
+        val uiConfig = if (domainConfig != null) {
+            FrequencyConfig(
+                daysOfWeek = domainConfig.daysOfWeek?.map { dayInt ->
+                    // Convert 0-6 (Sun-Sat) to DayOfWeek
+                    when (dayInt) {
+                        0 -> DayOfWeek.SUNDAY
+                        1 -> DayOfWeek.MONDAY
+                        2 -> DayOfWeek.TUESDAY
+                        3 -> DayOfWeek.WEDNESDAY
+                        4 -> DayOfWeek.THURSDAY
+                        5 -> DayOfWeek.FRIDAY
+                        6 -> DayOfWeek.SATURDAY
+                        else -> DayOfWeek.MONDAY // Fallback
+                    }
+                } ?: emptyList(),
+                timesPerPeriod = domainConfig.timesPerPeriod,
+                datesOfMonth = domainConfig.datesOfMonth ?: emptyList(),
+                specificDates = domainConfig.specificDates ?: emptyList()
+            )
+        } else {
+            FrequencyConfig()
+        }
+        
+        return HabitFrequencySelection(type = uiType, config = uiConfig)
+    }
+
+    private fun updateUISelectionsFromFrequency() {
+        selectedDaysOfWeek.clear()
+        selectedDaysOfWeek.addAll(frequencySelection.config.daysOfWeek)
+        
+        selectedDatesOfMonth.clear()
+        selectedDatesOfMonth.addAll(frequencySelection.config.datesOfMonth)
+        
+        selectedSpecificDates.clear()
+        selectedSpecificDates.addAll(frequencySelection.config.specificDates)
+    }
 }
 
 sealed interface CreateEditHabitUiState {

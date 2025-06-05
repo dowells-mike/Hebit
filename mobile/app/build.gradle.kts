@@ -8,7 +8,7 @@ plugins {
 
 android {
     namespace = "com.hebit.app"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.hebit.app"
@@ -61,6 +61,7 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.compose.material)
     implementation(libs.androidx.uiautomator.v18)
+    implementation(libs.androidx.runtime.livedata)
     // implementation(libs.androidx.security.crypto.ktx) // Temporarily disabled due to dependency issues
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)

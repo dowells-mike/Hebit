@@ -158,6 +158,33 @@ fun HabitStatsDto.toDomain(): HabitStats {
 
 // --- Domain to DTO Mappers (for Requests) ---
 
+fun HabitFrequency.toStringForDto(): String {
+    return when (this) {
+        HabitFrequency.DAILY -> "daily"
+        HabitFrequency.WEEKLY -> "weekly"
+        HabitFrequency.MONTHLY -> "monthly"
+        HabitFrequency.SPECIFIC_DATES -> "specific_dates"
+        HabitFrequency.UNKNOWN -> "daily" // Fallback to daily
+    }
+}
+
+fun HabitStatus.toStringForDto(): String {
+    return when (this) {
+        HabitStatus.ACTIVE -> "active"
+        HabitStatus.ARCHIVED -> "archived"
+        HabitStatus.UNKNOWN -> "active" // Fallback to active
+    }
+}
+
+fun HabitDifficulty.toStringForDto(): String {
+    return when (this) {
+        HabitDifficulty.EASY -> "easy"
+        HabitDifficulty.MEDIUM -> "medium"
+        HabitDifficulty.HARD -> "hard"
+        HabitDifficulty.UNKNOWN -> "medium" // Fallback to medium
+    }
+}
+
 fun HabitFrequencyConfig.toDto(): HabitFrequencyConfigDto {
     return HabitFrequencyConfigDto(
         daysOfWeek = this.daysOfWeek,

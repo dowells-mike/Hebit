@@ -2,6 +2,7 @@ package com.hebit.app.data.repository
 
 import com.hebit.app.data.mapper.toDomain
 import com.hebit.app.data.mapper.toDto
+import com.hebit.app.data.mapper.toStringForDto
 import com.hebit.app.data.remote.api.HebitApiService
 import com.hebit.app.data.remote.dto.CreateHabitRequest
 import com.hebit.app.data.remote.dto.UpdateHabitRequest
@@ -87,14 +88,14 @@ class HabitRepositoryImpl @Inject constructor(
                 description = habit.description,
                 icon = habit.icon,
                 color = habit.color,
-                frequency = habit.frequency.name.lowercase(),
+                frequency = habit.frequency.toStringForDto(),
                 frequencyConfig = habit.frequencyConfig?.toDto(),
                 category = habit.category,
-                difficulty = habit.difficulty?.name?.lowercase(),
+                difficulty = habit.difficulty?.toStringForDto(),
                 impact = habit.impact,
                 startDate = habit.startDate?.format(DateTimeFormatter.ISO_LOCAL_DATE),
                 endDate = habit.endDate?.format(DateTimeFormatter.ISO_LOCAL_DATE),
-                status = habit.status.name.lowercase()
+                status = habit.status.toStringForDto()
             )
             val response = apiService.createHabit(createRequest)
             if (response.isSuccessful && response.body() != null) {
@@ -115,14 +116,14 @@ class HabitRepositoryImpl @Inject constructor(
                 description = habit.description,
                 icon = habit.icon,
                 color = habit.color,
-                frequency = habit.frequency.name.lowercase(),
+                frequency = habit.frequency.toStringForDto(),
                 frequencyConfig = habit.frequencyConfig?.toDto(),
                 category = habit.category,
-                difficulty = habit.difficulty?.name?.lowercase(),
+                difficulty = habit.difficulty?.toStringForDto(),
                 impact = habit.impact,
                 startDate = habit.startDate?.format(DateTimeFormatter.ISO_LOCAL_DATE),
                 endDate = habit.endDate?.format(DateTimeFormatter.ISO_LOCAL_DATE),
-                status = habit.status.name.lowercase()
+                status = habit.status.toStringForDto()
             )
             val response = apiService.updateHabit(habit.id, updateRequest)
             if (response.isSuccessful && response.body() != null) {

@@ -5,11 +5,13 @@ import com.hebit.app.data.remote.api.HebitApiService
 import com.hebit.app.data.remote.dto.LoginRequest
 import com.hebit.app.data.remote.dto.RegisterRequest
 import com.hebit.app.data.remote.dto.ForgotPasswordRequest
+import com.hebit.app.data.remote.dto.RefreshTokenRequest
 import com.hebit.app.data.remote.dto.UserResponse
 import com.hebit.app.domain.model.Resource
 import com.hebit.app.domain.model.User
 import com.hebit.app.domain.repository.IAuthRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import retrofit2.HttpException
 import java.io.IOException
@@ -111,34 +113,25 @@ class AuthRepository @Inject constructor(
      */
     override fun getUserProfile(): Flow<Resource<User?>> = flow {
         emit(Resource.Loading())
-        
         try {
             val response = apiService.getUserProfile()
-            
             if (response.isSuccessful && response.body() != null) {
                 val userResponse = response.body()!!
-                
-                // Map to domain model
                 val user = mapUserResponseToDomain(userResponse)
                 emit(Resource.Success(user))
             } else {
-                val errorCode = response.code()
-                when (errorCode) {
-                    401 -> {
-                        // Token expired or invalid, clear auth data
-                        tokenManager.clearAuthData()
-                        emit(Resource.Error("Authentication required"))
-                    }
-                    else -> {
-                        val errorMessage = response.errorBody()?.string() ?: "Unknown error occurred"
-                        emit(Resource.Error(errorMessage))
-                    }
+                if (response.code() == 401) {
+                    // Attempt to refresh token
+                    refreshTokenAndRetryGetUserProfile(this@flow, null)
+                } else {
+                    val errorMessage = response.errorBody()?.string() ?: "Unknown error fetching profile"
+                    emit(Resource.Error(errorMessage))
                 }
             }
         } catch (e: HttpException) {
             if (e.code() == 401) {
-                tokenManager.clearAuthData()
-                emit(Resource.Error("Authentication required"))
+                // Attempt to refresh token
+                refreshTokenAndRetryGetUserProfile(this@flow, e)
             } else {
                 emit(Resource.Error("Server error: ${e.message()}"))
             }
@@ -146,6 +139,52 @@ class AuthRepository @Inject constructor(
             emit(Resource.Error("Network error: ${e.localizedMessage ?: "Check your internet connection"}"))
         } catch (e: Exception) {
             emit(Resource.Error("Unexpected error: ${e.localizedMessage ?: "An unexpected error occurred"}"))
+        }
+    }
+
+    private suspend fun refreshTokenAndRetryGetUserProfile(
+        originalFlowCollector: FlowCollector<Resource<User?>>,
+        originalException: HttpException?
+    ) {
+        val refreshToken = tokenManager.getRefreshToken()
+        val userId = tokenManager.getUserId()
+
+        if (refreshToken.isNullOrEmpty() || userId.isNullOrEmpty()) {
+            tokenManager.clearAuthData()
+            originalFlowCollector.emit(Resource.Error(originalException?.message() ?: "Authentication required. No refresh token."))
+            return
+        }
+
+        try {
+            val refreshResponse = apiService.refreshToken(RefreshTokenRequest(refreshToken, userId))
+            if (refreshResponse.isSuccessful && refreshResponse.body() != null) {
+                val newTokens = refreshResponse.body()!!
+                tokenManager.saveToken(newTokens.token)
+                tokenManager.saveRefreshToken(newTokens.refreshToken)
+
+                // Retry getUserProfile
+                val profileResponse = apiService.getUserProfile()
+                if (profileResponse.isSuccessful && profileResponse.body() != null) {
+                    val user = mapUserResponseToDomain(profileResponse.body()!!)
+                    originalFlowCollector.emit(Resource.Success(user))
+                } else {
+                    tokenManager.clearAuthData() // Failed even after refresh
+                    originalFlowCollector.emit(Resource.Error("Failed to get profile after token refresh: ${profileResponse.message()}"))
+                }
+            } else {
+                tokenManager.clearAuthData() // Refresh token failed
+                originalFlowCollector.emit(Resource.Error("Session expired. Please log in again. (Refresh failed: ${refreshResponse.message()})"))
+            }
+        } catch (e: HttpException) {
+            tokenManager.clearAuthData()
+            originalFlowCollector.emit(Resource.Error("Session expired. Please log in again. (Refresh HTTP error: ${e.message()})"))
+        } catch (e: IOException) {
+            // For network errors during refresh, we might not want to clear the token immediately,
+            // as it might be a temporary network issue. We can emit the original error or a specific network error.
+             originalFlowCollector.emit(Resource.Error(originalException?.message() ?: "Network error during token refresh. Please try again."))
+        } catch (e: Exception) {
+            tokenManager.clearAuthData()
+            originalFlowCollector.emit(Resource.Error("Session expired. Please log in again. (Unexpected refresh error: ${e.message})"))
         }
     }
     

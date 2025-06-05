@@ -67,16 +67,12 @@ val sampleColors = listOf("#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF",
 fun CreateEditHabitScreen(
     habitId: String?, // Null for create, non-null for edit
     onNavigateBack: () -> Unit,
-    // viewModel: CreateEditHabitViewModel = viewModel() // Default Hilt/Koin injection, manual for now
+    viewModel: CreateEditHabitViewModel = hiltViewModel()
 ) {
-    // Manually creating ViewModel for now, will replace with proper DI later
-    val factory = object : androidx.lifecycle.ViewModelProvider.Factory {
-        override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-            @Suppress("UNCHECKED_CAST")
-            return CreateEditHabitViewModel(habitId) as T
-        }
+    // Initialize ViewModel with habitId
+    LaunchedEffect(habitId) {
+        viewModel.initializeWithHabitId(habitId)
     }
-    val viewModel: CreateEditHabitViewModel = viewModel(factory = factory)
 
     val uiState by viewModel.uiState
     val context = LocalContext.current
@@ -86,6 +82,18 @@ fun CreateEditHabitScreen(
             // Could show a toast message here
             // Toast.makeText(context, "Habit saved!", Toast.LENGTH_SHORT).show()
             onNavigateBack() // Navigate back after save
+        }
+    }
+
+    // Show error toast if there's a save error
+    LaunchedEffect(uiState) {
+        if (uiState is CreateEditHabitUiState.Success) {
+            val errorMessage = (uiState as CreateEditHabitUiState.Success).saveError
+            if (errorMessage != null) {
+                println("CreateEditHabitScreen: Error saving habit: $errorMessage")
+                // TODO: Show error toast or snackbar
+                // Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
+            }
         }
     }
 
@@ -243,10 +251,8 @@ fun CreateEditHabitScreen(
 @Composable
 fun CreateHabitScreenPreview() {
     MaterialTheme {
-        CreateEditHabitScreen(
-            habitId = null, // Create mode
-            onNavigateBack = {}
-        )
+        // For previews, we'll create a simple composable that simulates the UI without the ViewModel
+        CreateEditHabitScreenPreview(habitId = null)
     }
 }
 
@@ -255,24 +261,7 @@ fun CreateHabitScreenPreview() {
 @Composable
 fun EditHabitScreenPreview_LoadedDaily() {
     MaterialTheme {
-        val factory = object : androidx.lifecycle.ViewModelProvider.Factory {
-            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-                @Suppress("UNCHECKED_CAST")
-                val vm = CreateEditHabitViewModel("editMe") as T
-                // Manually set state for preview
-                (vm as CreateEditHabitViewModel).onHabitNameChanged("Preview Habit")
-                (vm as CreateEditHabitViewModel).onFrequencyTypeChanged(HabitFrequencyType.DAILY)
-                return vm
-            }
-        }
-        val viewModel: CreateEditHabitViewModel = viewModel(factory = factory)
-        // Pass habitId to trigger edit mode logic in VM, then use the VM instance in composable
-        CreateEditHabitScreen(
-            habitId = "editMe", // Edit mode
-            onNavigateBack = {}
-            // Provide the already configured ViewModel if direct control is needed
-            // or rely on the one created inside CreateEditHabitScreen with the same habitId
-        )
+        CreateEditHabitScreenPreview(habitId = "editMe")
     }
 }
 
@@ -280,9 +269,30 @@ fun EditHabitScreenPreview_LoadedDaily() {
 @Composable
 fun EditHabitScreenPreview_LoadedWeekly() {
     MaterialTheme {
-         CreateEditHabitScreen(
-            habitId = "sampleHabitIdForWeekly", // Edit mode, VM will simulate loading this
-            onNavigateBack = {}
+        CreateEditHabitScreenPreview(habitId = "sampleHabitIdForWeekly")
+    }
+}
+
+@Preview(showBackground = true, name = "Create Habit Screen - Monthly")
+@Composable
+fun CreateHabitScreenMonthlyPreview() {
+    MaterialTheme {
+        CreateEditHabitScreenPreview(habitId = null)
+    }
+}
+
+// Simplified preview composable that doesn't use the actual ViewModel
+@Composable
+private fun CreateEditHabitScreenPreview(habitId: String?) {
+    // This is a simplified preview version that doesn't require ViewModel injection
+    // In a real app, you might use a fake/mock ViewModel for previews
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = if (habitId != null) "Edit Habit Screen Preview" else "Create Habit Screen Preview",
+            style = MaterialTheme.typography.headlineMedium
         )
     }
 }
@@ -538,28 +548,6 @@ fun SpecificDatesSelector(viewModel: CreateEditHabitViewModel) {
         }
     }
 }
-
-@Preview(showBackground = true, name = "Create Habit Screen - Monthly")
-@Composable
-fun CreateHabitScreenMonthlyPreview() {
-    MaterialTheme {
-        val factory = object : androidx.lifecycle.ViewModelProvider.Factory {
-            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-                @Suppress("UNCHECKED_CAST")
-                val vm = CreateEditHabitViewModel(null) as T
-                (vm as CreateEditHabitViewModel).onFrequencyTypeChanged(HabitFrequencyType.MONTHLY)
-                return vm
-            }
-        }
-        val viewModel: CreateEditHabitViewModel = viewModel(factory = factory)
-        CreateEditHabitScreen(
-            habitId = null, 
-            onNavigateBack = {}
-        )
-    }
-}
-
-// TODO: Need DatePickerDialog integration for Start/End dates 
 
 @Composable
 fun ReminderSection(reminders: List<HabitReminder>, onAddReminder: () -> Unit, onRemoveReminder: (String) -> Unit) {
