@@ -816,7 +816,7 @@ describe('AchievementService Unit Tests', () => {
         expect(updatePayload.$set.earned).toBe(true);
         expect(updatePayload.$set.earnedAt).toBeInstanceOf(Date);
 
-        expect(eventEmitter.emit).toHaveBeenCalledWith('ACHIEVEMENT_UNLOCKED', expect.anything());
+        expect(eventEmitter.emit).toHaveBeenCalledWith('ACHIEVEMENT_UNLOCKED', expect.any(Object));
         expect(mockUserModel.findByIdAndUpdate).toHaveBeenCalledWith(mockUserId, { $inc: { experiencePoints: mockAchievement.points } });
       });
       
@@ -915,7 +915,7 @@ describe('AchievementService Unit Tests', () => {
         const createdCall = (mockUserAchievementModel.create as jest.Mock).mock.calls[0][0] as Partial<UserAchievementDocument>;
         expect(createdCall.progress).toBe(100); 
         expect(createdCall.earned).toBe(true);
-        expect(eventEmitter.emit).toHaveBeenCalledWith('ACHIEVEMENT_UNLOCKED', expect.anything());
+        expect(eventEmitter.emit).toHaveBeenCalledWith('ACHIEVEMENT_UNLOCKED', expect.any(Object));
         expect(mockUserModel.findByIdAndUpdate).toHaveBeenCalled();
       });
 
@@ -926,7 +926,7 @@ describe('AchievementService Unit Tests', () => {
 
         await (achievementService as any).evaluateAchievementForUser(mockUserId, mockAchievement, mockEventPayload);
         expect(mockUserAchievementModel.create).toHaveBeenCalled();
-        expect(eventEmitter.emit).toHaveBeenCalledWith('ACHIEVEMENT_UNLOCKED', expect.anything());
+        expect(eventEmitter.emit).toHaveBeenCalledWith('ACHIEVEMENT_UNLOCKED', expect.any(Object));
       });
 
       it('should NOT unlock for specific habit streak if relatedEntityId does NOT match event entityId', async () => {
@@ -936,7 +936,7 @@ describe('AchievementService Unit Tests', () => {
 
         await (achievementService as any).evaluateAchievementForUser(mockUserId, mockAchievement, mockEventPayload);
         expect(mockUserAchievementModel.create).not.toHaveBeenCalled();
-        expect(eventEmitter.emit).not.toHaveBeenCalledWith('ACHIEVEMENT_UNLOCKED', expect.anything());
+        expect(eventEmitter.emit).not.toHaveBeenCalledWith('ACHIEVEMENT_UNLOCKED', expect.any(Object));
       });
 
       it('should do nothing if current streak is less than targetValue', async () => {
@@ -990,7 +990,7 @@ describe('AchievementService Unit Tests', () => {
         expect(updatePayload.$set.progress).toBe(100);
         expect(updatePayload.$set.earned).toBe(true);
         expect(updatePayload.$set.earnedAt).toBeInstanceOf(Date);
-        expect(eventEmitter.emit).toHaveBeenCalledWith('ACHIEVEMENT_UNLOCKED', expect.anything());
+        expect(eventEmitter.emit).toHaveBeenCalledWith('ACHIEVEMENT_UNLOCKED', expect.any(Object));
       });
     });
 
@@ -1022,7 +1022,7 @@ describe('AchievementService Unit Tests', () => {
 
         await (achievementService as any).evaluateAchievementForUser(mockUserId, mockAchievement, mockEventPayload);
         expect(mockUserAchievementModel.create).toHaveBeenCalled();
-        expect(eventEmitter.emit).toHaveBeenCalledWith('ACHIEVEMENT_UNLOCKED', expect.anything());
+        expect(eventEmitter.emit).toHaveBeenCalledWith('ACHIEVEMENT_UNLOCKED', expect.any(Object));
       });
 
       it('should NOT unlock task achievement if completed after specified timeString for "before" operator', async () => {
@@ -1039,7 +1039,7 @@ describe('AchievementService Unit Tests', () => {
 
         await (achievementService as any).evaluateAchievementForUser(mockUserId, mockAchievement, mockEventPayload);
         expect(mockUserAchievementModel.create).toHaveBeenCalled();
-        expect(eventEmitter.emit).toHaveBeenCalledWith('ACHIEVEMENT_UNLOCKED', expect.anything());
+        expect(eventEmitter.emit).toHaveBeenCalledWith('ACHIEVEMENT_UNLOCKED', expect.any(Object));
       });
 
       it('should unlock goal achievement if completed before targetDate', async () => {
@@ -1126,7 +1126,6 @@ describe('AchievementService Unit Tests', () => {
       });
     });
 
-    // TODO: Add tests for 'multi_condition' and 'complex' when implemented
+    // TODO: Add tests for 'multi_condition' and 'complex' types once they are implemented in the service.
   });
-
 }); 

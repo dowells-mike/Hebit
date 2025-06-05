@@ -103,7 +103,6 @@ interface TaskData {
 
 /**
  * Calculate task duration estimates based on user's history
- * This is a simple example of using collected data for predictions
  */
 export const estimateTaskDuration = async (taskData: TaskData, userId: string) => {
   try {
@@ -206,7 +205,6 @@ export const recommendTaskTime = async (userId: string) => {
 
 /**
  * Export task completion data for ML training
- * This would typically be called by a scheduled job
  */
 export const exportTaskDataForTraining = async () => {
   try {
@@ -235,8 +233,7 @@ export const exportTaskDataForTraining = async () => {
     
     return trainingData;
     
-    // In a real implementation, you would save this data to a file or database
-    // for later use in training ML models
+    // The resulting data can be saved to a file or database for model training.
   } catch (error) {
     console.error('Error exporting task data for training:', error);
     throw error;

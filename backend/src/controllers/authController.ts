@@ -279,10 +279,8 @@ export const refreshToken = catchAsync(async (req: Request, res: Response) => {
     throw new AppError('User ID is required', 400);
   }
 
-  // In a real app, we would validate the refresh token against the database
-  // For now, we'll just generate a new access token
-  // This is a simplified implementation for demonstration purposes only
-
+  // Here, we would typically validate the refresh token against a database record
+  // to ensure it's valid and hasn't been revoked.
   try {
     // Check if user exists
     const user = await User.findById(userId);
@@ -293,9 +291,7 @@ export const refreshToken = catchAsync(async (req: Request, res: Response) => {
     // Generate new access token
     const newAccessToken = generateAccessToken(userId);
     
-    // In a real app, we might also rotate the refresh token
-    // For now, we'll just return the new access token
-    
+    // A new refresh token could also be generated and returned here for rotation.
     res.status(200).json({
       token: newAccessToken
     });

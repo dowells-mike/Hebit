@@ -161,10 +161,7 @@ export const getEarnedAchievements = catchAsync(async (req: AuthRequest, res: Re
 export const checkAchievementProgress = catchAsync(async (req: AuthRequest, res: Response) => {
   const userId = req.user?._id;
   
-  // In a real application, this would be more sophisticated
-  // It would check various types of progress based on user actions
-  // For simplicity, we'll just update a specific achievement if provided
-  
+  // This endpoint can be used to manually update progress on an achievement.
   if (!req.body.achievementId) {
     throw new AppError('Achievement ID is required', 400);
   }
@@ -218,7 +215,7 @@ export const checkAchievementProgress = catchAsync(async (req: AuthRequest, res:
  * @access  Private/Admin
  */
 export const createAchievement = catchAsync(async (req: AuthRequest, res: Response) => {
-  // In production, this would be admin-only
+  // Access to this route should be restricted to administrators.
   
   // Validate required fields
   if (!req.body.name || !req.body.description || !req.body.category || 
@@ -238,7 +235,7 @@ export const createAchievement = catchAsync(async (req: AuthRequest, res: Respon
  * @access  Private/Admin
  */
 export const updateAchievement = catchAsync(async (req: AuthRequest, res: Response) => {
-  // In production, this would be admin-only
+  // Access to this route should be restricted to administrators.
   const achievementId = req.params.id;
   
   const achievement = await Achievement.findById(achievementId);
@@ -262,7 +259,7 @@ export const updateAchievement = catchAsync(async (req: AuthRequest, res: Respon
  * @access  Private/Admin
  */
 export const deleteAchievement = catchAsync(async (req: AuthRequest, res: Response) => {
-  // In production, this would be admin-only
+  // Access to this route should be restricted to administrators.
   const achievementId = req.params.id;
   
   const achievement = await Achievement.findById(achievementId);
@@ -275,7 +272,7 @@ export const deleteAchievement = catchAsync(async (req: AuthRequest, res: Respon
   await UserAchievement.deleteMany({ achievement: achievementId });
   
   res.status(200).json({ success: true });
-}); 
+});
 
 /**
  * @desc    Mark a user achievement as seen
@@ -336,9 +333,6 @@ export const getUserAchievements = async (req: AuthRequest, res: Response): Prom
   const authenticatedUserId = req.user?._id?.toString();
 
   if (userIdFromParams !== 'me' && userIdFromParams !== authenticatedUserId) {
-    // Optional: Restrict access if :userId is not 'me' or the authenticated user,
-    // unless admin or specific sharing rules are in place.
-    // For now, let's assume users can only fetch their own or 'me'.
      res.status(403).json({ message: 'Forbidden: You can only fetch your own achievements.' });
      return;
   }

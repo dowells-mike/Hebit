@@ -207,7 +207,7 @@ export const generateDailyMetrics = catchAsync(async (req: AuthRequest, res: Res
   
   // Count habits that were due on this day based on frequency
   habits.forEach(habit => {
-    // Simple check - would be more complex in production
+    // This check should be expanded based on the habit's frequency rules.
     const isDue = true; // Placeholder for actual frequency check logic
     
     if (isDue) {
@@ -238,8 +238,7 @@ export const generateDailyMetrics = catchAsync(async (req: AuthRequest, res: Res
     progress: goal.progress
   }));
   
-  // Calculate productivity score (simplified version)
-  // In a real app, this would be more sophisticated
+  // Calculate productivity score
   const taskScore = tasksCompleted * 10; // 10 points per completed task
   const habitScore = habitCompletionRate; // 0-100 points based on habit completion
   const productivityScore = Math.min(100, (taskScore + habitScore) / 2); // Average, max 100

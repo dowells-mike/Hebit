@@ -40,7 +40,6 @@ const migration: Migration = {
     const { client, db } = await getDb();
     
     try {
-      // TODO: Implement your migration logic here
       // Example: Add a new field with default value to all documents in a collection
       // await db.collection('users').updateMany({}, { $set: { newField: 'defaultValue' } });
       
@@ -55,7 +54,6 @@ const migration: Migration = {
     const { client, db } = await getDb();
     
     try {
-      // TODO: Implement your rollback logic here
       // Example: Remove the field that was added in the up method
       // await db.collection('users').updateMany({}, { $unset: { newField: '' } });
       

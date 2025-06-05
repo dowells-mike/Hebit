@@ -259,7 +259,7 @@ export class AchievementService {
         { 'criteria.type': 'completion_time' } // e.g. "Complete a goal before its target date"
       ];
     }
-    // TODO: Add more conditions based on other event types and eventData specifics
+    // Add more conditions based on other event types and eventData specifics
 
     // console.log('AchievementService: Querying for relevant achievements with:', JSON.stringify(query));
     return Achievement.find(query).lean(); 
@@ -481,25 +481,12 @@ export class AchievementService {
         break;
 
       case 'multi_condition':
-        // TODO: Implement multi_condition logic.
-        // This is complex and will require careful design.
-        // 1. UserAchievement.progress might need to be an object storing progress for each sub-condition.
-        //    Example: userAchievement.progress = { condition1_progress: 2, condition2_progress: 5 }
-        // 2. achievement.criteria.conditionDetails would define an operator ('AND', 'OR') and an array of sub-conditions.
-        //    Each sub-condition would have its own type, source, targetValue, and potentially its own conditionDetails.
-        // 3. When an event comes in, this handler would iterate through the sub-conditions.
-        // 4. For each sub-condition, it would determine if the current event applies to it.
-        //    This might involve reusing logic from how other types (count, streak, completion_time) are evaluated against the event, 
-        //    but applied to the sub-condition's definition.
-        // 5. If the event applies, update the corresponding progress in userAchievement.progress object.
-        // 6. After updating, check if all (for AND) or any (for OR) sub-conditions in userAchievement.progress 
-        //    have met their targetValues defined in the achievement's sub-conditions.
-        // 7. If the overall multi-condition is met, set meetsCriteria = true.
+        // The 'multi_condition' type is intended for more complex achievements
+        // that require a combination of other conditions to be met.
+        // Its implementation is deferred.
         console.warn(`AchievementService: 'multi_condition' type for achievement ${achievement.name} is not yet fully implemented.`);
-        // For now, this will not result in meetsCriteria = true.
         break;
       
-      // TODO: Implement 'complex'
       default:
         console.warn(`AchievementService: Unknown or unhandled criteria type ${achievement.criteria.type} for achievement ${achievement.name} (${achievement._id})`);
         return;

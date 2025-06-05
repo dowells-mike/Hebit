@@ -301,7 +301,7 @@ async function calculateProductivityScoreForPeriod(userId: string, startDate: Da
     if (tasksConsideredForConsistency.size > 2) {
         score += 5;
     }
-     // Proactiveness: (Placeholder - e.g. tasks completed well before due date)
+     // Proactiveness could be a factor, e.g. tasks completed well before due date.
 
     // Normalization / Scaling (Example: cap score or scale to a 0-100 range if needed)
     // For now, raw score. Max score can be high if many high priority tasks.
